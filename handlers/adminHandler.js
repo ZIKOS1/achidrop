@@ -223,10 +223,17 @@ module.exports = (bot) => {
         const userId = Number(ctx.match[1]);
         const entryId = ctx.match[2];
         const result = await balanceManager.reverseTradeCreditEntry(userId, entryId, "Admin tomonidan bekor qilindi");
-        if (result.error) return ctx.editMessageText(`❌ Xatolik: ${result.error}`).catch(() => {});
+        if (result.error) {
+            const errMsg = {
+                not_found: "Yozuv topilmadi.",
+                already_withdrawn: "Bu yozuv allaqachon kartaga chiqarilgan, bekor qilib bo'lmaydi.",
+                already_reversed: "Bu yozuv allaqachon bekor qilingan.",
+            }[result.error] || "Noma'lum xatolik.";
+            return ctx.editMessageText(`❌ ${errMsg}`).catch(() => {});
+        }
         ctx.editMessageText(`✅ Bekor qilindi. ${result.deducted.toLocaleString()} so'm balansdan ayirildi.`).catch(() => {});
         notifyUser(userId,
-            `⚠️ *Diqqat!* Sizning oldingi Instant Sell/Obmen tranzaksiyangiz (#${entryId}) bekor qilindi, ${result.deducted.toLocaleString()} so'm balansingizdan ayirildi. Savol bo'lsa admin bilan bog'laning.`,
+            `⚠️ *Diqqat!* Sizning oldingi Instant Sell/Obmen tranzaksiyangiz (#${result.entry.tradeId}) bekor qilindi, ${result.deducted.toLocaleString()} so'm balansingizdan ayirildi. Savol bo'lsa admin bilan bog'laning.`,
             bot.telegram.sendMessage.bind(bot.telegram), { parse_mode: "Markdown" }
         );
     });
