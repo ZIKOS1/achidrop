@@ -189,7 +189,7 @@ git add docs/superpowers/relay/server.js docs/superpowers/relay/DEPLOY.md
 git commit -m "docs: mirror relay source, add incoming-deposit auto-accept design"
 ```
 
-(Eslatma: bu repo hozircha git bilan boshlangan bo'lmasligi mumkin — shu holda avval `git init` qilish kerakligini foydalanuvchidan so'rang.)
+(Git allaqachon sozlangan: repo `feature/market-redesign` branch'ida, `main`ga hech qachon to'g'ridan-to'g'ri commit qilinmaydi.)
 
 ---
 
@@ -287,15 +287,37 @@ node -e "require('dotenv').config(); require('./lisSkinsPrice').getInstantSellPr
 
 Kutilgan: musbat butun son (so'mda) yoki aniq xato xabari (agar API key/endpoint hali noto'g'ri bo'lsa — shu holda Step 1'ga qaytib to'g'rilang).
 
-- [ ] **Step 4: Admin sozlamalar API'siga yangi maydonlarni qo'shish**
+- [ ] **Step 4: `skinUtils.js`ga `marketHashName` yordamchisini qo'shish**
+
+**MUHIM (pre-flight tekshiruvda topilgan):** Relay inventar javobida (`fetchUserInventory`/`fetchInventory` orqali) Steam'ning haqiqiy `market_hash_name` maydoni MAVJUD EMAS — mavjud kod hech qayerda `item.marketHashName`ga murojaat qilmaydi (`server.js`'dagi `buildSkin()` buni tasdiqlaydi: faqat `name`, `float`, `rarity` va h.k. bor). Shu sabab bu qiymatni o'zimiz, mavjud maydonlardan HOSIL QILAMIZ — Steam'ning market_hash_name formatiga ANIQ mos (StatTrak™ prefiksi item NOMINING o'zida allaqachon bor — `server.js`'dagi `buildSkin()`'ning `statTrak: /StatTrak/i.test(item.name)` qatori buni tasdiqlaydi — shu sabab qo'shimcha StatTrak parametri kerak emas, faqat `name` + wear yetarli).
+
+`skinUtils.js`ga, `wearName` funksiyasidan keyin qo'shing:
+
+```js
+// Steam'ning market_hash_name'ini item nomi + float'dan hosil qiladi
+// (masalan "AK-47 | Redline (Field-Tested)", yoki StatTrak bo'lsa
+// "StatTrak™ AK-47 | Redline (Field-Tested)" — StatTrak prefiksi
+// item.name'ning o'zida allaqachon bor). Float/wear bo'lmagan itemlar
+// (stiker, agent, keys) uchun nomning o'zi qaytadi. Bu Lis-Skins narx
+// qidiruvi VA relay'dagi kiruvchi-trade moslashtirish (Task 1/4) uchun
+// ISHLATILADIGAN, Steam formatiga ANIQ mos bo'lishi shart bo'lgan qiymat.
+function marketHashName(name, float) {
+    const wn = wearName(float);
+    return wn ? `${name} (${wn})` : name;
+}
+```
+
+`module.exports`ga qo'shing: `module.exports = { ..., marketHashName };`
+
+- [ ] **Step 5: Admin sozlamalar API'siga yangi maydonlarni qo'shish**
 
 `server.js`da `GET /api/admin/settings` (1874-qator atrofi) va `POST /api/admin/settings` (1895-qator atrofi) — joriy kodni o'qib, ular qanday `settings` obyektini qaytarish/yozishini ko'ring, so'ng `instantSellMarginPercent` va `usdToSomRate` maydonlarini xuddi shu naqsh bilan (mavjud maydonlar qatoriga) qo'shing.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add lisSkinsPrice.js .env.example server.js
-git commit -m "feat: Lis-Skins narx integratsiyasi (Instant Sell/auto-list uchun)"
+git add lisSkinsPrice.js skinUtils.js .env.example server.js
+git commit -m "feat: Lis-Skins narx integratsiyasi + marketHashName yordamchisi"
 ```
 
 ---
@@ -419,11 +441,11 @@ git commit -m "feat: Instant Sell/trade krediti uchun reversal (orqaga qaytarish
 - Create: `instantSellManager.js`
 
 **Interfaces:**
-- Consumes: `steam.js`'dan `fetchUserInventory` (mavjud), `lisSkinsPrice.js`'dan `getInstantSellPriceSom` (Task 2), `balanceManager.js`'dan `creditTradeProceeds` (mavjud), `database/db.js`'dan `read, write, withTransaction, readTx, writeTx`.
-- Produces (Task 5, 6, 7 iste'mol qiladi):
-  - `async function createInstantSellRequest(userId, assetId, marketHashName, steamId64, botTradeUrl): Promise<{ request } | { error }>`
+- Consumes: `lisSkinsPrice.js`'dan `getInstantSellPriceSom` (Task 2), `database/db.js`'dan `read, write` (oddiy, tranzaksiyasiz — sabab: bu yerda YANGI pul-yozish primitivi yaratilmaydi, faqat so'rov holati (`awaiting_deposit`→`credited`/`expired`/`mismatch`) kuzatiladi va pul harakati MAVJUD, o'zgartirilmagan `balanceManager.creditTradeProceeds`ga (parametr sifatida uzatiladi, to'g'ridan-to'g'ri import qilinmaydi — pastdagi Step 1'ga qarang) topshiriladi).
+- Produces (Task 5, 6, 7 iste'mol qiladi) — **ANIQ imzolar, quyidagi Step 1 kodi bilan bir xil:**
+  - `async function createInstantSellRequest(userId, assetId, marketHashName, steamId64): Promise<{ request } | { error }>`
   - `function getInstantSellRequest(id)`
-  - `async function pollAndCreditPendingRequests(botSteamId64): Promise<Array<{request, credited}>>` — relay'dan holatni so'rab, qabul qilingan bo'lsa balansga kredit qiladi.
+  - `async function pollAndCreditPendingRequests(creditTradeProceeds, onCredited): Promise<Array<{request}>>` — `creditTradeProceeds` va `onCredited` CHAQIRUVCHI (Task 5/index.js) tomonidan in'ektsiya qilinadi (`balanceManager.creditTradeProceeds`ni to'g'ridan-to'g'ri import qilish o'rniga) — modulni balanceManager'dan mustaqil, sinash oson qiladi.
   - `function getMyInstantSellRequests(userId)`
 
 - [ ] **Step 1: Faylni yozish**
@@ -503,8 +525,21 @@ async function createInstantSellRequest(userId, assetId, marketHashName, steamId
 }
 
 // index.js'dagi setInterval orqali chaqiriladi. `onCredited(user, request)` —
-// bildirishnoma yuborish uchun.
+// bildirishnoma yuborish uchun. `_polling` — agar oldingi chaqiruv (masalan
+// relay sekin javob bergani uchun) hali tugamagan bo'lsa, ustma-ust
+// ishga tushib bir xil so'rovni ikki marta kreditlab qo'ymasligi uchun.
+let _polling = false;
 async function pollAndCreditPendingRequests(creditTradeProceeds, onCredited) {
+    if (_polling) return [];
+    _polling = true;
+    try {
+        return await _pollAndCreditPendingRequestsInner(creditTradeProceeds, onCredited);
+    } finally {
+        _polling = false;
+    }
+}
+
+async function _pollAndCreditPendingRequestsInner(creditTradeProceeds, onCredited) {
     const all = getAllRequests();
     const pending = all.filter(r => r.status === "awaiting_deposit" && new Date(r.expiresAt).getTime() > Date.now());
     if (!pending.length) {
@@ -733,16 +768,18 @@ bot.action(/^is_pick_(.+)$/, async (ctx) => {
     catch (err) { return ctx.answerCbQuery("❌ Inventar xatosi: " + err.message, true); }
     const item = items.find(it => String(it.assetId) === assetId);
     if (!item) return ctx.answerCbQuery("❌ Item topilmadi (kesh eskirgan).", true);
-    if (!item.marketHashName) return ctx.answerCbQuery("❌ Bu item uchun narx aniqlab bo'lmadi.", true);
+    // `marketHashName` relay javobida YO'Q — Steam formatiga mos ravishda
+    // o'zimiz hosil qilamiz (Task 2'da qo'shilgan skinUtils.marketHashName).
+    const marketHashName = skinUtils.marketHashName(item.name, item.float);
 
     let priceSom;
     try {
         const { getInstantSellPriceSom } = require("../lisSkinsPrice");
-        priceSom = await getInstantSellPriceSom(item.marketHashName);
+        priceSom = await getInstantSellPriceSom(marketHashName);
     } catch (err) { return ctx.answerCbQuery("❌ Narx olishda xato: " + err.message, true); }
     if (priceSom == null) return ctx.answerCbQuery("❌ Bu skin uchun narx topilmadi.", true);
 
-    pendingInstantSell[user.id] = { assetId: item.assetId, marketHashName: item.marketHashName, name: item.name, priceSom };
+    pendingInstantSell[user.id] = { assetId: item.assetId, marketHashName, name: item.name, priceSom };
     await ctx.editMessageText(
         `⚡ *"${item.name}"*\n\n💰 Taklif: *${priceSom.toLocaleString()} so'm* (darhol to'lanadi)\n\nTasdiqlaysizmi?`,
         { parse_mode: "Markdown", ...Markup.inlineKeyboard([
@@ -839,9 +876,11 @@ app.post("/api/instant-sell", auth, async (req, res) => {
     catch (err) { return res.status(500).json({ error: err.message }); }
     const item = items.find(it => String(it.assetId) === String(assetId));
     if (!item) return res.status(404).json({ error: "Item topilmadi (kesh eskirgan)" });
-    if (!item.marketHashName) return res.status(400).json({ error: "Bu item uchun narx aniqlab bo'lmadi" });
+    // `marketHashName` relay javobida YO'Q — Task 2'da qo'shilgan
+    // skinUtils.marketHashName orqali Steam formatiga mos hosil qilinadi.
+    const marketHashName = skinUtils.marketHashName(item.name, item.float);
 
-    const result = await instantSellManager.createInstantSellRequest(u.id, item.assetId, item.marketHashName, u.steamId64);
+    const result = await instantSellManager.createInstantSellRequest(u.id, item.assetId, marketHashName, u.steamId64);
     if (result.error) return res.status(400).json({ error: result.error });
     res.json({ request: result.request, botTradeUrl: process.env.BOT_STEAM_TRADE_URL || null });
 });
@@ -949,7 +988,7 @@ app.get("/api/admin/steam-inventory-grouped", requireAdminPanel, async (req, res
         for (const it of items) {
             if (it.tradable === false) continue;
             const key = `${it.name}::${skinUtils.wearCode(it.float) ?? ""}`;
-            if (!groups.has(key)) groups.set(key, { name: it.name, wear: skinUtils.wearCode(it.float), marketHashName: it.marketHashName, items: [] });
+            if (!groups.has(key)) groups.set(key, { name: it.name, wear: skinUtils.wearCode(it.float), marketHashName: skinUtils.marketHashName(it.name, it.float), items: [] });
             groups.get(key).items.push(it);
         }
         res.json([...groups.values()].map(g => ({ ...g, count: g.items.length })));
