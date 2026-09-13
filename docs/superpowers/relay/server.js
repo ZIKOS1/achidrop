@@ -81,7 +81,13 @@ app.get("/deposit-status/:requestId", (req, res) => {
         pendingDeposits.delete(req.params.requestId);
         return res.json({ status: "expired" });
     }
-    res.json({ status: dep.status, offerId: dep.offerId, receivedItem: dep.receivedItem });
+    // Tashqariga faqat hujjatlashtirilgan uchta qiymat chiqadi
+    // (pending|accepted|expired) — ichki "accepting" oraliq holati
+    // (offer.accept() hali tugallanmagan payt) chaqiruvchiga "pending"
+    // sifatida ko'rinadi, chunki chaqiruvchi (instantSellManager.js) baribir
+    // shu holatda ham qayta so'rashda davom etadi.
+    const externalStatus = dep.status === "accepting" ? "pending" : dep.status;
+    res.json({ status: externalStatus, offerId: dep.offerId, receivedItem: dep.receivedItem });
 });
 
 function checkIncomingDeposits() {
