@@ -52,12 +52,12 @@ function failAutoDelivery(win, reason) {
 // index.js (bot) yoki server.js (/api middleware) dan davriy chaqiriladi —
 // "auto_sent" holatidagi barcha yutuqlarni tekshiradi: qabul qilindimi,
 // rad etildimi, yoki 1 soatdan oshib ketdimi.
-async function checkPendingWithdrawals(notifyFn) {
+async function checkPendingWithdrawals(notifyFn, arrayField = "wins") {
     const users = readUsers();
     let changed = false;
 
     for (const user of users) {
-        for (const win of user.wins || []) {
+        for (const win of user[arrayField] || []) {
             if (win.status !== "auto_sent" || !win.tradeOfferId) continue;
 
             let status;
@@ -91,15 +91,19 @@ async function checkPendingWithdrawals(notifyFn) {
     if (changed) write("users", users);
 }
 
-let lastCheckAt = 0;
 // server.js'ning /api middleware'idan har so'rovda emas, CHECK_INTERVAL_MS'da
 // bir marta chaqiriladi (relay'ga keraksiz tez-tez murojaat qilmaslik uchun).
 // Fire-and-forget — javobni kutmaydi, so'rovni sekinlashtirmaydi.
-function maybeCheckPendingWithdrawals(notifyFn) {
+// Har bir arrayField ("wins", "marketPurchases", ...) uchun ALOHIDA throttle
+// vaqti kerak — shuning uchun lastCheckAt endi funksiya ustida (key bo'yicha)
+// saqlanadi, yagona global o'zgaruvchi emas.
+function maybeCheckPendingWithdrawals(notifyFn, arrayField = "wins") {
     const now = Date.now();
-    if (now - lastCheckAt < CHECK_INTERVAL_MS) return;
-    lastCheckAt = now;
-    checkPendingWithdrawals(notifyFn).catch(err => console.log("WITHDRAW TEKSHIRUV XATO:", err.message));
+    const key = arrayField;
+    if (!maybeCheckPendingWithdrawals._last) maybeCheckPendingWithdrawals._last = {};
+    if (now - (maybeCheckPendingWithdrawals._last[key] || 0) < CHECK_INTERVAL_MS) return;
+    maybeCheckPendingWithdrawals._last[key] = now;
+    checkPendingWithdrawals(notifyFn, arrayField).catch(err => console.log("WITHDRAW TEKSHIRUV XATO:", err.message));
 }
 
 module.exports = { trySendAutoOffer, checkPendingWithdrawals, maybeCheckPendingWithdrawals };

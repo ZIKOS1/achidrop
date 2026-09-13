@@ -394,6 +394,8 @@ const DICT = {
   "market.price": { uz: "Narx", ru: "Цена", en: "Price" },
   "market.needTradeLinkDesc": { uz: "Sotib olgan skiningizni qabul qilishingiz uchun avval Steam Trade Link'ingizni kiriting.", ru: "Чтобы получить купленный скин, сначала укажите свою Steam Trade Link.", en: "To receive a purchased skin, first set your Steam trade link." },
   "market.waitingForSeller": { uz: "Sotuvchi skinni yuborishini kuting.", ru: "Ожидайте, пока продавец отправит скин.", en: "Waiting for the seller to send the skin." },
+  "market.myInventoryTitle": { uz: "Mening inventarim", ru: "Мой инвентарь", en: "My inventory" },
+  "market.myInventoryDesc": { uz: "Sotib olgan skiningizni istalgan payt Steam'ga chiqarib olishingiz mumkin.", ru: "Купленный скин можно в любой момент забрать в Steam.", en: "You can withdraw a purchased skin to Steam at any time." },
 
   "tradeWizard.linkTitle": { uz: "Trade Link kerak", ru: "Нужна Trade Link", en: "We need your trade link" },
   "tradeWizard.linkDesc": { uz: "Sotuvchi sizga skinni Steam orqali yuborishi uchun Trade Link kerak bo'ladi. Uni pastga kiriting.", ru: "Чтобы продавец мог отправить вам скин через Steam, нужна Trade Link. Укажите её ниже.", en: "The seller needs your Steam trade link to send you the skin. Enter it below." },

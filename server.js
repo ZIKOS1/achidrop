@@ -163,6 +163,7 @@ app.use("/api", async (req, res, next) => {
     // tekshirish (qabul qilindimi / 1 soatdan oshib ketdimi) — Vercel har doim
     // jonli bo'lgani uchun shu yerda, fire-and-forget, so'rovni sekinlashtirmasdan.
     maybeCheckPendingWithdrawals((user, text) => notifyUser(user, text, tgSendMessage));
+    maybeCheckPendingWithdrawals((user, text) => notifyUser(user, text, tgSendMessage), "marketPurchases");
 
     next();
 });
@@ -615,6 +616,53 @@ app.post("/api/withdraw/:lotId", auth, async (req, res) => {
         }
     );
 
+    res.json({ success: true, auto: false });
+});
+
+// GET /api/market-inventory — GET /api/inventory'ning market-xarid varianti:
+// buyer'ning marketPurchases'ini (har biri o'z status'i bilan) qaytaradi.
+app.get("/api/market-inventory", auth, (req, res) => {
+    const u = req.user;
+    if (!u) return res.status(404).json({ error: "User not found" });
+    res.json(u.marketPurchases || []);
+});
+
+// POST /api/market-withdraw/:purchaseId
+// POST /api/withdraw/:lotId bilan bir xil naqsh — faqat user.wins o'rniga
+// user.marketPurchases ustida ishlaydi (arrayField="marketPurchases").
+app.post("/api/market-withdraw/:purchaseId", auth, async (req, res) => {
+    const u = req.user;
+    if (!u) return res.status(404).json({ error: "User not found" });
+    if (!u.tradeLink) return res.status(400).json({ error: "Trade link kerak" });
+
+    const purchaseId = Number(req.params.purchaseId);
+    const arr = getUsers();
+    const user = arr.find(x => x.id === u.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const purchase = (user.marketPurchases || []).find(p => p.lotId === purchaseId && (!p.status || p.status === "pending" || p.status === "auto_failed"));
+    if (!purchase) return res.status(404).json({ error: "Item topilmadi yoki allaqachon so'ralgan" });
+
+    const auto = await trySendAutoOffer(user, purchase);
+    if (auto?.offerId) {
+        purchase.status = "auto_sent";
+        purchase.tradeOfferId = auto.offerId;
+        purchase.autoSentAt = new Date().toISOString();
+        saveUsers(arr);
+        return res.json({ success: true, auto: true });
+    }
+
+    purchase.status = "requested";
+    purchase.requestedAt = new Date().toISOString();
+    saveUsers(arr);
+    tgSendMessage(
+        Number(process.env.ADMIN_ID),
+        `📤 *MARKET SKIN CHIQARISH!*\n\n👤 *${user.name}*\n🏷 *${purchase.lotName}*\n💰 ${(purchase.price ?? 0).toLocaleString()} so'm\n🔗 \`${user.tradeLink}\``,
+        { inline_keyboard: [
+            [{ text: "✅ Skin yuborildi", callback_data: `mkt_skin_sent_${user.id}_${purchaseId}` }],
+            [{ text: "❌ Rad etish", callback_data: `mkt_skin_reject_${user.id}_${purchaseId}` }],
+        ]}
+    );
     res.json({ success: true, auto: false });
 });
 
@@ -1146,7 +1194,26 @@ app.post("/api/market/:id/buy", auth, async (req, res) => {
     if (result.error) return res.status(400).json({ error: result.error });
 
     const locked = result.trade;
-    notifyUser(locked.sellerId, `🛒 *Market #${locked.id}*: "${locked.skins?.[0]?.name}" sotildi! *${locked.agreedPrice.toLocaleString()} so'm*. Xaridorning trade linkiga skinni yuboring.`, tgSendMessage);
+
+    // Auksion g'oliblari uchun mavjud "wins" naqshiga o'xshab, xaridorning
+    // marketPurchases'iga yozuv qo'shamiz — shu orqali u istalgan payt
+    // "Chiqarib olish"ni bosib, avtomatik (yoki admin fallback) Steam trade
+    // offer olishi mumkin (withdrawDelivery.js, POST /api/market-withdraw).
+    const arr = getUsers();
+    const buyer = arr.find(x => x.id === u.id);
+    if (buyer) {
+        if (!Array.isArray(buyer.marketPurchases)) buyer.marketPurchases = [];
+        const skin = locked.skins?.[0];
+        buyer.marketPurchases.push({
+            lotId: locked.id, lotName: skin?.name ?? "Skin",
+            image: skin?.imageUrl ?? null, float: skin?.float ?? null,
+            assetId: skin?.assetId ?? null, price: locked.agreedPrice,
+            status: "pending", requestedAt: null,
+        });
+        saveUsers(arr);
+    }
+
+    notifyUser(locked.sellerId, `🛒 *Market #${locked.id}*: "${locked.skins?.[0]?.name}" sotildi! *${locked.agreedPrice.toLocaleString()} so'm*.`, tgSendMessage);
     res.json(enrichTrade(locked));
 });
 

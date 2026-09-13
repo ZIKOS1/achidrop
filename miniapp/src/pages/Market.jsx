@@ -1,13 +1,25 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { ShoppingBag, Plus, Search, Package, Clock } from "lucide-react";
+import { ShoppingBag, Plus, Search, Package, Clock, Send } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
-import { fmtMoney, imgSrc, parseSkinName, rarityColor, hap } from "../utils";
+import { fmtMoney, imgSrc, parseSkinName, rarityColor, hap, confirmTg } from "../utils";
 import { t } from "../i18n";
 import Empty from "../components/Empty";
 import { RarityBar, WearBadge } from "../components/SkinBadges";
 import TradeStatusBadge from "../components/TradeStatus";
+import TradeOnboardingWizard from "../components/TradeOnboardingWizard";
+
+// Auksion "Chiqarib olish" (Inventory.jsx) bilan bir xil holat-belgi naqshi —
+// bu yerda market xaridlari (user.marketPurchases) uchun ishlatiladi.
+const WITHDRAW_TAG_KEYS = {
+  pending: ["border-warning/40 bg-warning/10 text-warning", "inventory.pending"],
+  requested: ["border-accent/40 bg-accent/10 text-accent", "inventory.requested"],
+  auto_sent: ["border-accent/40 bg-accent/10 text-accent", "inventory.autoSent"],
+  delivered: ["border-success/40 bg-success/10 text-success", "inventory.delivered"],
+  rejected: ["border-destructive/40 bg-destructive/10 text-destructive", "inventory.rejected"],
+  auto_failed: ["border-destructive/40 bg-destructive/10 text-destructive", "inventory.autoFailed"],
+};
 
 const GRID_CLASSES = "grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6";
 
@@ -80,14 +92,61 @@ function MyListingRow({ listing, onClick, delay }) {
   );
 }
 
+// Sotib olingan (marketPurchases) bitta item — Inventory.jsx'dagi g'olib
+// kartasiga o'xshab, status belgisi va (kerak bo'lsa) "Chiqarib olish" tugmasi.
+function PurchaseRow({ purchase: p, onWithdraw, delay }) {
+  const [cls, lblKey] = WITHDRAW_TAG_KEYS[p.status || "pending"];
+  const canWithdraw = !p.status || p.status === "pending" || p.status === "rejected" || p.status === "auto_failed";
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, delay: delay / 1000, ease: [0.16, 1, 0.3, 1] }}
+      className="flex w-full flex-wrap items-center gap-3 border border-border bg-card p-3 shadow-panel"
+    >
+      <span className="flex size-14 shrink-0 items-center justify-center border border-border bg-secondary/40">
+        {p.image ? <img src={imgSrc(p.image)} alt="" className="size-full object-contain" /> : <Package className="size-6 text-muted-foreground" />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">{p.lotName ?? "Skin"}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <span className={"border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide " + cls}>{t(lblKey)}</span>
+          {p.price != null && (
+            <span className="font-heading text-xs font-bold text-primary">{p.price.toLocaleString()} {t("common.somWithAmount")}</span>
+          )}
+        </div>
+        {p.status === "rejected" && p.rejectComment && (
+          <p className="mt-1 text-[11px] text-destructive">{p.rejectComment}</p>
+        )}
+        {p.status === "auto_failed" && p.lastFailReason && (
+          <p className="mt-1 text-[11px] text-destructive">{p.lastFailReason}</p>
+        )}
+      </div>
+      {canWithdraw && (
+        <button
+          type="button"
+          onClick={() => onWithdraw(p.lotId)}
+          className="flex shrink-0 items-center gap-1.5 bg-primary px-3 py-2 font-heading text-xs font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-primary/90"
+        >
+          <Send className="size-3.5" />
+          {(p.status === "rejected" || p.status === "auto_failed") ? t("inventory.retry") : t("inventory.take")}
+        </button>
+      )}
+    </motion.div>
+  );
+}
+
 export default function Market() {
-  const { user, navigate, showToast } = useApp();
+  const { user, setUser, navigate, showToast } = useApp();
   const [tab, setTab] = useState("catalog");
   const [listings, setListings] = useState(null);
   const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("newest");
   const [mine, setMine] = useState(null);
+  const [purchases, setPurchases] = useState(null);
+  const [showWizard, setShowWizard] = useState(false);
+  const [pendingPurchaseId, setPendingPurchaseId] = useState(null);
 
   useEffect(() => {
     if (tab !== "catalog") return;
@@ -109,8 +168,11 @@ export default function Market() {
     if (tab !== "mine" || !user) return;
     let alive = true;
     setMine(null);
+    setPurchases(null);
     setError(false);
-    api("/api/market-mine").then((d) => alive && setMine(d)).catch(() => alive && setError(true));
+    Promise.all([api("/api/market-mine"), api("/api/market-inventory")])
+      .then(([m, p]) => { if (alive) { setMine(m); setPurchases(p); } })
+      .catch(() => alive && setError(true));
     return () => { alive = false; };
   }, [tab, user]);
 
@@ -118,6 +180,42 @@ export default function Market() {
     if (!user) return navigate("login");
     hap("impact", "light");
     navigate("market-sell");
+  }
+
+  // Inventory.jsx'dagi sendWithdrawRequest/confirmAndWithdraw/withdraw bilan
+  // bir xil naqsh — faqat /api/withdraw o'rniga /api/market-withdraw'ga.
+  async function sendWithdrawRequest(purchaseId) {
+    try {
+      const r = await api(`/api/market-withdraw/${purchaseId}`, { method: "POST" });
+      showToast(t(r?.auto ? "inventory.autoSentToast" : "inventory.requestSent"), "ok");
+      hap("notif", "success");
+      setPurchases((prev) => prev && prev.map((p) => (p.lotId === purchaseId ? { ...p, status: r?.auto ? "auto_sent" : "requested" } : p)));
+    } catch (e) {
+      showToast(e.error || t("common.genericError"), "err");
+    }
+  }
+
+  async function confirmAndWithdraw(purchaseId, tradeLink) {
+    const confirmMsg = `"${tradeLink}" ${t("inventory.confirmWithdraw")}`;
+    if (await confirmTg(confirmMsg)) sendWithdrawRequest(purchaseId);
+  }
+
+  function withdraw(purchaseId) {
+    if (!user?.tradeLink) {
+      setPendingPurchaseId(purchaseId);
+      setShowWizard(true);
+      return;
+    }
+    confirmAndWithdraw(purchaseId, user.tradeLink);
+  }
+
+  function handleWizardDone(patch) {
+    setShowWizard(false);
+    if (patch?.tradeLink) {
+      setUser((u) => (u ? { ...u, tradeLink: patch.tradeLink, ...(patch.steamPublicConfirmed ? { steamPublicConfirmed: true } : {}) } : u));
+      if (pendingPurchaseId != null) confirmAndWithdraw(pendingPurchaseId, patch.tradeLink);
+    }
+    setPendingPurchaseId(null);
   }
 
   return (
@@ -212,7 +310,7 @@ export default function Market() {
               </div>
             ))}
           </div>
-        ) : mine && mine.selling.length === 0 && mine.buying.length === 0 ? (
+        ) : mine && mine.selling.length === 0 && mine.buying.length === 0 && !(purchases && purchases.length > 0) ? (
           <Empty icon={Clock} title={t("market.emptyMine")} desc={t("market.emptyMineDesc")}>
             <button type="button" onClick={goSell} className="bg-primary px-5 py-2.5 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-primary/90">
               {t("market.sell")}
@@ -240,9 +338,22 @@ export default function Market() {
                 </div>
               </div>
             )}
+            {purchases && purchases.length > 0 && (
+              <div>
+                <h2 className="mb-1 font-heading text-sm font-bold uppercase tracking-wide text-muted-foreground">{t("market.myInventoryTitle")}</h2>
+                <p className="mb-2 text-xs text-muted-foreground">{t("market.myInventoryDesc")}</p>
+                <div className="space-y-2">
+                  {purchases.map((p, i) => (
+                    <PurchaseRow key={p.lotId ?? i} purchase={p} delay={i * 40} onWithdraw={withdraw} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )
       )}
+
+      {showWizard && <TradeOnboardingWizard onDone={handleWizardDone} />}
     </div>
   );
 }
