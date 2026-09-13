@@ -4,7 +4,7 @@
 // ledger faqat "qachon kartaga yechib olsa bo'ladi" degan alohida hisobni
 // yuritadi, pulning o'zini emas. Ya'ni "hold" faqat KARTAGA YECHISHni
 // cheklaydi, balansning o'zini emas.
-const { read, write } = require("./database/db");
+const { read, write, withTransaction, readTx, writeTx } = require("./database/db");
 
 const HOLD_MS = 7 * 24 * 60 * 60 * 1000; // 7 kun
 
@@ -73,7 +73,7 @@ function getHoldSummary(userId) {
     const entries = ledger?.entries || [];
     let frozen = 0, available = 0, pending = 0;
     for (const e of entries) {
-        if (e.withdrawalStatus === "withdrawn") continue;
+        if (e.withdrawalStatus === "withdrawn" || e.withdrawalStatus === "reversed") continue;
         if (e.withdrawalStatus === "pending") { pending += e.amount; continue; }
         if (isMatured(e)) available += e.amount; else frozen += e.amount;
     }
@@ -183,8 +183,51 @@ function getAllHoldsForAdmin() {
         .filter(s => s.frozen > 0 || s.available > 0 || s.pending > 0);
 }
 
+// Admin — Instant Sell (yoki istalgan trade-credit) yozuvini BEKOR QILADI:
+// balansdan berilgan summani (agar hali sarflanmagan bo'lsa yoki qisman
+// sarflangan bo'lsa — mavjud balans miqdorida) ayiradi va yozuvni
+// "reversed" deb belgilaydi. Faqat hali KARTAGA CHIQARILMAGAN
+// ("withdrawn" bo'lmagan) yozuvlarga ruxsat — pul haqiqatda ketgan bo'lsa,
+// bu funksiya orqali qaytarib bo'lmaydi (alohida qo'lda jarayon kerak).
+// Tranzaksiya ichida bajariladi — bir vaqtning o'zida user boshqa joyda
+// (bid/withdraw) balansini o'zgartirsa ham, ikkalasi bir-birini
+// "ko'rmay qolib" pulni noto'g'ri hisoblab qo'ymasligi uchun.
+async function reverseTradeCreditEntry(userId, entryId, reason) {
+    return withTransaction(async (session) => {
+        const ledgers = await readTx(session, "tradeBalances");
+        const ledgersArr = Array.isArray(ledgers) ? ledgers : [];
+        const ledger = ledgersArr.find(l => l.userId === userId);
+        const entry = ledger?.entries.find(e => e.id === entryId);
+        if (!entry) return { error: "not_found" };
+        if (entry.withdrawalStatus === "withdrawn") return { error: "already_withdrawn" };
+        if (entry.withdrawalStatus === "reversed") return { error: "already_reversed" };
+
+        const rawUsers = await readTx(session, "users");
+        const users = Array.isArray(rawUsers) ? rawUsers : Object.values(rawUsers);
+        const user = users.find(u => u.id === userId);
+        const deducted = Math.min(entry.amount, user?.balance ?? 0);
+
+        if (user) {
+            user.balance = (user.balance ?? 0) - deducted;
+            if (!Array.isArray(user.balanceHistory)) user.balanceHistory = [];
+            user.balanceHistory.push({
+                amount: -deducted,
+                reason: `Bekor qilindi (#${entry.tradeId}): ${reason}`,
+                date: new Date().toISOString(),
+            });
+        }
+        entry.withdrawalStatus = "reversed";
+        entry.reversedAt = new Date().toISOString();
+        entry.reverseReason = reason;
+
+        await writeTx(session, "users", users);
+        await writeTx(session, "tradeBalances", ledgersArr);
+        return { entry, deducted, cacheUpdates: { users, tradeBalances: ledgersArr } };
+    });
+}
+
 module.exports = {
     creditTradeProceeds, getHoldSummary,
     requestWithdrawal, getWithdrawalById, approveWithdrawal, rejectWithdrawal,
-    getAllHoldsForAdmin,
+    getAllHoldsForAdmin, reverseTradeCreditEntry,
 };
