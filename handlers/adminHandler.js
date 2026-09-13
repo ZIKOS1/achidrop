@@ -182,15 +182,59 @@ module.exports = (bot) => {
         const holds = balanceManager.getAllHoldsForAdmin();
         if (!holds.length) return ctx.reply("📭 Hozircha obmen orqali muzlatilgan mablag' yo'q.");
         const users = readUsers();
-        let text = `🔒 *Obmen — muzlatilgan mablag'lar*\n\n`;
-        holds.forEach(h => {
+        const rows = holds.map(h => {
             const u = users.find(x => x.id === h.userId);
-            text += `👤 *${u?.name ?? h.userId}* (\`${h.userId}\`)\n` +
-                `   🧊 Muzlatilgan: ${h.frozen.toLocaleString()} so'm\n` +
-                `   ✅ Yechish mumkin: ${h.available.toLocaleString()} so'm\n` +
-                (h.pending ? `   ⏳ So'rovda: ${h.pending.toLocaleString()} so'm\n` : "") + `\n`;
+            return [Markup.button.callback(`👤 ${u?.name ?? h.userId} — 🧊 ${h.frozen.toLocaleString()} so'm`, `holds_user_${h.userId}`)];
         });
-        ctx.reply(text, { parse_mode: "Markdown" });
+        ctx.reply("🔒 *Obmen — muzlatilgan mablag'lar*\n\nBatafsil ko'rish uchun userni tanlang:", { parse_mode: "Markdown", ...Markup.inlineKeyboard(rows) });
+    });
+
+    bot.action(/^holds_user_(\d+)$/, async (ctx) => {
+        await ctx.answerCbQuery();
+        if (!isAdmin(ctx)) return;
+        const userId = Number(ctx.match[1]);
+        const ledger = read("tradeBalances").find(l => l.userId === userId);
+        const entries = (ledger?.entries || []).filter(e => e.withdrawalStatus !== "withdrawn" && e.withdrawalStatus !== "reversed");
+        if (!entries.length) return ctx.editMessageText("📭 Bu userda faol yozuv yo'q.").catch(() => {});
+        const rows = entries.map(e => [Markup.button.callback(
+            `#${e.tradeId} — ${e.amount.toLocaleString()} so'm (${new Date(e.receivedAt).toLocaleDateString("uz-UZ")})`,
+            `holds_entry_${userId}_${e.id}`
+        )]);
+        ctx.editMessageText(`👤 *User ${userId}* — faol yozuvlar:`, { parse_mode: "Markdown", ...Markup.inlineKeyboard(rows) }).catch(() => {});
+    });
+
+    bot.action(/^holds_entry_(\d+)_(.+)$/, async (ctx) => {
+        await ctx.answerCbQuery();
+        if (!isAdmin(ctx)) return;
+        const userId = Number(ctx.match[1]);
+        const entryId = ctx.match[2];
+        ctx.editMessageText(
+            `⚠️ *#${entryId} yozuvini bekor qilasizmi?* Bu userning balansidan mos summa AYIRILADI.`,
+            { parse_mode: "Markdown", ...Markup.inlineKeyboard([
+                [Markup.button.callback("✅ Ha, bekor qilish", `holds_reverse_${userId}_${entryId}`)],
+                [Markup.button.callback("❌ Yo'q", "holds_cancel")],
+            ])}
+        ).catch(() => {});
+    });
+
+    bot.action(/^holds_reverse_(\d+)_(.+)$/, async (ctx) => {
+        await ctx.answerCbQuery();
+        if (!isAdmin(ctx)) return;
+        const userId = Number(ctx.match[1]);
+        const entryId = ctx.match[2];
+        const result = await balanceManager.reverseTradeCreditEntry(userId, entryId, "Admin tomonidan bekor qilindi");
+        if (result.error) return ctx.editMessageText(`❌ Xatolik: ${result.error}`).catch(() => {});
+        ctx.editMessageText(`✅ Bekor qilindi. ${result.deducted.toLocaleString()} so'm balansdan ayirildi.`).catch(() => {});
+        notifyUser(userId,
+            `⚠️ *Diqqat!* Sizning oldingi Instant Sell/Obmen tranzaksiyangiz (#${entryId}) bekor qilindi, ${result.deducted.toLocaleString()} so'm balansingizdan ayirildi. Savol bo'lsa admin bilan bog'laning.`,
+            bot.telegram.sendMessage.bind(bot.telegram), { parse_mode: "Markdown" }
+        );
+    });
+
+    bot.action("holds_cancel", async (ctx) => {
+        await ctx.answerCbQuery();
+        if (!isAdmin(ctx)) return;
+        ctx.editMessageText("Bekor qilindi.").catch(() => {});
     });
 
     // ── 💸 Pul chiqarish so'rovini tasdiqlash/rad etish (Obmen) ──────────────
