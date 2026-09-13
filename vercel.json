@@ -1,0 +1,15 @@
+{
+    "framework": null,
+    "buildCommand": "npm run build:miniapp",
+    "outputDirectory": "miniapp/dist",
+    "rewrites": [
+        { "source": "/api/:path*", "destination": "/api" },
+        { "source": "/admin", "destination": "/admin.html" }
+    ],
+    "functions": {
+        "api/index.js": {
+            "includeFiles": "node_modules/**",
+            "maxDuration": 30
+        }
+    }
+}

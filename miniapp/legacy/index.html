@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Auction Mini App</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root {
+  --bg:    var(--tg-theme-bg-color, #ffffff);
+  --bg2:   var(--tg-theme-secondary-bg-color, #f0f0f0);
+  --text:  var(--tg-theme-text-color, #000000);
+  --hint:  var(--tg-theme-hint-color, #999999);
+  --link:  var(--tg-theme-link-color, #2481cc);
+  --btn:   var(--tg-theme-button-color, #2481cc);
+  --btnT:  var(--tg-theme-button-text-color, #ffffff);
+  --r:     12px;
+  --nav:   60px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;user-select:none}
+::-webkit-scrollbar{display:none}
+
+/* Layout */
+#app{display:flex;flex-direction:column;height:100dvh}
+#pages{flex:1;overflow:hidden;position:relative}
+.page{position:absolute;inset:0;overflow-y:auto;padding:12px 12px calc(var(--nav)+12px);opacity:0;transform:translateX(16px);transition:opacity .2s,transform .2s;pointer-events:none;-webkit-overflow-scrolling:touch}
+.page.active{opacity:1;transform:none;pointer-events:all}
+
+/* Nav */
+#nav{position:fixed;bottom:0;left:0;right:0;height:var(--nav);background:var(--bg);border-top:1px solid var(--bg2);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom,0)}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:none;background:none;color:var(--hint);cursor:pointer;padding:8px 4px;transition:color .2s}
+.nav-btn.active{color:var(--btn)}
+.nav-btn .ni{font-size:22px;line-height:1}
+.nav-btn .nl{font-size:10px;font-weight:600}
+
+/* Cards */
+.card{background:var(--bg2);border-radius:var(--r);padding:14px;margin-bottom:10px;cursor:pointer;transition:transform .15s,opacity .15s}
+.card:active{transform:scale(.97);opacity:.85}
+.card-img{width:100%;height:180px;object-fit:cover;border-radius:8px;margin-bottom:10px;background:var(--bg);display:block}
+.card-no-img{width:100%;height:130px;background:var(--bg);border-radius:8px;margin-bottom:10px;display:flex;align-items:center;justify-content:center;font-size:52px}
+.card-title{font-size:16px;font-weight:700;margin-bottom:6px}
+.card-row{display:flex;justify-content:space-between;align-items:center}
+.card-price{font-size:17px;font-weight:800;color:var(--btn)}
+.card-timer{font-size:13px;color:#e74c3c;font-weight:700}
+.card-hint{font-size:12px;color:var(--hint);margin-top:5px}
+
+/* Detail */
+.det-img{width:100%;max-height:230px;object-fit:cover;border-radius:var(--r);margin-bottom:16px;display:block}
+.det-no-img{width:100%;height:180px;background:var(--bg2);border-radius:var(--r);display:flex;align-items:center;justify-content:center;font-size:68px;margin-bottom:16px}
+.det-title{font-size:22px;font-weight:800;margin-bottom:14px}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.info-box{background:var(--bg2);border-radius:10px;padding:12px;text-align:center}
+.ib-label{font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.ib-val{font-size:15px;font-weight:800}
+.ib-price{color:var(--btn)}
+.ib-timer{color:#e74c3c}
+
+/* Buttons */
+.btn{display:block;width:100%;padding:14px;border-radius:var(--r);border:none;font-size:16px;font-weight:700;cursor:pointer;transition:opacity .15s,transform .1s;margin-bottom:10px}
+.btn:active{opacity:.8;transform:scale(.98)}
+.btn:disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
+.btn-p{background:var(--btn);color:var(--btnT)}
+.btn-s{background:var(--bg2);color:var(--text)}
+.btn-g{background:#27ae60;color:#fff}
+.btn-r{background:#e74c3c;color:#fff}
+.btn-sm{padding:9px 16px;font-size:14px;margin-bottom:0;width:auto;display:inline-block}
+
+/* Input */
+.inp{width:100%;padding:14px;border-radius:var(--r);border:2px solid var(--bg2);background:var(--bg);color:var(--text);font-size:16px;outline:none;transition:border-color .2s;margin-bottom:10px}
+.inp:focus{border-color:var(--btn)}
+
+/* Sections */
+.sec{font-size:11px;font-weight:700;color:var(--hint);text-transform:uppercase;letter-spacing:.8px;margin:16px 0 8px;padding:0 4px}
+
+/* Profile */
+.p-header{background:var(--bg2);border-radius:var(--r);padding:20px;text-align:center;margin-bottom:14px}
+.avatar{width:72px;height:72px;border-radius:50%;background:var(--btn);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;color:var(--btnT);margin:0 auto 10px}
+.p-name{font-size:20px;font-weight:800;margin-bottom:4px}
+.badge{display:inline-block;background:var(--bg);border-radius:20px;padding:4px 14px;font-size:13px;font-weight:700;margin-top:6px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.stat{background:var(--bg2);border-radius:10px;padding:12px 8px;text-align:center}
+.stat-v{font-size:20px;font-weight:800;margin-bottom:2px}
+.stat-l{font-size:11px;color:var(--hint)}
+
+/* List items */
+.li{display:flex;align-items:center;justify-content:space-between;padding:13px 14px;background:var(--bg2);border-radius:var(--r);margin-bottom:8px;cursor:pointer}
+.li:active{opacity:.7}
+.li-l{display:flex;align-items:center;gap:10px}
+.li-ic{font-size:20px;width:32px;text-align:center}
+.li-txt{font-size:15px;font-weight:600}
+.li-r{color:var(--hint);font-size:18px}
+
+/* Balance */
+.bal-card{background:var(--btn);border-radius:var(--r);padding:24px;text-align:center;margin-bottom:14px}
+.bal-amt{font-size:34px;font-weight:900;color:var(--btnT)}
+.bal-lbl{color:rgba(255,255,255,.75);font-size:13px;margin-bottom:4px}
+.pay-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.pay-card{background:var(--bg2);border-radius:var(--r);padding:16px;text-align:center;cursor:pointer;transition:transform .15s}
+.pay-card:active{transform:scale(.95)}
+.pay-em{font-size:30px;display:block;margin-bottom:6px}
+.pay-nm{font-size:13px;font-weight:700}
+
+/* Inventory */
+.inv-item{background:var(--bg2);border-radius:var(--r);padding:14px;margin-bottom:10px}
+.inv-h{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.inv-name{font-size:15px;font-weight:700;flex:1;margin-right:8px}
+.tag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;flex-shrink:0}
+.tag-wait{background:rgba(255,193,7,.2);color:#e67e22}
+.tag-sent{background:rgba(52,152,219,.2);color:#2980b9}
+.tag-done{background:rgba(39,174,96,.2);color:#27ae60}
+
+/* Modal */
+#modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-end;transition:opacity .25s;opacity:0;pointer-events:none}
+#modal-bg.open{opacity:1;pointer-events:all}
+#modal{background:var(--bg);border-radius:20px 20px 0 0;padding:20px;width:100%;padding-bottom:calc(20px + env(safe-area-inset-bottom,0));transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+#modal-bg.open #modal{transform:none}
+#modal-handle{width:40px;height:4px;background:var(--hint);border-radius:2px;margin:0 auto 14px;opacity:.4}
+#modal-title{font-size:18px;font-weight:800;margin-bottom:14px;text-align:center}
+#modal-info{background:var(--bg2);border-radius:10px;padding:12px;margin-bottom:12px;font-size:14px;line-height:1.6}
+
+/* Toast */
+#toast{position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-80px);background:#222;color:#fff;padding:10px 20px;border-radius:20px;font-size:14px;font-weight:600;z-index:500;transition:transform .3s,opacity .3s;opacity:0;white-space:nowrap;max-width:82vw;text-align:center;pointer-events:none}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+#toast.ok{background:#27ae60}
+#toast.err{background:#e74c3c}
+
+/* Helpers */
+.loading{display:flex;align-items:center;justify-content:center;padding:48px;flex-direction:column;gap:12px;color:var(--hint)}
+.spin{width:36px;height:36px;border:3px solid var(--bg2);border-top-color:var(--btn);border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:48px 20px;color:var(--hint)}
+.empty-ic{font-size:52px;margin-bottom:12px}
+.empty-tx{font-size:16px}
+
+/* Page header */
+.ph{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.ph-back{background:var(--bg2);border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;color:var(--text);flex-shrink:0}
+.ph-title{font-size:18px;font-weight:800}
+
+/* Leaderboard */
+.lb{display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg2);border-radius:10px;margin-bottom:8px}
+.lb-rank{font-size:20px;width:30px;text-align:center}
+.lb-name{flex:1;font-weight:700;font-size:15px}
+.lb-w{font-size:13px;color:var(--hint)}
+
+/* Live badge */
+.live{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;color:#e74c3c;background:rgba(231,76,60,.12);padding:2px 7px;border-radius:20px}
+.live::before{content:'';width:6px;height:6px;background:#e74c3c;border-radius:50%;animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* My-bid highlight */
+.my-leading{background:rgba(39,174,96,.1);color:#27ae60;border-radius:10px;padding:10px;text-align:center;font-weight:700;margin-bottom:12px;font-size:14px}
+
+/* History items */
+.hist-item{background:var(--bg2);border-radius:var(--r);padding:13px;margin-bottom:8px}
+.hist-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.hist-name{font-size:14px;font-weight:700;flex:1;margin-right:8px}
+.hist-amt-pos{color:#27ae60;font-weight:800;font-size:15px}
+.hist-amt-neg{color:#e74c3c;font-weight:800;font-size:15px}
+.hist-date{font-size:12px;color:var(--hint)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="pages"></div>
+  <nav id="nav">
+    <button class="nav-btn active" data-tab="auctions"  onclick="go('auctions')">
+      <span class="ni">🏷</span><span class="nl">Auksionlar</span>
+    </button>
+    <button class="nav-btn" data-tab="profile"   onclick="go('profile')">
+      <span class="ni">👤</span><span class="nl">Profil</span>
+    </button>
+    <button class="nav-btn" data-tab="balance"   onclick="go('balance')">
+      <span class="ni">💰</span><span class="nl">Balans</span>
+    </button>
+    <button class="nav-btn" data-tab="inventory" onclick="go('inventory')">
+      <span class="ni">🎒</span><span class="nl">Inventar</span>
+    </button>
+  </nav>
+</div>
+
+<!-- Modal (bid / trade link) -->
+<div id="modal-bg" onclick="if(event.target===this)closeModal()">
+  <div id="modal">
+    <div id="modal-handle"></div>
+    <div id="modal-title"></div>
+    <div id="modal-info"></div>
+    <input class="inp" id="modal-inp" type="number" inputmode="numeric">
+    <button class="btn btn-p" id="modal-ok"></button>
+    <button class="btn btn-s" onclick="closeModal()">❌ Bekor</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── Telegram WebApp ──────────────────────────────────────────────────────────
+const tg = window.Telegram?.WebApp;
+tg?.ready();
+tg?.expand();
+
+const initData = tg?.initData || "";
+const MAIN_TABS = ["auctions","profile","balance","inventory"];
+
+// ── State ────────────────────────────────────────────────────────────────────
+let S = {
+  user: null,
+  page: "auctions",
+  auctionId: null,
+  intervals: {},
+};
+
+// ── API ──────────────────────────────────────────────────────────────────────
+async function api(url, opts = {}) {
+  const r = await fetch(url, {
+    ...opts,
+    headers: { "Content-Type":"application/json", "x-init-data": initData, ...(opts.headers||{}) },
+  });
+  const json = await r.json().catch(() => ({}));
+  if (!r.ok) throw json;
+  return json;
+}
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+function toast(msg, type = "") {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = "toast " + (type === "ok" ? "ok" : type === "err" ? "err" : "");
+  el.classList.add("show");
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove("show"), 3000);
+}
+
+// ── Haptic ───────────────────────────────────────────────────────────────────
+const hap = (t, s) => {
+  try { t === "impact" ? tg?.HapticFeedback?.impactOccurred(s||"light") : tg?.HapticFeedback?.notificationOccurred(s||"success"); } catch {}
+};
+
+// ── Escape ───────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// ── Timer ────────────────────────────────────────────────────────────────────
+function fmtTime(ms) {
+  const d = ms - Date.now();
+  if (d <= 0) return "⏰ Tugadi";
+  const h = Math.floor(d/3600000), m = Math.floor((d%3600000)/60000), s = Math.floor((d%60000)/1000);
+  if (h > 0) return `⏳ ${h}s ${m}d`;
+  if (m > 0) return `⏳ ${m}d ${s}s`;
+  return `⏳ ${s}s`;
+}
+
+// ── Badge ────────────────────────────────────────────────────────────────────
+function badge(wins) {
+  if (wins >= 10) return "💎 Legendary";
+  if (wins  >= 5) return "🥇 VIP";
+  if (wins  >= 2) return "🥈 Pro";
+  return "🥉 Rookie";
+}
+
+// ── Navigate ─────────────────────────────────────────────────────────────────
+function go(page, data = null) {
+  Object.values(S.intervals).forEach(clearInterval);
+  S.intervals = {};
+
+  const isMain = MAIN_TABS.includes(page);
+  const nav    = document.getElementById("nav");
+  nav.style.display = isMain ? "flex" : "none";
+
+  if (isMain) {
+    document.querySelectorAll(".nav-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === page));
+    tg?.BackButton?.hide();
+  } else {
+    tg?.BackButton?.show();
+    tg?.BackButton?.onClick(() => { tg?.BackButton?.hide(); go(parentOf(page)); });
+  }
+
+  S.page = page;
+  if (data) S.auctionId = data;
+
+  const pages = document.getElementById("pages");
+  pages.innerHTML = `<div class="page active" id="pg"></div>`;
+  const el = document.getElementById("pg");
+
+  const map = {
+    auctions:        renderAuctions,
+    "auction-detail":renderDetail,
+    profile:         renderProfile,
+    balance:         renderBalance,
+    inventory:       renderInventory,
+    leaderboard:     renderLeaderboard,
+    "bid-history":   renderBidHistory,
+    "bal-history":   renderBalHistory,
+  };
+  (map[page] || (() => {}))(el, data);
+}
+
+function parentOf(p) {
+  if (p === "auction-detail") return "auctions";
+  if (p === "leaderboard")    return "auctions";
+  if (p === "bid-history")    return "profile";
+  if (p === "bal-history")    return "profile";
+  return "auctions";
+}
+
+// ── Auctions Page ─────────────────────────────────────────────────────────────
+async function renderAuctions(el) {
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div style="font-size:22px;font-weight:800;">🏷 Auksionlar</div>
+      <button class="btn btn-s btn-sm" onclick="go('leaderboard')">🏆 Top</button>
+    </div>
+    <div id="al"><div class="loading"><div class="spin"></div><div>Yuklanmoqda...</div></div></div>`;
+
+  try {
+    const list = await api("/api/auctions");
+    const al = document.getElementById("al");
+    if (!list.length) {
+      al.innerHTML = `<div class="empty"><div class="empty-ic">😔</div><div class="empty-tx">Hozircha faol auksionlar yo'q</div></div>`;
+      return;
+    }
+    al.innerHTML = list.map(a => `
+      <div class="card" onclick="hap('impact');go('auction-detail',${a.id})">
+        ${a.image
+          ? `<img class="card-img" src="/api/image/${esc(a.image)}" alt="${esc(a.name)}" loading="lazy" onerror="this.style.display='none'">`
+          : `<div class="card-no-img">📦</div>`}
+        <div class="card-row">
+          <div class="card-title">${esc(a.name)}</div>
+          ${a.endTimeMs ? `<span class="live">LIVE</span>` : ""}
+        </div>
+        <div class="card-row" style="margin-top:7px;">
+          <div class="card-price" id="pr-${a.id}">${a.price.toLocaleString()} so'm</div>
+          <div class="card-timer" id="tm-${a.id}">${a.endTimeMs ? fmtTime(a.endTimeMs) : ""}</div>
+        </div>
+        <div class="card-hint">👤 ${a.lastBidderName ? esc(a.lastBidderName) : "Hali bid yo'q"} &nbsp;|&nbsp; Min: +${(a.minBid).toLocaleString()} so'm</div>
+      </div>`).join("");
+
+    list.forEach(a => {
+      if (!a.endTimeMs) return;
+      S.intervals[a.id] = setInterval(() => {
+        const t = document.getElementById(`tm-${a.id}`);
+        if (t) t.textContent = fmtTime(a.endTimeMs);
+      }, 1000);
+    });
+  } catch {
+    document.getElementById("al").innerHTML = `<div class="empty"><div class="empty-ic">❌</div><div class="empty-tx">Xato yuz berdi</div></div>`;
+  }
+}
+
+// ── Auction Detail ─────────────────────────────────────────────────────────────
+async function renderDetail(el, id) {
+  el.innerHTML = `
+    <div class="ph">
+      <button class="ph-back" onclick="go('auctions')">←</button>
+      <div class="ph-title">Auksion</div>
+    </div>
+    <div id="dc"><div class="loading"><div class="spin"></div></div></div>`;
+
+  try {
+    const a = await api(`/api/auction/${id}`);
+
+    if (a.status !== "active") {
+      document.getElementById("dc").innerHTML = `
+        <div class="empty">
+          <div class="empty-ic">⛔</div>
+          <div class="empty-tx">Bu auksion tugagan</div>
+          <div style="margin-top:8px;color:var(--hint);font-size:14px;">🏆 G'olib: ${a.lastBidderName ? esc(a.lastBidderName) : "Yo'q"}<br>💰 ${a.price.toLocaleString()} so'm</div>
+        </div>
+        <button class="btn btn-s" onclick="go('auctions')">⬅️ Auksionlarga</button>`;
+      return;
+    }
+
+    const u    = S.user;
+    const myW  = u && a.lastBidder === u.id;
+    const min2 = a.price + a.minBid;
+
+    document.getElementById("dc").innerHTML = `
+      ${a.image
+        ? `<img class="det-img" src="/api/image/${esc(a.image)}" alt="${esc(a.name)}" onerror="this.style.display='none'">`
+        : `<div class="det-no-img">📦</div>`}
+      <div class="det-title">${esc(a.name)}</div>
+      <div class="info-grid">
+        <div class="info-box"><div class="ib-label">Joriy narx</div><div class="ib-val ib-price" id="dp">${a.price.toLocaleString()} so'm</div></div>
+        <div class="info-box"><div class="ib-label">Qolgan vaqt</div><div class="ib-val ib-timer" id="dt">${a.endTimeMs ? fmtTime(a.endTimeMs) : "∞"}</div></div>
+        <div class="info-box"><div class="ib-label">Minimal bid</div><div class="ib-val">+${a.minBid.toLocaleString()} so'm</div></div>
+        <div class="info-box"><div class="ib-label">Yetakchi</div><div class="ib-val" style="font-size:13px;">${a.lastBidderName ? esc(a.lastBidderName) : "Yo'q"}</div></div>
+      </div>
+      ${myW ? `<div class="my-leading">🏆 Siz hozircha yetakchisiz!</div>` : ""}
+      ${u ? `
+        <div style="color:var(--hint);font-size:13px;text-align:center;margin-bottom:10px;">
+          Sizning balansiz: <strong style="color:var(--text)">${(u.balance??0).toLocaleString()} so'm</strong>
+        </div>
+        <button class="btn btn-p" id="bid-btn" onclick="openBidModal(${a.id},${a.price},${a.minBid})">💸 BID qo'yish</button>
+        <button class="btn btn-s" id="qbid-btn" onclick="quickBid(${a.id})">⚡ Tez bid (+${a.minBid.toLocaleString()} so'm)</button>
+      ` : `<div class="empty"><div class="empty-tx">Bid qo'yish uchun botga /start yuboring</div></div>`}`;
+
+    if (a.endTimeMs) {
+      S.intervals.detail = setInterval(() => {
+        const t = document.getElementById("dt");
+        if (t) t.textContent = fmtTime(a.endTimeMs);
+      }, 1000);
+    }
+  } catch {
+    document.getElementById("dc").innerHTML = `<div class="empty"><div class="empty-ic">❌</div><div class="empty-tx">Xato yuz berdi</div></div>`;
+  }
+}
+
+// ── Bid Modal ─────────────────────────────────────────────────────────────────
+function openBidModal(lotId, price, minBid) {
+  const min2 = price + minBid;
+  const u    = S.user;
+  document.getElementById("modal-title").textContent = "💸 BID qo'yish";
+  document.getElementById("modal-info").innerHTML = `
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--hint)">Joriy narx:</span><strong>${price.toLocaleString()} so'm</strong></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--hint)">Minimal:</span><strong style="color:var(--btn)">${min2.toLocaleString()} so'm</strong></div>
+    <div style="display:flex;justify-content:space-between;"><span style="color:var(--hint)">Balansingiz:</span><strong>${(u?.balance??0).toLocaleString()} so'm</strong></div>`;
+  const inp = document.getElementById("modal-inp");
+  inp.type  = "number";
+  inp.value = min2;
+  inp.min   = min2;
+  inp.placeholder = "Summa kiriting...";
+  inp.dataset.lotId  = lotId;
+  inp.dataset.minBid = min2;
+  inp.dataset.mode   = "bid";
+  const ok  = document.getElementById("modal-ok");
+  ok.textContent = "💸 Bid qo'yish";
+  ok.onclick = submitBid;
+  document.getElementById("modal-bg").classList.add("open");
+  hap("impact","medium");
+  setTimeout(() => inp.focus(), 350);
+}
+
+async function submitBid() {
+  const inp    = document.getElementById("modal-inp");
+  const amount = Number(inp.value);
+  const lotId  = Number(inp.dataset.lotId);
+  const minBid = Number(inp.dataset.minBid);
+  if (!amount || amount < minBid) { toast(`Minimal: ${minBid.toLocaleString()} so'm`, "err"); hap("notif","error"); return; }
+
+  const ok = document.getElementById("modal-ok");
+  ok.disabled = true; ok.textContent = "⏳...";
+
+  try {
+    const r = await api("/api/bid", { method:"POST", body: JSON.stringify({ lotId, amount }) });
+    if (S.user) S.user.balance = r.newBalance;
+    closeModal();
+    toast(`✅ Bid qabul qilindi! ${amount.toLocaleString()} so'm`, "ok");
+    hap("notif","success");
+    setTimeout(() => go("auction-detail", lotId), 400);
+  } catch(e) {
+    toast(e.error || "Xato", "err");
+    hap("notif","error");
+  } finally {
+    ok.disabled = false; ok.textContent = "💸 Bid qo'yish";
+  }
+}
+
+async function quickBid(lotId) {
+  hap("impact","medium");
+  const btn = document.getElementById("qbid-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "⏳..."; }
+  try {
+    const r = await api(`/api/quickbid/${lotId}`, { method:"POST" });
+    if (S.user) S.user.balance = r.newBalance;
+    toast(`⚡ Tez bid: ${r.newPrice.toLocaleString()} so'm!`, "ok");
+    hap("notif","success");
+    setTimeout(() => go("auction-detail", lotId), 400);
+  } catch(e) {
+    toast(e.error || "Xato", "err");
+    hap("notif","error");
+    if (btn) { btn.disabled = false; btn.textContent = `⚡ Tez bid`; }
+  }
+}
+
+function closeModal() {
+  document.getElementById("modal-bg").classList.remove("open");
+  document.getElementById("modal-inp").blur();
+  document.getElementById("modal-inp").type = "number";
+}
+
+// ── Profile ──────────────────────────────────────────────────────────────────
+function renderProfile(el) {
+  const u = S.user;
+  if (!u) {
+    el.innerHTML = `<div class="empty"><div class="empty-ic">👤</div><div class="empty-tx">Ma'lumot yuklanmadi.<br>Botga /start yuboring.</div></div>`;
+    return;
+  }
+  const ini = u.name.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase();
+  el.innerHTML = `
+    <div class="p-header">
+      <div class="avatar">${ini}</div>
+      <div class="p-name">${esc(u.name)}</div>
+      <div style="color:var(--hint);font-size:12px;">ID: ${u.id}</div>
+      <div class="badge">${badge(u.wins)}</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-v">${u.wins}</div><div class="stat-l">Yutishlar</div></div>
+      <div class="stat"><div class="stat-v">${(u.balance??0).toLocaleString()}</div><div class="stat-l">So'm</div></div>
+      <div class="stat"><div class="stat-v">${u.referrals}</div><div class="stat-l">Referrallar</div></div>
+    </div>
+    <div class="sec">Havolalar</div>
+    <div class="li" onclick="go('bid-history')"><div class="li-l"><span class="li-ic">📊</span><span class="li-txt">Bid tarixi</span></div><span class="li-r">›</span></div>
+    <div class="li" onclick="go('bal-history')"><div class="li-l"><span class="li-ic">💳</span><span class="li-txt">Balans tarixi</span></div><span class="li-r">›</span></div>
+    <div class="li" onclick="go('leaderboard')"><div class="li-l"><span class="li-ic">🏆</span><span class="li-txt">Liderlar jadvali</span></div><span class="li-r">›</span></div>
+    <div class="li" onclick="openTradeLink()">
+      <div class="li-l"><span class="li-ic">🔗</span><span class="li-txt">Steam Trade Link</span></div>
+      <span style="color:var(--hint);font-size:13px;">${u.tradeLink ? "✅ Mavjud" : "❌ Yo'q"}</span>
+    </div>`;
+}
+
+function openTradeLink() {
+  const u = S.user;
+  document.getElementById("modal-title").textContent = "🔗 Steam Trade Link";
+  document.getElementById("modal-info").innerHTML = `<div style="font-size:13px;color:var(--hint);line-height:1.5;">Trade Link kiriting:<br><code>https://steamcommunity.com/tradeoffer/new/?partner=...</code></div>`;
+  const inp = document.getElementById("modal-inp");
+  inp.type        = "url";
+  inp.value       = u?.tradeLink || "";
+  inp.placeholder = "https://steamcommunity.com/tradeoffer/new/...";
+  inp.dataset.mode = "tradelink";
+  const ok = document.getElementById("modal-ok");
+  ok.textContent = "✅ Saqlash";
+  ok.onclick = saveTradeLink;
+  document.getElementById("modal-bg").classList.add("open");
+  setTimeout(() => inp.focus(), 350);
+}
+
+async function saveTradeLink() {
+  const inp  = document.getElementById("modal-inp");
+  const link = inp.value.trim();
+  if (link && !link.startsWith("https://steamcommunity.com/tradeoffer/new/")) {
+    toast("Noto'g'ri link formati!", "err"); return;
+  }
+  try {
+    await api("/api/trade-link", { method:"POST", body: JSON.stringify({ tradeLink: link || null }) });
+    if (S.user) S.user.tradeLink = link || null;
+    closeModal();
+    inp.type = "number";
+    document.getElementById("modal-ok").onclick = submitBid;
+    toast("✅ Trade Link saqlandi!", "ok");
+    renderProfile(document.getElementById("pg"));
+  } catch(e) { toast(e.error || "Xato", "err"); }
+}
+
+// ── Balance ──────────────────────────────────────────────────────────────────
+async function renderBalance(el) {
+  const u = S.user;
+  if (!u) {
+    el.innerHTML = `<div class="empty"><div class="empty-ic">💰</div><div class="empty-tx">Avval /start yuboring</div></div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div class="bal-card">
+      <div class="bal-lbl">Balansingiz</div>
+      <div class="bal-amt">${(u.balance??0).toLocaleString()} so'm</div>
+    </div>
+    <div class="sec">To'lov usuli</div>
+    <div class="pay-grid">
+      <div class="pay-card" onclick="topupInfo('payme','🔵','Payme')"><span class="pay-em">🔵</span><span class="pay-nm">Payme</span></div>
+      <div class="pay-card" onclick="topupInfo('click','🟢','Click')"><span class="pay-em">🟢</span><span class="pay-nm">Click</span></div>
+      <div class="pay-card" onclick="topupInfo('paynet','🟠','Paynet')"><span class="pay-em">🟠</span><span class="pay-nm">Paynet</span></div>
+      <div class="pay-card" onclick="topupInfo('uzumbank','🍇','Uzum Bank')"><span class="pay-em">🍇</span><span class="pay-nm">Uzum Bank</span></div>
+    </div>
+    <div class="sec">Referral</div>
+    <div class="card" style="cursor:default">
+      <div style="font-size:13px;color:var(--hint);margin-bottom:8px;">Sizning havolangiz:</div>
+      <div id="ref-link" style="font-size:13px;background:var(--bg);padding:10px;border-radius:8px;word-break:break-all;line-height:1.5;">Yuklanmoqda...</div>
+      <button class="btn btn-s" style="margin-top:10px;" onclick="copyRef()">📋 Nusxalash</button>
+      <div style="margin-top:8px;font-size:13px;color:var(--hint);">Har bir do'st uchun: <strong style="color:var(--text)">+10,000 so'm</strong> 🎁</div>
+    </div>`;
+
+  try {
+    const info = await api("/api/bot-info");
+    const link = info.username
+      ? `https://t.me/${info.username}?start=ref_${u.id}`
+      : `Bot username .env ga WEBAPP_URL qo'shganda avtomatik to'ldiriladi`;
+    document.getElementById("ref-link").textContent = link;
+  } catch {}
+}
+
+function topupInfo(bank, emoji, name) {
+  hap("impact","light");
+  tg?.showAlert(`${emoji} ${name} orqali balans to'ldirish:\n\nBotga qaytib, "${emoji} ${name}" tugmasini bosing. Kartaga pul o'tkazing va chekni yuboring.`);
+}
+
+async function copyRef() {
+  const link = document.getElementById("ref-link")?.textContent || "";
+  try {
+    await navigator.clipboard.writeText(link);
+    toast("📋 Nusxalandi!", "ok");
+  } catch {
+    toast("Nusxalab bo'lmadi", "err");
+  }
+}
+
+// ── Inventory ─────────────────────────────────────────────────────────────────
+async function renderInventory(el) {
+  el.innerHTML = `
+    <div style="font-size:22px;font-weight:800;margin-bottom:14px;">🎒 Inventar</div>
+    <div id="ic"><div class="loading"><div class="spin"></div></div></div>`;
+
+  try {
+    const wins = await api("/api/inventory");
+    const ic   = document.getElementById("ic");
+    if (!wins.length) {
+      ic.innerHTML = `<div class="empty"><div class="empty-ic">🎒</div><div class="empty-tx">Inventaringiz bo'sh</div></div>`;
+      return;
+    }
+    const tags = {
+      pending:   ["tag-wait", "⏳ Kutilmoqda"],
+      requested: ["tag-sent", "✈️ Yuborilmoqda"],
+      delivered: ["tag-done", "✅ Olingan"],
+    };
+    ic.innerHTML = wins.map(w => {
+      const [cls, lbl] = tags[w.status || "pending"];
+      const canW = !w.status || w.status === "pending";
+      return `
+        <div class="inv-item">
+          <div class="inv-h">
+            <div class="inv-name">📦 ${esc(w.lotName || "?")}</div>
+            <span class="tag ${cls}">${lbl}</span>
+          </div>
+          <div style="font-size:13px;color:var(--hint);margin-bottom:${canW?10:0}px;">
+            💰 ${(w.price||0).toLocaleString()} so'm${w.date ? " · " + new Date(w.date).toLocaleDateString("uz-UZ") : ""}
+          </div>
+          ${canW ? `<button class="btn btn-p" style="margin:0;" onclick="withdraw(${w.lotId})">📤 Olish</button>` : ""}
+        </div>`;
+    }).join("");
+  } catch {
+    document.getElementById("ic").innerHTML = `<div class="empty"><div class="empty-ic">❌</div><div class="empty-tx">Xato yuz berdi</div></div>`;
+  }
+}
+
+async function withdraw(lotId) {
+  const u = S.user;
+  if (!u?.tradeLink) {
+    tg?.showAlert("Avval Trade Link qo'shing!\n\nProfil > 🔗 Steam Trade Link");
+    return;
+  }
+  tg?.showConfirm(`📤 "${u.tradeLink}" manziliga yuborishni tasdiqlaysizmi?\n\n⏳ Admin 1 soat ichida yuboradi.`, async ok => {
+    if (!ok) return;
+    try {
+      await api(`/api/withdraw/${lotId}`, { method:"POST" });
+      toast("✅ So'rov yuborildi!", "ok");
+      hap("notif","success");
+      renderInventory(document.getElementById("pg"));
+    } catch(e) { toast(e.error || "Xato", "err"); }
+  });
+}
+
+// ── Leaderboard ───────────────────────────────────────────────────────────────
+async function renderLeaderboard(el) {
+  el.innerHTML = `
+    <div class="ph">
+      <button class="ph-back" onclick="go('auctions')">←</button>
+      <div class="ph-title">🏆 Liderlar jadvali</div>
+    </div>
+    <div id="lbc"><div class="loading"><div class="spin"></div></div></div>`;
+
+  try {
+    const top  = await api("/api/leaderboard");
+    const lbc  = document.getElementById("lbc");
+    const me   = S.user?.id;
+    const md   = ["🥇","🥈","🥉","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"];
+    if (!top.length) { lbc.innerHTML = `<div class="empty"><div class="empty-ic">🏆</div><div class="empty-tx">Hali hech kim yutmagan</div></div>`; return; }
+    lbc.innerHTML = top.map((u,i) => `
+      <div class="lb" style="${u.id===me?"background:rgba(52,152,219,.12);border:1px solid var(--btn);":""}">
+        <div class="lb-rank">${md[i]}</div>
+        <div class="lb-name">${esc(u.name)}${u.id===me?' <span style="color:var(--btn);font-size:12px;">(Siz)</span>':""}</div>
+        <div class="lb-w">${u.wins} ta ${badge(u.wins)}</div>
+      </div>`).join("");
+  } catch {
+    document.getElementById("lbc").innerHTML = `<div class="empty"><div class="empty-ic">❌</div><div class="empty-tx">Xato</div></div>`;
+  }
+}
+
+// ── Bid History ───────────────────────────────────────────────────────────────
+async function renderBidHistory(el) {
+  el.innerHTML = `
+    <div class="ph">
+      <button class="ph-back" onclick="go('profile')">←</button>
+      <div class="ph-title">📊 Bid tarixi</div>
+    </div>
+    <div id="bhc"><div class="loading"><div class="spin"></div></div></div>`;
+
+  try {
+    const bids = await api("/api/bid-history");
+    const bhc  = document.getElementById("bhc");
+    if (!bids.length) { bhc.innerHTML = `<div class="empty"><div class="empty-ic">📊</div><div class="empty-tx">Hali bid qilmadingiz</div></div>`; return; }
+    bhc.innerHTML = bids.map(b => `
+      <div class="hist-item">
+        <div class="hist-row">
+          <div class="hist-name">📦 ${esc(b.lotName||"?")}</div>
+          <div class="hist-amt-neg">-${(b.amount||0).toLocaleString()} so'm</div>
+        </div>
+        <div class="hist-date">📅 ${b.date ? new Date(b.date).toLocaleString("uz-UZ") : "-"}</div>
+      </div>`).join("");
+  } catch {
+    document.getElementById("bhc").innerHTML = `<div class="empty"><div class="empty-ic">❌</div></div>`;
+  }
+}
+
+// ── Balance History ────────────────────────────────────────────────────────────
+async function renderBalHistory(el) {
+  el.innerHTML = `
+    <div class="ph">
+      <button class="ph-back" onclick="go('profile')">←</button>
+      <div class="ph-title">💳 Balans tarixi</div>
+    </div>
+    <div id="bahc"><div class="loading"><div class="spin"></div></div></div>`;
+
+  try {
+    const hist = await api("/api/balance-history");
+    const bahc = document.getElementById("bahc");
+    if (!hist.length) { bahc.innerHTML = `<div class="empty"><div class="empty-ic">💳</div><div class="empty-tx">Balans tarixi yo'q</div></div>`; return; }
+    bahc.innerHTML = hist.map(h => `
+      <div class="hist-item">
+        <div class="hist-row">
+          <div class="hist-name">${esc(h.reason||"-")}</div>
+          <div class="${h.amount>0?"hist-amt-pos":"hist-amt-neg"}">${h.amount>0?"+":""}${(h.amount||0).toLocaleString()} so'm</div>
+        </div>
+        <div class="hist-date">📅 ${h.date ? new Date(h.date).toLocaleString("uz-UZ") : "-"}</div>
+      </div>`).join("");
+  } catch {
+    document.getElementById("bahc").innerHTML = `<div class="empty"><div class="empty-ic">❌</div></div>`;
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(async () => {
+  try {
+    S.user = await api("/api/me");
+  } catch {}
+  go("auctions");
+})();
+</script>
+</body>
+</html>

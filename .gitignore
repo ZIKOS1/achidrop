@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+
+# environment variables (ENG MUHIM)
+.env
+.env.local
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# build files
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# eski/vestigial fayl-asosidagi JSON'lar — haqiqiy ma'lumot MongoDB'da
+# (database/db.js), bu fayllar db.js tomonidan umuman o'qilmaydi, lekin
+# ba'zilarida eski real foydalanuvchi ma'lumotlari (ism/username) bor —
+# git tarixiga keraksiz shaxsiy ma'lumot yozilmasligi uchun chiqarib tashlandi.
+database/*.json
+
+# optional lock (agar xohlasang)
+package-lock.json
+.vercel
+.env*

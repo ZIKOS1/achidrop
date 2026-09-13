@@ -1,0 +1,30 @@
+{
+  "name": "auksion-bot",
+  "version": "1.0.0",
+  "description": "Telegram Auction Bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "build:miniapp": "cd miniapp && npm install && npm run build"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.22.2",
+    "express-rate-limit": "^8.6.1",
+    "helmet": "^8.3.0",
+    "mongoose": "^8.24.1",
+    "node-steam-openid": "^2.0.0",
+    "steamcommunity": "^3.50.3",
+    "telegraf": "^4.16.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0",
+    "steam-user": "^5.3.0"
+  },
+  "overrides": {
+    "steam-appticket": "2.0.1",
+    "adm-zip": "0.6.0"
+  }
+}
