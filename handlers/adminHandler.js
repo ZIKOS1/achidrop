@@ -544,6 +544,24 @@ module.exports = (bot) => {
         ));
     });
 
+    // Market xaridi uchun skin_reject_'ning aynan bir xil nusxasi (Task 10
+    // post-review fix) — targetId/lotId o'rniga targetId/purchaseId saqlaydi,
+    // matn-handlerdagi "reject_comment_market" bosqichi buni yakunlaydi.
+    bot.action(/^mkt_skin_reject_(\d+)_(\d+)$/, async (ctx) => {
+        await ctx.answerCbQuery();
+        if (!isAdmin(ctx)) return;
+        const targetId = Number(ctx.match[1]);
+        const purchaseId = Number(ctx.match[2]);
+        temp[ctx.from.id] = { step: "reject_comment_market", targetId, purchaseId };
+        ctx.editMessageText(
+            "❌ *Rad etish sababini yozing:*\n\n_(Bu izoh foydalanuvchiga yuboriladi)_",
+            { parse_mode: "Markdown", ...CANCEL_BTN }
+        ).catch(() => ctx.reply(
+            "❌ *Rad etish sababini yozing:*\n\n_(Bu izoh foydalanuvchiga yuboriladi)_",
+            { parse_mode: "Markdown", ...CANCEL_BTN }
+        ));
+    });
+
     // ── 🆘 Qo'llab-quvvatlash — botdan javob yozish/yopish ────────────────────
     bot.action(/^support_reply_(\d+)$/, async (ctx) => {
         await ctx.answerCbQuery();
@@ -799,6 +817,35 @@ module.exports = (bot) => {
                 process.env.WEBAPP_URL
                     ? { parse_mode: "Markdown", ...Markup.inlineKeyboard([[Markup.button.webApp("🎒 Inventarga o'tish", `${process.env.WEBAPP_URL}/?page=inventory`)]]) }
                     : { parse_mode: "Markdown", ...Markup.inlineKeyboard([[Markup.button.callback("🎒 Inventar", "my_inventory")]]) }
+            );
+            return;
+        }
+
+        // ── MARKET SKIN CHIQARISHNI RAD ETISH — izoh (Task 10 post-review fix) ─
+        if (state?.step === "reject_comment_market") {
+            const comment = ctx.message.text.trim();
+            const targetId = state.targetId;
+            const purchaseId = state.purchaseId;
+            delete temp[adminId];
+
+            const raw = read("users");
+            const arr = Array.isArray(raw) ? raw : Object.values(raw);
+            const user = arr.find(u => u.id === targetId);
+            const purchase = user?.marketPurchases?.find(p => p.lotId === purchaseId);
+            if (!user || !purchase) return ctx.reply("❌ Item yoki user topilmadi.");
+
+            purchase.status = "rejected";
+            purchase.rejectComment = comment;
+            purchase.rejectedAt = new Date().toISOString();
+            write("users", arr);
+
+            ctx.reply(`❌ *Rad etildi!*\n\n👤 ${user.name}\n🏷 ${purchase.lotName}\n💬 ${comment}`, { parse_mode: "Markdown" });
+
+            notifyUser(
+                user,
+                `❌ *Market xaridi chiqarish so'rovingiz rad etildi.*\n\n🏷 *${purchase.lotName}*\n💬 Sabab: ${comment}\n\nIltimos, Trade Link'ni tekshirib qayta urinib ko'ring.`,
+                bot.telegram.sendMessage.bind(bot.telegram),
+                { parse_mode: "Markdown" }
             );
             return;
         }

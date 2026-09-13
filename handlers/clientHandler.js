@@ -751,6 +751,30 @@ module.exports = (bot) => {
         );
     });
 
+    // Market xaridlari uchun skin_sent_'ning aynan bir xil nusxasi — faqat
+    // user.wins o'rniga user.marketPurchases ustida ishlaydi (Task 10
+    // post-review fix: admin fallback tugmalari avval hech narsaga bog'lanmagan edi).
+    bot.action(/^mkt_skin_sent_(\d+)_(\d+)$/, async (ctx) => {
+        await ctx.answerCbQuery();
+        if (!isAdmin(ctx)) return;
+        const userId = Number(ctx.match[1]), purchaseId = Number(ctx.match[2]);
+        const raw = read("users"), arr = Array.isArray(raw)?raw:Object.values(raw);
+        const user = arr.find(u => u.id === userId);
+        if (!user) return ctx.reply("❌ User topilmadi.");
+        const purchase = (user.marketPurchases||[]).find(p => p.lotId === purchaseId);
+        if (!purchase) return ctx.reply("❌ Item topilmadi.");
+        purchase.status = "delivered"; purchase.deliveredAt = new Date().toISOString();
+        write("users", arr);
+        ctx.editMessageText(`✅ *Yuborildi!*\n\n👤 ${user.name}\n🏷 ${purchase.lotName}`, { parse_mode:"Markdown" }).catch(() => {});
+        notifyUser(user,
+            `🎉 *Skin yuborildi! Qabul qilib oling!*\n\n🏷 *${purchase.lotName}*\n\nSteam ilovangizni oching va trade offerni qabul qiling!`,
+            bot.telegram.sendMessage.bind(bot.telegram),
+            process.env.WEBAPP_URL
+                ? { parse_mode:"Markdown", ...Markup.inlineKeyboard([[Markup.button.webApp("🛒 Marketga o'tish", `${process.env.WEBAPP_URL}/?page=market`)]]) }
+                : { parse_mode:"Markdown" }
+        );
+    });
+
     // ── 🔗 Trade Link ────────────────────────────────────────────────────────
     bot.action("add_trade_link", async (ctx) => {
         await ctx.answerCbQuery();
