@@ -110,9 +110,13 @@ module.exports = (bot) => {
     });
 
     // ── ➕ Sotuvga qo'yish: Steam ulash → inventar → narx ────────────────────
+    // MUHIM: Telegram bitta callback query'ga FAQAT BITTA javob (answerCbQuery)
+    // qabul qiladi — ikkinchisi rad etiladi va foydalanuvchi xato matnini
+    // umuman ko'rmaydi. Shu sabab bu yerda "bo'sh" javob faqat xato bo'lmagan
+    // yo'lda yuboriladi.
     bot.action("market_new", async (ctx) => {
-        await ctx.answerCbQuery();
         if (!isAdmin(ctx)) return ctx.answerCbQuery("❌ Faqat admin sotuvga qo'ya oladi.", true);
+        await ctx.answerCbQuery();
         const user = getUser(ctx.from.id);
         if (!user) return;
         if (!user.steamId64) {
@@ -183,10 +187,11 @@ module.exports = (bot) => {
         try { return edit ? await ctx.editMessageText(text, opts) : await ctx.reply(text, opts); } catch {}
     }
 
+    // answerCbQuery FAQAT bir marta — quyidagi xato yo'llari xabarni o'zi
+    // ko'rsatadi (yuqorida bo'sh javob yuborilsa, ular ko'rinmay qolardi).
     bot.action(/^is_pick_(.+)$/, async (ctx) => {
-        await ctx.answerCbQuery();
         const user = getUser(ctx.from.id);
-        if (!user) return;
+        if (!user) return ctx.answerCbQuery();
         const assetId = ctx.match[1];
         let items;
         try { items = await fetchUserInventory(user.steamId64); }
@@ -203,6 +208,7 @@ module.exports = (bot) => {
         if (priceSom == null) return ctx.answerCbQuery("❌ Bu skin uchun narx topilmadi.", true);
 
         pendingInstantSell[user.id] = { assetId: item.assetId, marketHashName, name: item.name, priceSom };
+        await ctx.answerCbQuery();
         await ctx.editMessageText(
             `⚡ *"${item.name}"*\n\n💰 Taklif: *${priceSom.toLocaleString()} so'm* (darhol to'lanadi)\n\nTasdiqlaysizmi?`,
             { parse_mode: "Markdown", ...Markup.inlineKeyboard([
@@ -213,9 +219,8 @@ module.exports = (bot) => {
     });
 
     bot.action("is_confirm", async (ctx) => {
-        await ctx.answerCbQuery();
         const user = getUser(ctx.from.id);
-        if (!user) return;
+        if (!user) return ctx.answerCbQuery();
         const pending = pendingInstantSell[user.id];
         if (!pending) return ctx.answerCbQuery("❌ So'rov topilmadi, qaytadan boshlang.", true);
         delete pendingInstantSell[user.id];
@@ -229,6 +234,7 @@ module.exports = (bot) => {
         if (result.error) return ctx.answerCbQuery("❌ Xatolik: " + result.error, true);
 
         const botTradeUrl = process.env.BOT_STEAM_TRADE_URL || "(admin bilan bog'laning)";
+        await ctx.answerCbQuery();
         await ctx.editMessageText(
             `📤 *"${pending.name}"* itemini quyidagi trade-link'ga yuboring:\n\n\`${botTradeUrl}\`\n\n` +
             `⚠️ FAQAT shu itemni yuboring, hech narsa so'ramang. Qabul qilingach, *${pending.priceSom.toLocaleString()} so'm* darhol balansingizga tushadi.\n\n⏰ So'rov 15 daqiqa amal qiladi.`,
