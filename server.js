@@ -27,6 +27,7 @@ const balanceManager = require("./balanceManager");
 const skinUtils      = require("./skinUtils");
 const { trySendAutoOffer, maybeCheckPendingWithdrawals } = require("./withdrawDelivery");
 const supportManager = require("./supportManager");
+const instantSellManager = require("./instantSellManager");
 
 const app  = express();
 const PORT = process.env.WEBAPP_PORT || 3000;
@@ -1161,9 +1162,13 @@ app.get("/api/market/:id", auth, async (req, res) => {
 });
 
 // POST /api/market — { assetId, price } — bitta skinni katalogga chiqarish.
+// Admin-only: oddiy userlar endi faqat Instant Sell orqali sota oladi
+// (POST /api/instant-sell) — o'zboshimchalik bilan narx belgilab market'ga
+// qo'ya olmaydi.
 app.post("/api/market", auth, async (req, res) => {
     const u = req.user;
     if (!u) return res.status(404).json({ error: "User not found" });
+    if (u.id !== Number(process.env.ADMIN_ID)) return res.status(403).json({ error: "forbidden" });
     if (!u.steamId64) return res.status(400).json({ error: "Avval Steam hisobingizni ulang" });
 
     const assetId = req.body.assetId;
@@ -1229,6 +1234,38 @@ app.post("/api/market/:id/cancel", auth, async (req, res) => {
     const result = tradeManager.cancelTrade(trade.id, u.id);
     if (result.error) return res.status(400).json({ error: result.error });
     res.json(enrichTrade(result.trade));
+});
+
+// POST /api/instant-sell — { assetId } — o'z Steam inventaridan skinni
+// tizimga darhol sotish (narx Lis-Skins asosida hisoblanadi).
+app.post("/api/instant-sell", auth, async (req, res) => {
+    const u = req.user;
+    if (!u) return res.status(404).json({ error: "User not found" });
+    if (!u.steamId64) return res.status(400).json({ error: "Avval Steam hisobingizni ulang" });
+    if (!u.tradeLink) return res.status(400).json({ error: "Avval Trade Link kiriting" });
+
+    const assetId = req.body.assetId;
+    if (!assetId) return res.status(400).json({ error: "assetId kerak" });
+
+    let items;
+    try { items = await fetchUserInventory(u.steamId64); }
+    catch (err) { return res.status(500).json({ error: err.message }); }
+    const item = items.find(it => String(it.assetId) === String(assetId));
+    if (!item) return res.status(404).json({ error: "Item topilmadi (kesh eskirgan)" });
+    // `marketHashName` relay javobida YO'Q — Task 2'da qo'shilgan
+    // skinUtils.marketHashName orqali Steam formatiga mos hosil qilinadi.
+    const marketHashName = skinUtils.marketHashName(item.name, item.float);
+
+    const result = await instantSellManager.createInstantSellRequest(u.id, item.assetId, marketHashName, u.steamId64);
+    if (result.error) return res.status(400).json({ error: result.error });
+    res.json({ request: result.request, botTradeUrl: process.env.BOT_STEAM_TRADE_URL || null });
+});
+
+// GET /api/instant-sell-mine — mening Instant Sell so'rovlarim tarixi
+app.get("/api/instant-sell-mine", auth, (req, res) => {
+    const u = req.user;
+    if (!u) return res.status(404).json({ error: "User not found" });
+    res.json(instantSellManager.getMyInstantSellRequests(u.id));
 });
 
 // GET /api/trade-hold-summary — obmendan tushgan (7 kunlik hold) mablag'lar

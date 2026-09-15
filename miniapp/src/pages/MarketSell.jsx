@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ShoppingBag, Package, ChevronDown, ArrowLeft, Check } from "lucide-react";
+import { ShoppingBag, Package, ChevronDown, ArrowLeft, Check, Zap, CheckCircle2, Copy } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
 import { imgSrc, wearClasses, hap, tradeErr, tradeFee } from "../utils";
@@ -8,11 +8,23 @@ import { t } from "../i18n";
 import Empty from "../components/Empty";
 import BackLink from "../components/BackLink";
 import { SteamLogo } from "../components/BrandIcons";
+import TradeOnboardingWizard from "../components/TradeOnboardingWizard";
 
 const PAGE_SIZE = 8;
 
+// server.js'dagi POST /api/instant-sell xato kodlari/matnlari — tradeErr()'dagi
+// qattiq allowlist bu yerga mos kelmaydi (bu yerdagi xatolar boshqa naqsh:
+// ba'zilari tayyor o'zbekcha gap, ba'zilari kod). Shu sabab alohida helper.
+function instantSellErr(e) {
+  const code = e?.error || e;
+  if (code === "price_not_found") return t("market.instantSellErrPrice");
+  if (code === "relay_unavailable") return t("market.instantSellErrRelay");
+  if (typeof code === "string" && code) return code; // server allaqachon tayyor o'zbekcha xabar qaytaradi
+  return t("common.genericError");
+}
+
 export default function MarketSell() {
-  const { user, navigate, showToast, tg } = useApp();
+  const { user, setUser, navigate, showToast, tg } = useApp();
   const [inv, setInv] = useState(null);
   const [invError, setInvError] = useState("");
   const [invLoading, setInvLoading] = useState(false);
@@ -21,6 +33,12 @@ export default function MarketSell() {
   const [priceStep, setPriceStep] = useState(false);
   const [priceInput, setPriceInput] = useState("");
   const [creating, setCreating] = useState(false);
+  // ── Instant Sell (admin bo'lmagan userlar) ──────────────────────────────
+  const [instantStep, setInstantStep] = useState(false);
+  const [instantResult, setInstantResult] = useState(null);
+  const [showWizard, setShowWizard] = useState(false);
+
+  const isAdmin = user?.role === "admin";
 
   useEffect(() => {
     if (!user?.steamId64 || inv) return;
@@ -53,6 +71,18 @@ export default function MarketSell() {
 
   const selected = (inv || []).find((it) => it.assetId === selectedId);
 
+  function pickItem(assetId) {
+    setSelectedId(assetId);
+    if (isAdmin) setPriceStep(true);
+    else setInstantStep(true);
+  }
+
+  function backToPicker() {
+    setPriceStep(false);
+    setInstantStep(false);
+    setSelectedId(null);
+  }
+
   async function confirmCreate() {
     const price = Number(priceInput.replace(/\s/g, ""));
     if (!Number.isFinite(price) || price < 999) return showToast(t("trade.err.min_price"), "err");
@@ -69,6 +99,44 @@ export default function MarketSell() {
     }
   }
 
+  // Bot tomondagi is_pick_ -> is_confirm oqimi bilan bir xil naqsh (faqat
+  // React holatida): item tanlangach DARHOL narx so'ralmaydi — tasdiqlash
+  // ekrani ko'rsatiladi, "Ha, sotaman" bosilgach POST /api/instant-sell
+  // chaqiriladi (narx server tomonda hisoblab, natija bilan qaytariladi).
+  async function confirmInstantSell(tradeLinkOverride) {
+    const tradeLink = tradeLinkOverride || user.tradeLink;
+    if (!tradeLink) { setShowWizard(true); return; }
+    setCreating(true);
+    try {
+      const result = await api("/api/instant-sell", { method: "POST", body: JSON.stringify({ assetId: selectedId }) });
+      hap("notif", "success");
+      setInstantResult(result);
+    } catch (e) {
+      showToast(instantSellErr(e), "err");
+      hap("notif", "error");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  function sellAnother() {
+    setInstantResult(null);
+    setInstantStep(false);
+    setSelectedId(null);
+  }
+
+  function handleWizardDone(patch) {
+    setShowWizard(false);
+    if (patch?.tradeLink) {
+      setUser((u) => (u ? {
+        ...u,
+        tradeLink: patch.tradeLink,
+        ...(patch.steamPublicConfirmed ? { steamPublicConfirmed: true } : {}),
+      } : u));
+      confirmInstantSell(patch.tradeLink);
+    }
+  }
+
   const visibleInv = (inv || []).slice(0, shown);
   const hasMore = inv && inv.length > shown;
 
@@ -78,7 +146,10 @@ export default function MarketSell() {
 
       <div className="border border-border bg-card p-5 shadow-panel">
         <h2 className="font-heading text-base font-bold uppercase tracking-wide text-foreground">
-          {priceStep ? t("market.priceStepTitle") : t("market.pickSkin")}
+          {priceStep ? t("market.priceStepTitle")
+            : instantResult ? t("market.instantSellSentTitle")
+            : instantStep ? t("market.instantSellConfirmTitle")
+            : t("market.pickSkin")}
         </h2>
 
         {!user.steamId64 ? (
@@ -100,6 +171,57 @@ export default function MarketSell() {
           </div>
         ) : invError ? (
           <p className="mt-4 text-sm text-destructive">{invError}</p>
+        ) : instantResult ? (
+          <motion.div
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="mt-4 space-y-4"
+          >
+            <div className="flex items-center gap-3 border border-success/40 bg-success/10 p-3">
+              <CheckCircle2 className="size-5 shrink-0 text-success" />
+              <div className="min-w-0 flex-1">
+                <p className="font-heading text-sm font-bold text-foreground">{t("market.instantSellSentTitle")}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t("market.instantSellSentDesc")}{" "}
+                  <span className="font-semibold text-success">
+                    {instantResult.request?.priceSom?.toLocaleString()} {t("common.somWithAmount")}
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2 border border-border bg-secondary/30 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("market.instantSellTradeLinkLabel")}</p>
+              <div className="flex items-center gap-2">
+                <code className="min-w-0 flex-1 truncate text-xs text-foreground">
+                  {instantResult.botTradeUrl || t("market.instantSellNoUrl")}
+                </code>
+                {instantResult.botTradeUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(instantResult.botTradeUrl);
+                      showToast(t("trade.linkCopied"), "ok");
+                      hap("impact", "light");
+                    }}
+                    className="shrink-0 border border-border p-1.5 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                  >
+                    <Copy className="size-3.5" />
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-warning">{t("market.instantSellWarning")}</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={sellAnother}
+              className="flex w-full items-center justify-center gap-2 border border-border py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+            >
+              {t("market.instantSellSellAnother")}
+            </button>
+          </motion.div>
         ) : priceStep ? (
           <motion.div
             initial={{ opacity: 0, x: 16 }}
@@ -164,6 +286,51 @@ export default function MarketSell() {
               </button>
             </div>
           </motion.div>
+        ) : instantStep ? (
+          <motion.div
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="mt-4 space-y-4"
+          >
+            <div className="flex items-center gap-3 border border-border bg-secondary/30 p-3">
+              <span className="flex size-14 shrink-0 items-center justify-center border border-border bg-background">
+                {selected?.image ? <img src={imgSrc(selected.image)} alt="" className="size-full object-contain" /> : <Package className="size-5 text-muted-foreground" />}
+              </span>
+              <p className="min-w-0 flex-1 truncate text-sm text-foreground">{selected?.name}</p>
+            </div>
+
+            <div className="flex items-start gap-2 border border-primary/30 bg-primary/5 p-3">
+              <Zap className="mt-0.5 size-4 shrink-0 text-primary" />
+              <p className="text-xs text-muted-foreground">{t("market.instantSellHint")}</p>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={backToPicker}
+                className="flex items-center gap-1.5 border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <ArrowLeft className="size-4" />
+                {t("market.changeSkin")}
+              </button>
+              <button
+                type="button"
+                disabled={creating}
+                onClick={() => confirmInstantSell()}
+                className="flex flex-1 items-center justify-center gap-2 bg-primary py-2.5 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {creating ? (
+                  <span className="spin size-4 rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />
+                ) : (
+                  <>
+                    <Zap className="size-4" />
+                    {t("market.instantSellConfirmBtn")}
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.div>
         ) : inv && inv.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">{t("trade.noTradable")}</p>
         ) : (
@@ -175,7 +342,7 @@ export default function MarketSell() {
                   <motion.button
                     key={it.assetId}
                     type="button"
-                    onClick={() => { setSelectedId(it.assetId); setPriceStep(true); }}
+                    onClick={() => pickItem(it.assetId)}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.22, delay: Math.min(i, 11) * 0.03 }}
@@ -217,6 +384,8 @@ export default function MarketSell() {
           </>
         )}
       </div>
+
+      {showWizard && <TradeOnboardingWizard onDone={handleWizardDone} />}
     </div>
   );
 }

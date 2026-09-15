@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { ShoppingBag, Plus, Search, Package, Clock, Send } from "lucide-react";
+import { ShoppingBag, Plus, Search, Package, Clock, Send, Zap } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
 import { fmtMoney, imgSrc, parseSkinName, rarityColor, hap, confirmTg } from "../utils";
@@ -59,6 +59,32 @@ function MarketCard({ listing, onClick, delay }) {
           <p className="font-heading text-lg font-bold tracking-tight text-primary">{fmtMoney(listing.agreedPrice)}</p>
           <span className="truncate pb-0.5 text-[11px] text-muted-foreground">{listing.sellerName ?? ""}</span>
         </div>
+      </div>
+    </motion.button>
+  );
+}
+
+// Grid'ning birinchi kartasi — CS.Float uslubidagi katalogdagi oddiy
+// MarketCard'ga o'xshaydi (bir xil o'lcham/animatsiya), lekin skin rasmi
+// o'rniga ⚡ ikonka bilan "Tezkor sotish"ga taklif qiladi (MarketSell.jsx'ga olib boradi).
+function InstantSellCard({ onClick, delay }) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, delay: Math.min(delay, 8 * 45) / 1000, ease: [0.16, 1, 0.3, 1] }}
+      whileTap={{ scale: 0.98 }}
+      whileHover={{ y: -3 }}
+      className="group flex flex-col overflow-hidden border border-primary/40 bg-primary/5 text-left shadow-panel transition-colors hover:border-primary"
+    >
+      <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_50%_35%,color-mix(in_oklch,var(--primary)_14%,var(--card)),var(--card))]">
+        <Zap className="size-10 text-primary transition-transform duration-500 group-hover:scale-110" />
+      </div>
+      <div className="flex flex-1 flex-col gap-0.5 p-3">
+        <p className="truncate font-heading text-sm font-bold leading-tight text-primary">{t("market.instantSellCardTitle")}</p>
+        <p className="mt-1 truncate text-[11px] text-muted-foreground">{t("market.instantSellCardDesc")}</p>
       </div>
     </motion.button>
   );
@@ -280,13 +306,18 @@ export default function Market() {
 
           {listings === null && !error && <MarketGridSkeleton />}
           {error && <Empty icon={ShoppingBag} title={t("common.error")} desc={t("common.errorRetry")} />}
-          {listings && listings.length === 0 && <Empty icon={ShoppingBag} title={t("market.empty")} desc={t("market.emptyDesc")} />}
-          {listings && listings.length > 0 && (
-            <div className={GRID_CLASSES}>
-              {listings.map((l, i) => (
-                <MarketCard key={l.id} listing={l} delay={i * 45} onClick={() => navigate("market-detail", l.id)} />
-              ))}
-            </div>
+          {listings && (
+            <>
+              {listings.length === 0 && (
+                <p className="text-sm text-muted-foreground">{t("market.empty")}</p>
+              )}
+              <div className={GRID_CLASSES}>
+                <InstantSellCard onClick={goSell} delay={0} />
+                {listings.map((l, i) => (
+                  <MarketCard key={l.id} listing={l} delay={(i + 1) * 45} onClick={() => navigate("market-detail", l.id)} />
+                ))}
+              </div>
+            </>
           )}
         </>
       )}
