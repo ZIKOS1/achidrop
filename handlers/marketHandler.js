@@ -13,6 +13,8 @@ const { createPendingAuth } = require("../auth-steam");
 const tradeManager = require("../tradeManager");
 const skinUtils    = require("../skinUtils");
 const tradeHandler = require("./tradeHandler"); // showTradeRoom — faqat tradeHandler(bot) chaqirilgandan keyin mavjud bo'ladi (index.js shunday tartibda ulaydi)
+const instantSellManager = require("../instantSellManager");
+const { getInstantSellPriceSom } = require("../lisSkinsPrice");
 
 const LISTINGS_PAGE_SIZE  = 5;
 const INVENTORY_PAGE_SIZE = 6;
@@ -21,6 +23,7 @@ const MIN_TRADE_PRICE     = 999;
 const marketListPage = {}; // userId -> page
 const marketInvPage  = {}; // userId -> page
 const pendingMarketSkin  = {}; // userId -> skin obyekti (narx so'ralayotgan payt)
+const pendingInstantSell = {}; // userId -> { assetId, marketHashName, name, priceSom } (tanlangandan keyin, tasdiqlashni kutayotgan payt)
 
 function readUsers() { const d = read("users"); return Array.isArray(d) ? d : Object.values(d); }
 function getUser(id) { return readUsers().find(u => u.id === id) || null; }
@@ -36,10 +39,13 @@ module.exports = (bot) => {
         const { pageItems, page: p, totalPages, total } = skinUtils.paginate(listings, page, LISTINGS_PAGE_SIZE);
         marketListPage[user.id] = p;
 
-        const rows = [
-            [Markup.button.callback("➕ Sotuvga qo'yish", "market_new")],
-            [Markup.button.callback("📋 Mening bozorim", "market_mine")],
-        ];
+        const rows = [];
+        if (isAdmin({ from: { id: user.id } })) {
+            rows.push([Markup.button.callback("➕ Sotuvga qo'yish", "market_new")]);
+        } else {
+            rows.push([Markup.button.callback("⚡ Tezkor sotish (o'z skiningizni soting)", "instant_sell_new")]);
+        }
+        rows.push([Markup.button.callback("📋 Mening bozorim", "market_mine")]);
         pageItems.forEach(t => {
             const mine = t.sellerId === user.id;
             const skin = t.skins?.[0];
@@ -105,6 +111,7 @@ module.exports = (bot) => {
     // ── ➕ Sotuvga qo'yish: Steam ulash → inventar → narx ────────────────────
     bot.action("market_new", async (ctx) => {
         await ctx.answerCbQuery();
+        if (!isAdmin(ctx)) return ctx.answerCbQuery("❌ Faqat admin sotuvga qo'ya oladi.", true);
         const user = getUser(ctx.from.id);
         if (!user) return;
         if (!user.steamId64) {
@@ -123,6 +130,104 @@ module.exports = (bot) => {
             ).catch(() => {});
         }
         await showMarketInventoryPicker(ctx, user, true);
+    });
+
+    // ── ⚡ Tezkor sotish (Instant Sell): Steam ulash → inventar → narx → tasdiq ─
+    bot.action("instant_sell_new", async (ctx) => {
+        await ctx.answerCbQuery();
+        const user = getUser(ctx.from.id);
+        if (!user) return;
+        if (!user.steamId64) {
+            const nonce = createPendingAuth(user.id, "bidder");
+            const url = `${process.env.WEBAPP_URL}/api/auth/steam/start?state=${nonce}`;
+            return ctx.editMessageText(
+                "🔗 *Tezkor sotish uchun avval Steam hisobingizni ulang:*",
+                { parse_mode: "Markdown", ...Markup.inlineKeyboard([
+                    [Markup.button.url("🔗 Steam orqali ulash", url)],
+                    [Markup.button.callback("⬅️ Orqaga", "back_to_market")],
+                ])}
+            ).catch(() => {});
+        }
+        if (!user.tradeLink) {
+            return ctx.editMessageText(
+                "⚠️ *Tezkor sotish uchun avval Trade Link kiritishingiz kerak.* Profil bo'limidan kiriting.",
+                { parse_mode: "Markdown", ...Markup.inlineKeyboard([[Markup.button.callback("⬅️ Orqaga", "back_to_market")]]) }
+            ).catch(() => {});
+        }
+        await showInstantSellInventoryPicker(ctx, user, true);
+    });
+
+    async function showInstantSellInventoryPicker(ctx, user, edit) {
+        let items;
+        try { items = await fetchUserInventory(user.steamId64); }
+        catch (err) {
+            const msg = `❌ Inventarni olishda xato: ${err.message}`;
+            const opts = Markup.inlineKeyboard([[Markup.button.callback("⬅️ Orqaga", "back_to_market")]]);
+            try { return edit ? await ctx.editMessageText(msg, opts) : await ctx.reply(msg, opts); } catch {}
+            return;
+        }
+        const tradable = items.filter(it => it.tradable !== false);
+        const { pageItems, totalPages, total } = skinUtils.paginate(tradable, 0, INVENTORY_PAGE_SIZE);
+        if (!total) {
+            const msg = "😔 Steam inventaringizda savdo qilinadigan itemlar topilmadi.";
+            return ctx.editMessageText(msg, Markup.inlineKeyboard([[Markup.button.callback("⬅️ Orqaga", "back_to_market")]])).catch(() => {});
+        }
+        const rows = pageItems.map(it => [Markup.button.callback(
+            `${it.name}${it.float != null ? ` (${skinUtils.wearCode(it.float)})` : ""}`,
+            `is_pick_${it.assetId}`
+        )]);
+        rows.push([Markup.button.callback("⬅️ Orqaga", "back_to_market")]);
+        const text = `⚡ *Tezkor sotish — skinni tanlang:* (${total} ta)`;
+        const opts = { parse_mode: "Markdown", ...Markup.inlineKeyboard(rows) };
+        try { return edit ? await ctx.editMessageText(text, opts) : await ctx.reply(text, opts); } catch {}
+    }
+
+    bot.action(/^is_pick_(.+)$/, async (ctx) => {
+        await ctx.answerCbQuery();
+        const user = getUser(ctx.from.id);
+        if (!user) return;
+        const assetId = ctx.match[1];
+        let items;
+        try { items = await fetchUserInventory(user.steamId64); }
+        catch (err) { return ctx.answerCbQuery("❌ Inventar xatosi: " + err.message, true); }
+        const item = items.find(it => String(it.assetId) === assetId);
+        if (!item) return ctx.answerCbQuery("❌ Item topilmadi (kesh eskirgan).", true);
+        // `marketHashName` relay javobida YO'Q — Steam formatiga mos ravishda
+        // o'zimiz hosil qilamiz (Task 2'da qo'shilgan skinUtils.marketHashName).
+        const marketHashName = skinUtils.marketHashName(item.name, item.float);
+
+        let priceSom;
+        try { priceSom = await getInstantSellPriceSom(marketHashName); }
+        catch (err) { return ctx.answerCbQuery("❌ Narx olishda xato: " + err.message, true); }
+        if (priceSom == null) return ctx.answerCbQuery("❌ Bu skin uchun narx topilmadi.", true);
+
+        pendingInstantSell[user.id] = { assetId: item.assetId, marketHashName, name: item.name, priceSom };
+        await ctx.editMessageText(
+            `⚡ *"${item.name}"*\n\n💰 Taklif: *${priceSom.toLocaleString()} so'm* (darhol to'lanadi)\n\nTasdiqlaysizmi?`,
+            { parse_mode: "Markdown", ...Markup.inlineKeyboard([
+                [Markup.button.callback("✅ Ha, sotaman", "is_confirm")],
+                [Markup.button.callback("❌ Bekor", "back_to_market")],
+            ])}
+        ).catch(() => {});
+    });
+
+    bot.action("is_confirm", async (ctx) => {
+        await ctx.answerCbQuery();
+        const user = getUser(ctx.from.id);
+        if (!user) return;
+        const pending = pendingInstantSell[user.id];
+        if (!pending) return ctx.answerCbQuery("❌ So'rov topilmadi, qaytadan boshlang.", true);
+        delete pendingInstantSell[user.id];
+
+        const result = await instantSellManager.createInstantSellRequest(user.id, pending.assetId, pending.marketHashName, user.steamId64);
+        if (result.error) return ctx.answerCbQuery("❌ Xatolik: " + result.error, true);
+
+        const botTradeUrl = process.env.BOT_STEAM_TRADE_URL || "(admin bilan bog'laning)";
+        await ctx.editMessageText(
+            `📤 *"${pending.name}"* itemini quyidagi trade-link'ga yuboring:\n\n\`${botTradeUrl}\`\n\n` +
+            `⚠️ FAQAT shu itemni yuboring, hech narsa so'ramang. Qabul qilingach, *${pending.priceSom.toLocaleString()} so'm* darhol balansingizga tushadi.\n\n⏰ So'rov 15 daqiqa amal qiladi.`,
+            { parse_mode: "Markdown" }
+        ).catch(() => {});
     });
 
     async function showMarketInventoryPicker(ctx, user, edit) {
