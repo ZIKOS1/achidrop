@@ -43,7 +43,10 @@ function getMyInstantSellRequests(userId) {
 // odatda wear-tier darajasida, aniq float darajasida emas).
 async function createInstantSellRequest(userId, assetId, marketHashName, steamId64) {
     const priceSom = await getInstantSellPriceSom(marketHashName);
-    if (priceSom == null) return { error: "price_not_found" };
+    // `== null` NaN'ni USHLAMAYDI (NaN == null → false) — narx moduli buzilgan
+    // javob qaytarsa, NaN balansgacha yetib borib uni butunlay buzib qo'yishi
+    // mumkin. Asosiy himoya lisSkinsPrice.js'da, bu — ikkinchi qavat.
+    if (priceSom == null || !Number.isFinite(priceSom) || priceSom <= 0) return { error: "price_not_found" };
 
     const id = Date.now();
     const request = {

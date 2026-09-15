@@ -1,12 +1,16 @@
 // Lis-Skins'dan CS2 skin narxini olish — Instant Sell (buyback) va admin
 // auto-list narxlarini hisoblash uchun asos. Natija 1 soatga keshlanadi
-// (API'ga har so'rovda murojaat qilmaslik uchun).
+// (API'ga har so'rovda murojaat qilmaslik uchun). Narx TOPILMAGAN (null)
+// natija esa faqat qisqa muddatga keshlanadi — API javob shakli kutilganidan
+// farq qilsa (yoki kalit endigina sozlansa), soat davomida "narx yo'q" deb
+// qotib qolmasligi uchun.
 const CACHE_MS = 60 * 60 * 1000;
+const NULL_CACHE_MS = 60 * 1000;
 const priceCache = new Map(); // marketHashName -> { usd, ts }
 
 async function fetchLisSkinsPriceUsd(marketHashName) {
     const cached = priceCache.get(marketHashName);
-    if (cached && Date.now() - cached.ts < CACHE_MS) return cached.usd;
+    if (cached && Date.now() - cached.ts < (cached.usd == null ? NULL_CACHE_MS : CACHE_MS)) return cached.usd;
 
     const apiKey = process.env.LIS_SKINS_API_KEY;
     if (!apiKey) throw new Error("LIS_SKINS_API_KEY .env da sozlanmagan");
@@ -16,7 +20,13 @@ async function fetchLisSkinsPriceUsd(marketHashName) {
     if (!resp.ok) throw new Error(`Lis-Skins API xato (HTTP ${resp.status})`);
     const body = await resp.json();
     const item = body?.data?.[0] ?? body?.items?.[0] ?? null; // Step 1'da tasdiqlangan haqiqiy shaklga moslang
-    const usd = item ? Number(item.price) : null;
+    // API javob shakli kutilganidan farq qilsa (`price` yo'q, obyekt yoki
+    // raqamsiz matn bo'lsa) `Number(...)` NaN qaytaradi. NaN esa `== null`
+    // tekshiruvlaridan (getInstantSellPriceSom, createInstantSellRequest, UI)
+    // JIMGINA o'tib ketadi va oxir-oqibat user.balance'ni NaN qilib buzadi —
+    // shu sabab bu yerda ANIQ tekshiriladi.
+    const n = Number(item?.price);
+    const usd = Number.isFinite(n) && n > 0 ? n : null;
 
     priceCache.set(marketHashName, { usd, ts: Date.now() });
     return usd;
