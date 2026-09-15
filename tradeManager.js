@@ -230,6 +230,24 @@ async function confirmTrade(tradeId, byUserId) {
 // hech qachon tasdiqlanmaydi (status endi "open" emas, /buy qayta ishlamaydi).
 // Fix: ikkalasini BITTA tranzaksiyada, bitta o'qishdan keyin bajarish —
 // oraliqda hech qanday tashqi write() bo'lmaydi, shu sabab race yo'qoladi.
+//
+// SOTUVCHI ADMIN (bot inventari) bo'lsa — e'lon shu yerning o'zida DARHOL
+// "completed" bo'ladi: skinni bot akkаunti avtomatik yetkazadi (xaridor
+// "Mening inventarim"dan istalgan payt chiqarib oladi), shu sabab "sotuvchi
+// yubordi / xaridor oldi" bosqichlari umuman mavjud emas. Ilgari bunday
+// xarid ham "seller_sending"da qolib ketardi — u STALE_STATES ro'yxatida
+// bo'lgani uchun 24 soatdan keyin sweepStaleTrades() uni bekor qilib, pulni
+// xaridorga QAYTA qaytarib yuborardi (skin allaqachon chiqarib olingan
+// bo'lsa ham), sotuvchiga esa tushum hech qachon o'tmasdi.
+// Sotuvchi ODDIY user bo'lsa (Task 6'dan oldingi eski P2P e'lonlar) — hech
+// narsa o'zgarmaydi: bot boshqa odamning skinini avtomatik yubora olmaydi,
+// shu sabab eski "seller_sending → markSent → markReceived" oqimi qoladi.
+//
+// `autoCompleted: true` qaytsa, chaqiruvchi (server.js / marketHandler.js)
+// sotuvchi tushumini balanceManager.creditTradeProceeds() orqali qo'shadi
+// (boshqa barcha markReceived/autoCompleteTrade chaqiruv joylaridagi kabi —
+// creditTradeProceeds oddiy read/write funksiyasi, shu sabab bu
+// tranzaksiya ichida chaqirib bo'lmaydi).
 async function buyMarketListing(tradeId, buyerId) {
     return withTransaction(async (session) => {
         const trades = await readTx(session, "trades");
@@ -251,13 +269,27 @@ async function buyMarketListing(tradeId, buyerId) {
         trade.buyerId = buyerId;
         trade.buyerConfirmed = true;
         trade.priceLocked = true;
-        trade.buyerFundsHeld = true;
-        trade.status = "seller_sending";
-        logAudit(trade, "seller_sending", buyerId);
+
+        const adminId = Number(process.env.ADMIN_ID);
+        const sellerIsAdmin = Number.isFinite(adminId) && trade.sellerId === adminId;
+
+        if (sellerIsAdmin) {
+            // Komissiya markReceived/autoCompleteTrade bilan bir xil hisoblanadi.
+            trade.feeAmount      = trade.feeWaived ? 0 : tradeFee(trade.agreedPrice);
+            trade.sellerProceeds = trade.agreedPrice - trade.feeAmount;
+            trade.buyerFundsHeld = false;
+            trade.status         = "completed";
+            trade.completedAt    = new Date().toISOString();
+            logAudit(trade, "completed", buyerId);
+        } else {
+            trade.buyerFundsHeld = true;
+            trade.status = "seller_sending";
+            logAudit(trade, "seller_sending", buyerId);
+        }
 
         await writeTx(session, "users", users);
         await writeTx(session, "trades", trades);
-        return { trade, cacheUpdates: { trades, users } };
+        return { trade, autoCompleted: sellerIsAdmin, cacheUpdates: { trades, users } };
     });
 }
 

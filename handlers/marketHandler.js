@@ -6,11 +6,12 @@
 // nizo/bekor qilish) tradeHandler.js'ning UMUMIY `showTradeRoom`'idan
 // (kind'ga qaramaydi) qayta ishlatiladi — market va obmen bir xil davomni bosib o'tadi.
 const { Markup } = require("telegraf");
-const { read, refresh } = require("../database/db");
+const { read, write, refresh } = require("../database/db");
 const { notifyUser } = require("../notify");
 const { fetchUserInventory } = require("../steam");
 const { createPendingAuth } = require("../auth-steam");
 const tradeManager = require("../tradeManager");
+const balanceManager = require("../balanceManager");
 const skinUtils    = require("../skinUtils");
 const tradeHandler = require("./tradeHandler"); // showTradeRoom — faqat tradeHandler(bot) chaqirilgandan keyin mavjud bo'ladi (index.js shunday tartibda ulaydi)
 const instantSellManager = require("../instantSellManager");
@@ -348,13 +349,39 @@ module.exports = (bot) => {
         if (result.error) return ctx.answerCbQuery("❌ Xatolik yuz berdi.", true);
 
         const trade = result.trade;
-        const buyer = getUser(ctx.from.id);
+        // Sotuvchi admin bo'lsa — tradeManager savdoni darhol "completed"
+        // qildi: sotuvchi tushumini qo'shamiz va xaridorga "Chiqarib olish"
+        // uchun marketPurchases yozuvini yozamiz (POST /api/market/:id/buy
+        // dagi naqshning aynan o'zi — bot va mini-app bir xil ishlashi uchun).
+        if (result.autoCompleted) {
+            balanceManager.creditTradeProceeds(trade.sellerId, trade.sellerProceeds, trade.id, trade.feeAmount);
+            const arr = readUsers();
+            const buyer = arr.find(x => x.id === ctx.from.id);
+            if (buyer) {
+                if (!Array.isArray(buyer.marketPurchases)) buyer.marketPurchases = [];
+                const skin = trade.skins?.[0];
+                buyer.marketPurchases.push({
+                    lotId: trade.id, lotName: skin?.name ?? "Skin",
+                    image: skin?.imageUrl ?? null, float: skin?.float ?? null,
+                    assetId: skin?.assetId ?? null, price: trade.agreedPrice,
+                    status: "pending", requestedAt: null,
+                });
+                write("users", arr);
+            }
+        }
+
         await ctx.editMessageText(
-            `✅ *Sotib olindi!*\n\n📦 ${trade.skins?.[0]?.name}\n💰 ${fmt(trade.agreedPrice)} so'm\n\nSotuvchi skinni Trade Link'ingizga yuborishini kuting.`,
+            `✅ *Sotib olindi!*\n\n📦 ${trade.skins?.[0]?.name}\n💰 ${fmt(trade.agreedPrice)} so'm\n\n` +
+            (result.autoCompleted
+                ? `🎒 Skinni "Mening inventarim" bo'limidan istalgan payt Steam'ga chiqarib olishingiz mumkin.`
+                : `Sotuvchi skinni Trade Link'ingizga yuborishini kuting.`),
             { parse_mode: "Markdown", ...Markup.inlineKeyboard([[Markup.button.callback("📦 Savdoni ochish", `trade_${trade.id}`)]]) }
         ).catch(() => {});
         notifyUser(trade.sellerId,
-            `🛒 *Market #${trade.id}*: "${trade.skins?.[0]?.name}" sotildi! *${fmt(trade.agreedPrice)} so'm*. Xaridorning trade linkiga skinni yuboring.`,
+            `🛒 *Market #${trade.id}*: "${trade.skins?.[0]?.name}" sotildi! *${fmt(trade.agreedPrice)} so'm*. ` +
+            (result.autoCompleted
+                ? `\n💰 *${fmt(trade.sellerProceeds)} so'm* hisobingizga tushdi (skin xaridorga avtomatik yetkaziladi).`
+                : `Xaridorning trade linkiga skinni yuboring.`),
             bot.telegram.sendMessage.bind(bot.telegram),
             { parse_mode: "Markdown", ...Markup.inlineKeyboard([[Markup.button.callback("📦 Savdoni ochish", `trade_${trade.id}`)]]) }
         );

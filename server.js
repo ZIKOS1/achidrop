@@ -1201,25 +1201,44 @@ app.post("/api/market/:id/buy", auth, async (req, res) => {
 
     const locked = result.trade;
 
-    // Auksion g'oliblari uchun mavjud "wins" naqshiga o'xshab, xaridorning
-    // marketPurchases'iga yozuv qo'shamiz — shu orqali u istalgan payt
-    // "Chiqarib olish"ni bosib, avtomatik (yoki admin fallback) Steam trade
-    // offer olishi mumkin (withdrawDelivery.js, POST /api/market-withdraw).
-    const arr = getUsers();
-    const buyer = arr.find(x => x.id === u.id);
-    if (buyer) {
-        if (!Array.isArray(buyer.marketPurchases)) buyer.marketPurchases = [];
-        const skin = locked.skins?.[0];
-        buyer.marketPurchases.push({
-            lotId: locked.id, lotName: skin?.name ?? "Skin",
-            image: skin?.imageUrl ?? null, float: skin?.float ?? null,
-            assetId: skin?.assetId ?? null, price: locked.agreedPrice,
-            status: "pending", requestedAt: null,
-        });
-        saveUsers(arr);
+    // Sotuvchi admin bo'lsa (bot inventaridan sotilgan e'lon) — tradeManager
+    // savdoni tranzaksiya ichida DARHOL "completed" qilib qo'ydi, shu sabab
+    // sotuvchi tushumini shu yerda qo'shamiz (POST /api/trades/:id/received
+    // dagi naqshning aynan o'zi — creditTradeProceeds tranzaksiyada
+    // qatnasha olmaydi).
+    //
+    // Xaridorning marketPurchases yozuvi ("Chiqarib olish" tugmasi) ham FAQAT
+    // shu holatda qo'shiladi: eski (Task 6'gacha bo'lgan) oddiy userning P2P
+    // e'loni sotib olinsa, botda u skin yo'q — avtomatik yetkazib bo'lmaydi,
+    // xaridor eski trade-room oqimi orqali sotuvchidan oladi.
+    if (result.autoCompleted) {
+        balanceManager.creditTradeProceeds(locked.sellerId, locked.sellerProceeds, locked.id, locked.feeAmount);
+
+        // Auksion g'oliblari uchun mavjud "wins" naqshiga o'xshab, xaridorning
+        // marketPurchases'iga yozuv qo'shamiz — shu orqali u istalgan payt
+        // "Chiqarib olish"ni bosib, avtomatik (yoki admin fallback) Steam trade
+        // offer olishi mumkin (withdrawDelivery.js, POST /api/market-withdraw).
+        const arr = getUsers();
+        const buyer = arr.find(x => x.id === u.id);
+        if (buyer) {
+            if (!Array.isArray(buyer.marketPurchases)) buyer.marketPurchases = [];
+            const skin = locked.skins?.[0];
+            buyer.marketPurchases.push({
+                lotId: locked.id, lotName: skin?.name ?? "Skin",
+                image: skin?.imageUrl ?? null, float: skin?.float ?? null,
+                assetId: skin?.assetId ?? null, price: locked.agreedPrice,
+                status: "pending", requestedAt: null,
+            });
+            saveUsers(arr);
+        }
     }
 
-    notifyUser(locked.sellerId, `🛒 *Market #${locked.id}*: "${locked.skins?.[0]?.name}" sotildi! *${locked.agreedPrice.toLocaleString()} so'm*.`, tgSendMessage);
+    notifyUser(locked.sellerId,
+        `🛒 *Market #${locked.id}*: "${locked.skins?.[0]?.name}" sotildi! *${locked.agreedPrice.toLocaleString()} so'm*.` +
+        (result.autoCompleted
+            ? `\n💰 *${(locked.sellerProceeds ?? 0).toLocaleString()} so'm* hisobingizga tushdi (skin xaridorga avtomatik yetkaziladi).`
+            : `\nXaridorning trade linkiga skinni yuboring.`),
+        tgSendMessage);
     res.json(enrichTrade(locked));
 });
 
