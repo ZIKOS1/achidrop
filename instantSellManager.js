@@ -8,8 +8,19 @@
 //      tradeDelivery.js/withdrawDelivery.js bilan bir xil naqsh) relay'dan
 //      holatni so'raydi: "accepted" bo'lsa — item nomi ANIQ mos kelishini
 //      YANA BIR BOR tekshirib (ikki bosqichli tasdiqlash), keyingina
-//      balanceManager.creditTradeProceeds() chaqiradi.
-const { read, write } = require("./database/db");
+//      pul balansga qo'shiladi.
+//
+// MUHIM (jarayonlararo xavfsizlik): bot va mini-app (Vercel) alohida
+// jarayonlar, har birining o'z xotiradagi keshi bor. Shu sabab
+// "instantSellRequests" bilan ishlashda — xuddi bid/obmen pul amallaridagi
+// kabi — o'qishdan oldin refresh() qilinadi, holatni o'zgartirish + pulni
+// kreditlash esa BITTA MongoDB tranzaksiyasida bajariladi
+// (balanceManager.reverseTradeCreditEntry naqshi). Aks holda: (a) mini-appdan
+// yaratilgan so'rov bot jarayonida ko'rinmay qolishi, (b) ikki jarayonning
+// yozuvi bir-birini bosib yuborishi, (c) kreditlash bilan "credited" deb
+// saqlash orasida jarayon uzilib, keyingi tsiklda IKKI MARTA kreditlanishi
+// mumkin edi.
+const { read, write, refresh, withTransaction, readTx, writeTx } = require("./database/db");
 const { getInstantSellPriceSom } = require("./lisSkinsPrice");
 
 const REQUEST_TTL_MS = 15 * 60 * 1000; // 15 daqiqa — shu vaqt ichida item kelmasa eskiradi
@@ -68,44 +79,73 @@ async function createInstantSellRequest(userId, assetId, marketHashName, steamId
     });
     if (!resp.ok) return { error: "relay_unavailable" };
 
+    // Boshqa jarayon (bot ⇄ mini-app) shu orada yozgan so'rovlar ustiga
+    // eski keshni bosib yubormaslik uchun — yozishdan oldin eng yangi
+    // holatni olamiz.
+    await refresh("instantSellRequests").catch(() => {});
     const all = getAllRequests();
     all.push(request);
     saveAllRequests(all);
     return { request };
 }
 
-// index.js'dagi setInterval orqali chaqiriladi. `onCredited(user, request)` —
-// bildirishnoma yuborish uchun. `_polling` — agar oldingi chaqiruv (masalan
-// relay sekin javob bergani uchun) hali tugamagan bo'lsa, ustma-ust
-// ishga tushib bir xil so'rovni ikki marta kreditlab qo'ymasligi uchun.
+// balanceManager.creditTradeProceeds()'ning tranzaksiya ICHIDAGI nusxasi —
+// o'sha funksiyaning o'zi oddiy read/write bilan ishlaydi, shu sabab boshqa
+// modulning Mongo sessiyasi ichida xavfsiz chaqirib bo'lmaydi. Bu yerda
+// yozuvlar shakli bir xil saqlanadi (balans tarixi + 7 kunlik hold ledgeri),
+// shu sabab admin paneldagi "bekor qilish" (reverseTradeCreditEntry) va
+// "Balans" sahifasi bu yozuvlarni ham xuddi oddiy tushum kabi ko'radi.
+// `fee` har doim 0 (Instant Sell'da komissiya narxning o'zida hisobga
+// olingan — instantSellMarginPercent), shu sabab "tradeFees" yozuvi yo'q.
+function creditRequestInTx(users, ledgers, request) {
+    const user = users.find(u => u.id === request.userId);
+    if (user) {
+        user.balance = (user.balance ?? 0) + request.priceSom;
+        if (!Array.isArray(user.balanceHistory)) user.balanceHistory = [];
+        user.balanceHistory.push({
+            amount: request.priceSom,
+            reason: `Obmen — skin sotildi (#${request.id})`,
+            date: new Date().toISOString(),
+        });
+    }
+    let ledger = ledgers.find(l => l.userId === request.userId);
+    if (!ledger) { ledger = { userId: request.userId, entries: [] }; ledgers.push(ledger); }
+    if (!Array.isArray(ledger.entries)) ledger.entries = [];
+    ledger.entries.push({
+        id: Date.now() + "-" + Math.random().toString(36).slice(2, 6),
+        amount: request.priceSom, source: "trade", tradeId: request.id, fee: 0,
+        receivedAt: new Date().toISOString(),
+        withdrawalStatus: null, // null | "pending" | "withdrawn"
+    });
+}
+
+// index.js'dagi setInterval orqali chaqiriladi — kreditlangan so'rovlar
+// massivini qaytaradi (bildirishnomani chaqiruvchi yuboradi). `_polling` —
+// agar oldingi chaqiruv (masalan relay sekin javob bergani uchun) hali
+// tugamagan bo'lsa, ustma-ust ishga tushib bir xil so'rovni ikki marta
+// kreditlab qo'ymasligi uchun.
 let _polling = false;
-async function pollAndCreditPendingRequests(creditTradeProceeds, onCredited) {
+async function pollAndCreditPendingRequests() {
     if (_polling) return [];
     _polling = true;
     try {
-        return await _pollAndCreditPendingRequestsInner(creditTradeProceeds, onCredited);
+        return await _pollAndCreditPendingRequestsInner();
     } finally {
         _polling = false;
     }
 }
 
-async function _pollAndCreditPendingRequestsInner(creditTradeProceeds, onCredited) {
+async function _pollAndCreditPendingRequestsInner() {
+    // ── 1-bosqich: relay bilan gaplashish (TASHQI I/O) ─────────────────────
+    // Bu QAT'IY ravishda tranzaksiyadan TASHQARIDA bo'lishi kerak:
+    // withTransaction'ning `fn` funksiyasi to'qnashuvda qayta ishga
+    // tushirilishi mumkin (database/db.js izohiga qarang), tashqi so'rov esa
+    // qayta bajarilib kutilmagan natija berardi.
+    await refresh("instantSellRequests").catch(() => {});
     const all = getAllRequests();
     const pending = all.filter(r => r.status === "awaiting_deposit" && new Date(r.expiresAt).getTime() > Date.now());
-    if (!pending.length) {
-        // Eskirganlarni belgilash
-        let changed = false;
-        for (const r of all) {
-            if (r.status === "awaiting_deposit" && new Date(r.expiresAt).getTime() <= Date.now()) {
-                r.status = "expired";
-                changed = true;
-            }
-        }
-        if (changed) saveAllRequests(all);
-        return [];
-    }
 
-    const results = [];
+    const outcomes = new Map(); // requestId -> { status, receivedAssetId? }
     for (const request of pending) {
         let body;
         try {
@@ -116,22 +156,69 @@ async function _pollAndCreditPendingRequestsInner(creditTradeProceeds, onCredite
         }
 
         if (body.status === "expired") {
-            request.status = "expired";
+            outcomes.set(request.id, { status: "expired" });
         } else if (body.status === "accepted") {
             // Ikkinchi bosqichli tekshiruv: kelgan item nomi so'ralganiga ANIQ mos kelishi shart.
             if (body.receivedItem?.marketHashName !== request.marketHashName) {
-                request.status = "mismatch"; // admin diqqatiga — pul BERILMAYDI
+                outcomes.set(request.id, { status: "mismatch" }); // admin diqqatiga — pul BERILMAYDI
             } else {
-                request.status = "credited";
-                request.creditedAt = new Date().toISOString();
-                request.receivedAssetId = body.receivedItem.assetId;
-                creditTradeProceeds(request.userId, request.priceSom, request.id, 0);
-                results.push({ request });
+                outcomes.set(request.id, { status: "credited", receivedAssetId: body.receivedItem.assetId });
             }
         }
     }
-    saveAllRequests(all);
-    return results;
+
+    const hasExpiredByTtl = all.some(r => r.status === "awaiting_deposit" && new Date(r.expiresAt).getTime() <= Date.now());
+    if (!outcomes.size && !hasExpiredByTtl) return [];
+
+    // ── 2-bosqich: holat o'zgarishi + pul kreditlash — BITTA tranzaksiyada ──
+    const result = await withTransaction(async (session) => {
+        const rawRequests = await readTx(session, "instantSellRequests");
+        const requests = Array.isArray(rawRequests) ? rawRequests : [];
+
+        const toCredit = [];
+        let changed = false;
+        for (const r of requests) {
+            // Faqat hali "awaiting_deposit" bo'lganlarga tegamiz — boshqa
+            // jarayon (yoki avvalgi, yarim uzilgan tsikl) allaqachon
+            // "credited" qilib qo'ygan bo'lsa, ikkinchi marta kreditlanmaydi.
+            if (r.status !== "awaiting_deposit") continue;
+            const outcome = outcomes.get(r.id);
+            if (outcome?.status === "credited") {
+                r.status = "credited";
+                r.creditedAt = new Date().toISOString();
+                r.receivedAssetId = outcome.receivedAssetId;
+                toCredit.push(r);
+                changed = true;
+            } else if (outcome?.status === "expired" || outcome?.status === "mismatch") {
+                r.status = outcome.status;
+                changed = true;
+            } else if (!outcome && new Date(r.expiresAt).getTime() <= Date.now()) {
+                r.status = "expired";
+                changed = true;
+            }
+        }
+        if (!changed) return { results: [] };
+
+        const cacheUpdates = { instantSellRequests: requests };
+        if (toCredit.length) {
+            const rawUsers = await readTx(session, "users");
+            const users = Array.isArray(rawUsers) ? rawUsers : Object.values(rawUsers);
+            const rawLedgers = await readTx(session, "tradeBalances");
+            const ledgers = Array.isArray(rawLedgers) ? rawLedgers : [];
+
+            for (const r of toCredit) creditRequestInTx(users, ledgers, r);
+
+            await writeTx(session, "users", users);
+            await writeTx(session, "tradeBalances", ledgers);
+            cacheUpdates.users = users;
+            cacheUpdates.tradeBalances = ledgers;
+        }
+        await writeTx(session, "instantSellRequests", requests);
+
+        return { results: toCredit.map(r => ({ request: r })), cacheUpdates };
+    });
+
+    return result?.results || [];
 }
 
 module.exports = { createInstantSellRequest, getInstantSellRequest, getMyInstantSellRequests, pollAndCreditPendingRequests };

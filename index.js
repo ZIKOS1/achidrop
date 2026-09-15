@@ -4,7 +4,6 @@ const { read, connect, refresh } = require("./database/db");
 const { notifyUser } = require("./notify");
 const { finishAuction } = require("./auctionLifecycle");
 const instantSellManager = require("./instantSellManager");
-const balanceManager = require("./balanceManager");
 
 // Vaqtni chiroyli ko'rsatish
 function timeLeft(endTime) {
@@ -87,10 +86,7 @@ async function main() {
     // ── Instant Sell: kutilayotgan depozitlarni tekshirish (relay orqali) ────
     setInterval(async () => {
         try {
-            const credited = await instantSellManager.pollAndCreditPendingRequests(
-                balanceManager.creditTradeProceeds,
-                () => {}
-            );
+            const credited = await instantSellManager.pollAndCreditPendingRequests();
             for (const { request } of credited) {
                 notifyUser(request.userId,
                     `✅ *Tezkor sotish yakunlandi!*\n\n💰 *${request.priceSom.toLocaleString()} so'm* hisobingizga tushdi.\n\n🧊 7 kundan keyin "Balans" bo'limidan yechib olishingiz mumkin bo'ladi.`,
