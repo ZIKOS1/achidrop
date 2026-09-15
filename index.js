@@ -3,6 +3,8 @@ const { Telegraf, Markup } = require("telegraf");
 const { read, connect, refresh } = require("./database/db");
 const { notifyUser } = require("./notify");
 const { finishAuction } = require("./auctionLifecycle");
+const instantSellManager = require("./instantSellManager");
+const balanceManager = require("./balanceManager");
 
 // Vaqtni chiroyli ko'rsatish
 function timeLeft(endTime) {
@@ -81,6 +83,24 @@ async function main() {
             console.log("OBMEN AUTO-TASDIQ XATO:", err.message);
         }
     }, 5 * 60_000);
+
+    // ── Instant Sell: kutilayotgan depozitlarni tekshirish (relay orqali) ────
+    setInterval(async () => {
+        try {
+            const credited = await instantSellManager.pollAndCreditPendingRequests(
+                balanceManager.creditTradeProceeds,
+                () => {}
+            );
+            for (const { request } of credited) {
+                notifyUser(request.userId,
+                    `✅ *Tezkor sotish yakunlandi!*\n\n💰 *${request.priceSom.toLocaleString()} so'm* hisobingizga tushdi.\n\n🧊 7 kundan keyin "Balans" bo'limidan yechib olishingiz mumkin bo'ladi.`,
+                    bot.telegram.sendMessage.bind(bot.telegram), { parse_mode: "Markdown" }
+                );
+            }
+        } catch (err) {
+            console.log("INSTANT SELL TEKSHIRUV XATO:", err.message);
+        }
+    }, 30_000);
 
     // ── Auction tugash tekshirish (har 10 soniyada) ───────────────────────────────
     // MUHIM: g'olib yozuvini (rasm/float/stiker/trade-ban snapshot bilan) yagona
