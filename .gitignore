@@ -28,6 +28,7 @@ database/*.json
 package-lock.json
 .vercel
 .env*
+!.env.example
 
 # Subagent-driven-development ish maydoni (ledger, brieflar, review paketlari)
 .superpowers/
