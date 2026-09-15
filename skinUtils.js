@@ -77,6 +77,18 @@ function wearName(float) {
     return "Battle-Scarred";
 }
 
+// Steam'ning market_hash_name'ini item nomi + float'dan hosil qiladi
+// (masalan "AK-47 | Redline (Field-Tested)", yoki StatTrak bo'lsa
+// "StatTrak™ AK-47 | Redline (Field-Tested)" — StatTrak prefiksi
+// item.name'ning o'zida allaqachon bor). Float/wear bo'lmagan itemlar
+// (stiker, agent, keys) uchun nomning o'zi qaytadi. Bu Lis-Skins narx
+// qidiruvi VA relay'dagi kiruvchi-trade moslashtirish (Task 1/4) uchun
+// ISHLATILADIGAN, Steam formatiga ANIQ mos bo'lishi shart bo'lgan qiymat.
+function marketHashName(name, float) {
+    const wn = wearName(float);
+    return wn ? `${name} (${wn})` : name;
+}
+
 const WEAR_TIERS = [
     { code: "all", label: "Hammasi" },
     { code: "FN",  label: "Factory New" },
@@ -100,6 +112,6 @@ function paginate(items, page, pageSize) {
 
 module.exports = {
     CATEGORY_KEYWORDS, CATEGORIES, guessCategory,
-    wearCode, wearName, WEAR_TIERS,
+    wearCode, wearName, marketHashName, WEAR_TIERS,
     paginate, enrichStickers,
 };

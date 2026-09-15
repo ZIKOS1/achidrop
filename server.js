@@ -1945,6 +1945,8 @@ app.get("/api/admin/settings", requireAdminPanel, (req, res) => {
         steamId64: s.steamId64 || null,
         referralBonus: s.referralBonus ?? 10000,
         tradeFeeTiers: tradeManager.getFeeTiers(),
+        instantSellMarginPercent: s.instantSellMarginPercent ?? 12,
+        usdToSomRate: s.usdToSomRate ?? 12700,
     });
 });
 
@@ -1972,6 +1974,16 @@ app.post("/api/admin/settings", requireAdminPanel, (req, res) => {
         if (!tiers) return res.status(400).json({ error: "Komissiya darajalari noto'g'ri (3 ta daraja, o'sish tartibida, musbat qiymatlar kerak)" });
         s.tradeFeeTiers = tiers;
     }
+    if (req.body.instantSellMarginPercent !== undefined) {
+        const m = Number(req.body.instantSellMarginPercent);
+        if (isNaN(m) || m < 0 || m > 100) return res.status(400).json({ error: "Instant Sell margin 0-100% orasida bo'lishi kerak" });
+        s.instantSellMarginPercent = m;
+    }
+    if (req.body.usdToSomRate !== undefined) {
+        const rate = Number(req.body.usdToSomRate);
+        if (isNaN(rate) || rate <= 0) return res.status(400).json({ error: "USD to Som kurs musbat raqam bo'lishi kerak" });
+        s.usdToSomRate = rate;
+    }
     write("settings", s);
     res.json({
         success: true,
@@ -1979,6 +1991,8 @@ app.post("/api/admin/settings", requireAdminPanel, (req, res) => {
         steamId64: s.steamId64 || null,
         referralBonus: s.referralBonus ?? 10000,
         tradeFeeTiers: tradeManager.getFeeTiers(),
+        instantSellMarginPercent: s.instantSellMarginPercent ?? 12,
+        usdToSomRate: s.usdToSomRate ?? 12700,
     });
 });
 
