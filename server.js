@@ -28,6 +28,7 @@ const skinUtils      = require("./skinUtils");
 const { trySendAutoOffer, maybeCheckPendingWithdrawals } = require("./withdrawDelivery");
 const supportManager = require("./supportManager");
 const instantSellManager = require("./instantSellManager");
+const lisSkinsPrice = require("./lisSkinsPrice");
 
 const app  = express();
 const PORT = process.env.WEBAPP_PORT || 3000;
@@ -1658,6 +1659,62 @@ app.get("/api/admin/steam-inventory", requireAdminPanel, async (req, res) => {
         console.log("STEAM INVENTORY XATO:", err.message);
         res.status(502).json({ error: err.message });
     }
+});
+
+// GET /api/admin/steam-inventory-grouped — bot akkauntining inventarini
+// nom+wear bo'yicha guruhlab qaytaradi (bulk-list uchun — bir xil skinning
+// nechta nusxasi bo'lsa bittasiga narx belgilab, hammasini birdaniga
+// sotuvga chiqarish mumkin bo'lishi uchun).
+app.get("/api/admin/steam-inventory-grouped", requireAdminPanel, async (req, res) => {
+    try {
+        const items = await fetchInventory(req.query.refresh === "1");
+        const groups = new Map();
+        for (const it of items) {
+            if (it.tradable === false) continue;
+            const key = `${it.name}::${skinUtils.wearCode(it.float) ?? ""}`;
+            if (!groups.has(key)) groups.set(key, { name: it.name, wear: skinUtils.wearCode(it.float), marketHashName: skinUtils.marketHashName(it.name, it.float), items: [] });
+            groups.get(key).items.push(it);
+        }
+        res.json([...groups.values()].map(g => ({ ...g, count: g.items.length })));
+    } catch (err) {
+        res.status(502).json({ error: err.message });
+    }
+});
+
+// GET /api/admin/list-price?marketHashName=... — Lis-Skins'dan sotuv narxini so'raydi
+// (bulk-list sahifasida "Lis narxidan taklif qil" tugmasi uchun).
+app.get("/api/admin/list-price", requireAdminPanel, async (req, res) => {
+    try {
+        const price = await lisSkinsPrice.getListPriceSom(String(req.query.marketHashName || ""));
+        res.json({ priceSom: price });
+    } catch (err) {
+        res.status(502).json({ error: err.message });
+    }
+});
+
+// POST /api/admin/market-bulk-list — { assetIds: string[], price: number }
+// Bir xil guruhdagi bir nechta itemni bittasiga narx belgilab, HAMMASINI
+// alohida-alohida market e'loni qilib bir vaqtda yaratadi. Bot inventaridan
+// topilmagan assetId'lar (masalan kesh eskirgan yoki item allaqachon
+// sotilgan bo'lsa) xato tashlamasdan shunchaki tashlab ketiladi.
+app.post("/api/admin/market-bulk-list", requireAdminPanel, async (req, res) => {
+    const { assetIds, price } = req.body || {};
+    if (!Array.isArray(assetIds) || !assetIds.length) return res.status(400).json({ error: "assetIds kerak" });
+    if (!Number.isFinite(price) || price < MIN_TRADE_PRICE) return res.status(400).json({ error: "min_price" });
+
+    let items;
+    try { items = await fetchInventory(); }
+    catch (err) { return res.status(502).json({ error: err.message }); }
+
+    const created = [];
+    const adminId = Number(process.env.ADMIN_ID);
+    for (const assetId of assetIds) {
+        const item = items.find(it => String(it.assetId) === String(assetId));
+        if (!item) continue;
+        const trade = tradeManager.createTrade(adminId, [buildSkin(item)], "website", price, "public", null, "market");
+        created.push(trade.id);
+    }
+    res.json({ created });
 });
 
 // ── ADMIN: Auksionlar ─────────────────────────────────────────────────────────

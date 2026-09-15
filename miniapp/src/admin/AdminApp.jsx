@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Gavel, Package, Plus, Users, Ticket, Image as ImageIcon, LogOut, Crosshair, Crown, BookOpen, LifeBuoy } from "lucide-react";
+import { Gavel, Package, Plus, Users, Ticket, Image as ImageIcon, LogOut, Crosshair, Crown, BookOpen, LifeBuoy, ShoppingCart } from "lucide-react";
 import { api } from "./api";
 import { AdminContext } from "./context";
 import Modal from "../components/Modal";
@@ -8,6 +8,7 @@ import AdminLogin from "./AdminLogin";
 import AdminHome from "./pages/AdminHome";
 import AdminAuctions from "./pages/AdminAuctions";
 import AdminAuctionForm from "./pages/AdminAuctionForm";
+import AdminMarket from "./pages/AdminMarket";
 import AdminUsers from "./pages/AdminUsers";
 import AdminUserDetail from "./pages/AdminUserDetail";
 import AdminPromos from "./pages/AdminPromos";
@@ -20,6 +21,7 @@ const PAGES = {
   home: () => <AdminHome />,
   "admin-auctions": () => <AdminAuctions />,
   "admin-auction-form": (data) => <AdminAuctionForm id={data} />,
+  "admin-market": () => <AdminMarket />,
   "admin-users": () => <AdminUsers />,
   "admin-user-detail": (data) => <AdminUserDetail id={data} />,
   "admin-promos": () => <AdminPromos />,
@@ -38,6 +40,7 @@ const NAV_ITEMS = [
   { key: "home", label: "Bosh sahifa", icon: Gavel },
   { key: "admin-auctions", label: "Auksionlar", icon: Package },
   { key: "admin-auction-form", label: "Yangi auksion", icon: Plus, navData: null },
+  { key: "admin-market", label: "Market", icon: ShoppingCart },
   { key: "admin-users", label: "Foydalanuvchilar", icon: Users },
   { key: "admin-promos", label: "Promo kodlar", icon: Ticket },
   { key: "admin-banners", label: "Bannerlar", icon: ImageIcon },
