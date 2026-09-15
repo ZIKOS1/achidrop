@@ -219,7 +219,12 @@ module.exports = (bot) => {
         if (!pending) return ctx.answerCbQuery("❌ So'rov topilmadi, qaytadan boshlang.", true);
         delete pendingInstantSell[user.id];
 
-        const result = await instantSellManager.createInstantSellRequest(user.id, pending.assetId, pending.marketHashName, user.steamId64);
+        let result;
+        try {
+            result = await instantSellManager.createInstantSellRequest(user.id, pending.assetId, pending.marketHashName, user.steamId64);
+        } catch (err) {
+            return ctx.answerCbQuery("❌ Xatolik: " + err.message, true);
+        }
         if (result.error) return ctx.answerCbQuery("❌ Xatolik: " + result.error, true);
 
         const botTradeUrl = process.env.BOT_STEAM_TRADE_URL || "(admin bilan bog'laning)";
