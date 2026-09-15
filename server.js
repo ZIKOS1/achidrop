@@ -642,7 +642,10 @@ app.post("/api/market-withdraw/:purchaseId", auth, async (req, res) => {
     const user = arr.find(x => x.id === u.id);
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    const purchase = (user.marketPurchases || []).find(p => p.lotId === purchaseId && (!p.status || p.status === "pending" || p.status === "auto_failed"));
+    // "rejected" ham qayta urinishga yaroqli — POST /api/withdraw/:lotId dagi
+    // kabi: admin qo'lda yetkazishni rad etgan bo'lsa, foydalanuvchi Trade
+    // Link'ini tuzatib qayta so'rashi mumkin bo'lishi kerak.
+    const purchase = (user.marketPurchases || []).find(p => p.lotId === purchaseId && (!p.status || p.status === "pending" || p.status === "rejected" || p.status === "auto_failed"));
     if (!purchase) return res.status(404).json({ error: "Item topilmadi yoki allaqachon so'ralgan" });
 
     const auto = await trySendAutoOffer(user, purchase);
@@ -650,12 +653,15 @@ app.post("/api/market-withdraw/:purchaseId", auth, async (req, res) => {
         purchase.status = "auto_sent";
         purchase.tradeOfferId = auto.offerId;
         purchase.autoSentAt = new Date().toISOString();
+        delete purchase.rejectComment;
+        delete purchase.lastFailReason;
         saveUsers(arr);
         return res.json({ success: true, auto: true });
     }
 
     purchase.status = "requested";
     purchase.requestedAt = new Date().toISOString();
+    delete purchase.rejectComment;
     saveUsers(arr);
     tgSendMessage(
         Number(process.env.ADMIN_ID),
