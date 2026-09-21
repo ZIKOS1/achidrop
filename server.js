@@ -588,7 +588,12 @@ app.post("/api/withdraw/:lotId", auth, async (req, res) => {
     const user  = arr.find(x => x.id === u.id);
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    const win = (user.wins || []).find(w => w.lotId === lotId && (!w.status || w.status === "pending" || w.status === "rejected" || w.status === "auto_failed"));
+    // "requested" ham qayta so'rashga ochiq — avtomatik yuborish (masalan
+    // Steam'ning "juda ko'p taklif" cheklovi) muvaffaqiyatsiz bo'lib qo'lda-admin
+    // navbatiga tushgan itemlarni, admin hali qo'lda yakunlamagan bo'lsa
+    // (yakunlansa status "delivered"ga o'tadi, bu yerga tushmaydi), foydalanuvchi
+    // saytdan qayta urinib ko'rishi mumkin bo'lsin uchun.
+    const win = (user.wins || []).find(w => w.lotId === lotId && (!w.status || ["pending", "rejected", "auto_failed", "requested"].includes(w.status)));
     if (!win) return res.status(404).json({ error: "Item topilmadi yoki allaqachon so'ralgan" });
 
     const auto = await trySendAutoOffer(user, win);

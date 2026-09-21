@@ -28,10 +28,15 @@ function banRemaining(tradeBanUntil) {
 
 // "Chiqarib olish" tugmasi bilan bir xil shart — bulk tanlash checkbox'i ham
 // aynan shu itemlarnigina belgilashi kerak (band/trade-ban'li skinlar tanlab
-// bo'lmaydi).
+// bo'lmaydi). "requested" ham qayta so'rashga ochiq — bu holat avtomatik
+// yuborish (masalan Steam'ning "juda ko'p taklif" cheklovi) muvaffaqiyatsiz
+// bo'lib, qo'lda-admin navbatiga tushgan itemlarga tegishli; admin hali
+// "Skin yuborildi" bosmagan ekan (bosgan bo'lsa status "delivered"ga o'tadi),
+// qayta urinish xavfsiz — eng yomon holatda yana muvaffaqiyatsiz bo'lib,
+// yana shu holatda qoladi.
 function canWithdrawWin(w) {
   const ban = banRemaining(w.tradeBanUntil);
-  return (!w.status || w.status === "pending" || w.status === "rejected" || w.status === "auto_failed") && !ban;
+  return (!w.status || ["pending", "rejected", "auto_failed", "requested"].includes(w.status)) && !ban;
 }
 
 const TAG_KEYS = {
@@ -303,7 +308,7 @@ export default function Inventory() {
                       className="mt-auto flex w-full items-center justify-center gap-2 bg-primary py-2 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground shadow-[0_6px_16px_-6px_color-mix(in_oklch,var(--primary)_70%,transparent)] transition-all duration-300 group-hover:bg-primary/90 group-hover:shadow-[0_10px_22px_-6px_color-mix(in_oklch,var(--primary)_80%,transparent)]"
                     >
                       <Send className="size-4" />
-                      {(w.status === "rejected" || w.status === "auto_failed") ? t("inventory.retry") : t("inventory.take")}
+                      {["rejected", "auto_failed", "requested"].includes(w.status) ? t("inventory.retry") : t("inventory.take")}
                     </button>
                   )}
                   {w.status === "auto_failed" && (
