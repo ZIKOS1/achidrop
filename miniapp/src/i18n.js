@@ -196,6 +196,13 @@ const DICT = {
   "inventory.retry": { uz: "Qayta so'rash", ru: "Запросить снова", en: "Request again" },
   "inventory.steamItemsTitle": { uz: "Steamingizdagi itemlar", ru: "Предметы в вашем Steam", en: "Your Steam items" },
   "inventory.steamItemsEmpty": { uz: "Steam inventaringizda savdo qilinadigan skin topilmadi", ru: "В вашем Steam-инвентаре не найдено скинов для торговли", en: "No tradable skins found in your Steam inventory" },
+  "inventory.selectAll": { uz: "Barchasini belgilash", ru: "Выбрать все", en: "Select all" },
+  "inventory.deselectAll": { uz: "Belgilashni bekor qilish", ru: "Снять выбор", en: "Deselect all" },
+  "inventory.selectedCount": { uz: "ta tanlandi", ru: "выбрано", en: "selected" },
+  "inventory.withdrawSelected": { uz: "Tanlanganlarni chiqarib olish", ru: "Забрать выбранные", en: "Withdraw selected" },
+  "inventory.confirmWithdrawBulk": { uz: "ta skinni manziliga yuborishni tasdiqlaysizmi?", ru: "скин(ов) отправить по этому адресу — подтверждаете?", en: "skin(s) will be sent to this address — confirm?" },
+  "inventory.bulkSending": { uz: "Yuborilmoqda...", ru: "Отправка...", en: "Sending..." },
+  "inventory.bulkDone": { uz: "{total} tadan {ok} tasi muvaffaqiyatli yuborildi", ru: "Из {total}: {ok} успешно отправлено", en: "{ok} of {total} sent successfully" },
 
   "support.problemButton": { uz: "Xatolik bo'lyapti", ru: "Возникла проблема", en: "Something's wrong" },
   "support.title": { uz: "Yordam", ru: "Поддержка", en: "Support" },

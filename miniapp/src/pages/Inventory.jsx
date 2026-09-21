@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PackageOpen, Send, Lock, Package } from "lucide-react";
+import { PackageOpen, Send, Lock, Package, CheckSquare, Square } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
 import { fmtMoney, hap, imgSrc, confirmTg, rarityColor } from "../utils";
@@ -24,6 +24,14 @@ function banRemaining(tradeBanUntil) {
   const days = Math.floor(ms / 86400000);
   const hours = Math.floor((ms % 86400000) / 3600000);
   return { days, hours };
+}
+
+// "Chiqarib olish" tugmasi bilan bir xil shart — bulk tanlash checkbox'i ham
+// aynan shu itemlarnigina belgilashi kerak (band/trade-ban'li skinlar tanlab
+// bo'lmaydi).
+function canWithdrawWin(w) {
+  const ban = banRemaining(w.tradeBanUntil);
+  return (!w.status || w.status === "pending" || w.status === "rejected" || w.status === "auto_failed") && !ban;
 }
 
 const TAG_KEYS = {
@@ -60,6 +68,9 @@ export default function Inventory() {
   const [supportLotId, setSupportLotId] = useState(null);
   const [showWizard, setShowWizard] = useState(false);
   const [pendingLotId, setPendingLotId] = useState(null);
+  const [pendingBulkIds, setPendingBulkIds] = useState(null);
+  const [selected, setSelected] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const [steamItems, setSteamItems] = useState(null);
   const [steamError, setSteamError] = useState(false);
@@ -131,13 +142,78 @@ export default function Inventory() {
     if (patch?.tradeLink) {
       setUser((u) => (u ? { ...u, tradeLink: patch.tradeLink, ...(patch.steamPublicConfirmed ? { steamPublicConfirmed: true } : {}) } : u));
       if (pendingLotId != null) confirmAndWithdraw(pendingLotId, patch.tradeLink);
+      if (pendingBulkIds != null) runBulkWithdraw(pendingBulkIds);
     }
     setPendingLotId(null);
+    setPendingBulkIds(null);
+  }
+
+  function toggleSelect(lotId) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(lotId)) next.delete(lotId);
+      else next.add(lotId);
+      return next;
+    });
+  }
+
+  const withdrawableWins = (wins || []).filter(canWithdrawWin);
+  const allSelected = withdrawableWins.length > 0 && withdrawableWins.every((w) => selected.has(w.lotId));
+
+  function toggleSelectAll() {
+    setSelected(allSelected ? new Set() : new Set(withdrawableWins.map((w) => w.lotId)));
+  }
+
+  // Tanlangan har bir lot uchun MAVJUD bitta-item /api/withdraw/:lotId'ni
+  // KETMA-KET (parallel emas) chaqiradi — relay/Steam'ga bir zumda ko'p
+  // trade-offer so'rovi tashlab yubormaslik uchun. Backend o'zgarmagan —
+  // foydalanuvchi uchun bitta tugma bosish "bittada chiqarib olish".
+  async function runBulkWithdraw(lotIds) {
+    setBulkBusy(true);
+    let ok = 0;
+    for (const lotId of lotIds) {
+      try {
+        const r = await api(`/api/withdraw/${lotId}`, { method: "POST" });
+        ok++;
+        setWins((prev) => prev && prev.map((w) => (w.lotId === lotId ? { ...w, status: r?.auto ? "auto_sent" : "requested" } : w)));
+      } catch {
+        // shu itemni o'tkazib yuboramiz, qolganlarini davom ettiramiz
+      }
+    }
+    setBulkBusy(false);
+    setSelected(new Set());
+    hap("notif", ok === lotIds.length ? "success" : "warning");
+    showToast(t("inventory.bulkDone", { ok, total: lotIds.length }), ok === lotIds.length ? "ok" : "err");
+    load();
+  }
+
+  async function withdrawSelected() {
+    const lotIds = Array.from(selected);
+    if (lotIds.length === 0) return;
+    if (!user?.tradeLink) {
+      setPendingBulkIds(lotIds);
+      setShowWizard(true);
+      return;
+    }
+    const msg = `${lotIds.length} ${t("inventory.confirmWithdrawBulk")}\n"${user.tradeLink}"`;
+    if (await confirmTg(msg)) runBulkWithdraw(lotIds);
   }
 
   return (
     <div className="space-y-8">
-      <h1 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground">{t("inventory.title")}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground">{t("inventory.title")}</h1>
+        {withdrawableWins.length > 1 && (
+          <button
+            type="button"
+            onClick={toggleSelectAll}
+            className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {allSelected ? <CheckSquare className="size-4 text-primary" /> : <Square className="size-4" />}
+            {t(allSelected ? "inventory.deselectAll" : "inventory.selectAll")}
+          </button>
+        )}
+      </div>
 
       {wins === null && !error && <CardRowsSkeleton />}
       {error && <Empty title={t("common.error")} />}
@@ -148,7 +224,7 @@ export default function Inventory() {
           {wins.map((w, i) => {
             const [cls, lblKey] = TAG_KEYS[w.status || "pending"];
             const ban = banRemaining(w.tradeBanUntil);
-            const canWithdraw = (!w.status || w.status === "pending" || w.status === "rejected" || w.status === "auto_failed") && !ban;
+            const canWithdraw = canWithdrawWin(w);
             const hasDetail = w.float != null || w.stickers?.length > 0;
             const isOpen = expandedWin === i;
             return (
@@ -184,6 +260,15 @@ export default function Inventory() {
                     <WearBadge float={w.float} short />
                   </div>
                   <span className={"absolute right-2 top-2 border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide backdrop-blur " + cls}>{t(lblKey)}</span>
+                  {canWithdraw && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); toggleSelect(w.lotId); }}
+                      className="absolute bottom-2 left-2 flex size-7 items-center justify-center border border-border bg-background/80 text-muted-foreground backdrop-blur transition-colors hover:text-foreground"
+                    >
+                      {selected.has(w.lotId) ? <CheckSquare className="size-4 text-primary" /> : <Square className="size-4" />}
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex flex-1 flex-col gap-3 p-4">
@@ -298,6 +383,21 @@ export default function Inventory() {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {selected.size > 0 && (
+        <div className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-md items-center justify-between gap-3 border border-primary/40 bg-card px-4 py-3 shadow-panel-lg animate-fade-up">
+          <span className="text-sm font-semibold text-foreground">{selected.size} {t("inventory.selectedCount")}</span>
+          <button
+            type="button"
+            disabled={bulkBusy}
+            onClick={withdrawSelected}
+            className="flex items-center gap-2 bg-primary px-4 py-2 font-heading text-xs font-bold uppercase tracking-wide text-primary-foreground disabled:opacity-50"
+          >
+            <Send className="size-4" />
+            {bulkBusy ? t("inventory.bulkSending") : t("inventory.withdrawSelected")}
+          </button>
         </div>
       )}
 
