@@ -109,7 +109,9 @@ export default function AdminAuctionForm({ id }) {
       setFloatError("");
     } else {
       setFloatData(null);
-      setFloatError("Bu item uchun float ma'lumoti mavjud emas (eski format)");
+      // Case'larda (weapon crate) float umuman bo'lmaydi — bu normal holat,
+      // faqat skin uchun float topilmasa (eski format) ogohlantirish beramiz.
+      setFloatError(item.itemType === "case" ? "" : "Bu item uchun float ma'lumoti mavjud emas (eski format)");
     }
   }
 
