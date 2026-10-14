@@ -61,23 +61,38 @@ function creditTradeProceeds(userId, amount, tradeId, fee = 0) {
     return entry;
 }
 
-function isMatured(entry) {
-    return Date.now() - new Date(entry.receivedAt).getTime() >= HOLD_MS;
+// Yozuvning o'z `holdMs` maydoni bo'lsa (masalan Skin sotish — 8 kun 12
+// soat) shu ishlatiladi, aks holda eski 7 kunlik standart.
+function unlockAtMs(entry) {
+    const hold = Number.isFinite(entry.holdMs) ? entry.holdMs : HOLD_MS;
+    return new Date(entry.receivedAt).getTime() + hold;
 }
 
-// { frozen, available } — "available" faqat withdrawalStatus:null va 7 kun
-// o'tgan yozuvlar (allaqachon so'rov yuborilgan yoki chiqarilgan summalar bu
-// yerga kirmaydi — ular alohida "pending"/"withdrawn" holatda).
-function getHoldSummary(userId) {
-    const ledger = getLedger(userId);
-    const entries = ledger?.entries || [];
-    let frozen = 0, available = 0, pending = 0;
-    for (const e of entries) {
+function isMatured(entry, now = Date.now()) {
+    return now >= unlockAtMs(entry);
+}
+
+// Sof funksiya (testlanadi). `nextUnlockAt` — eng yaqin muzlatilgan
+// yozuvning ochilish vaqti (UI'dagi taymer uchun), muzlatilgan yo'q bo'lsa null.
+function summarizeHoldEntries(entries, now = Date.now()) {
+    let frozen = 0, available = 0, pending = 0, nextUnlock = null;
+    for (const e of entries || []) {
         if (e.withdrawalStatus === "withdrawn" || e.withdrawalStatus === "reversed") continue;
         if (e.withdrawalStatus === "pending") { pending += e.amount; continue; }
-        if (isMatured(e)) available += e.amount; else frozen += e.amount;
+        if (isMatured(e, now)) { available += e.amount; continue; }
+        frozen += e.amount;
+        const at = unlockAtMs(e);
+        if (nextUnlock == null || at < nextUnlock) nextUnlock = at;
     }
-    return { frozen, available, pending };
+    return { frozen, available, pending, nextUnlockAt: nextUnlock == null ? null : new Date(nextUnlock).toISOString() };
+}
+
+// { frozen, available, pending, nextUnlockAt } — "available" faqat
+// withdrawalStatus:null va hold muddati o'tgan yozuvlar (allaqachon so'rov
+// yuborilgan yoki chiqarilgan summalar bu yerga kirmaydi).
+function getHoldSummary(userId) {
+    const ledger = getLedger(userId);
+    return summarizeHoldEntries(ledger?.entries || []);
 }
 
 // Foydalanuvchi "Pul yechish" so'ragan payt — FIFO tartibda "available"
@@ -227,7 +242,7 @@ async function reverseTradeCreditEntry(userId, entryId, reason) {
 }
 
 module.exports = {
-    creditTradeProceeds, getHoldSummary,
+    creditTradeProceeds, getHoldSummary, summarizeHoldEntries, isMatured, HOLD_MS,
     requestWithdrawal, getWithdrawalById, approveWithdrawal, rejectWithdrawal,
     getAllHoldsForAdmin, reverseTradeCreditEntry,
 };

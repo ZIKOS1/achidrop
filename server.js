@@ -170,6 +170,21 @@ app.use("/api", async (req, res, next) => {
     next();
 });
 
+// ── Vaqtincha o'chirilgan bo'limlar (features.js) ─────────────────────────
+// Faqat YANGI amallar bloklanadi (bid, e'lon/xarid, obmen ochish/qo'shilish).
+// Boshlangan obmenlar yakunlanishi va yutilgan skinni chiqarib olish ishlaydi.
+const { FEATURES } = require("./features");
+app.use("/api", (req, res, next) => {
+    if (req.method !== "POST") return next();
+    const p = req.path;
+    const blocked =
+        (!FEATURES.auctions && (p === "/bid" || p.startsWith("/quickbid/"))) ||
+        (!FEATURES.market && (p === "/market" || /^\/market\/[^/]+\/buy$/.test(p))) ||
+        (!FEATURES.trade && (p === "/trades" || /^\/trades\/[^/]+\/join$/.test(p)));
+    if (blocked) return res.status(403).json({ error: "Bu bo'lim vaqtincha o'chirilgan", code: "feature_disabled" });
+    next();
+});
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 function validateInitData(initData) {
     if (!initData) return null;
@@ -1267,36 +1282,129 @@ app.post("/api/market/:id/cancel", auth, async (req, res) => {
     res.json(enrichTrade(result.trade));
 });
 
-// POST /api/instant-sell — { assetId } — o'z Steam inventaridan skinni
-// tizimga darhol sotish (narx Lis-Skins asosida hisoblanadi).
+// ── Skin sotish (Instant Sell) ───────────────────────────────────────────────
+// Bizning (bot) trade linkimiz — user skinni shu linkga O'ZI yuboradi.
+// Admin panel > Sozlamalar'dan o'zgartiriladi, bo'lmasa .env'dagi qiymat.
+function getBotTradeUrl() {
+    return getSettings().botTradeUrl || process.env.BOT_STEAM_TRADE_URL || null;
+}
+
+// Telegram (eski) Markdown'ini buzadigan belgilarni qochiradi — user nomida
+// "_" yoki "*" bo'lsa xabar umuman yuborilmay qolardi.
+function mdEscape(text) {
+    return String(text).replace(/([_*`\[])/g, "\\$1");
+}
+
+function sellItemView(it, prices) {
+    const marketHashName = skinUtils.marketHashName(it.name, it.float);
+    const priceSom = prices ? prices.get(marketHashName) ?? null : null;
+    return {
+        assetId: String(it.assetId), name: it.name, marketHashName,
+        imageUrl: it.image || null, float: it.float ?? null,
+        wear: skinUtils.wearCode(it.float),
+        tradable: it.tradable !== false,
+        priceSom,
+    };
+}
+
+// GET /api/instant-sell/quote — userning Steam inventari + har bir skin uchun
+// biz to'laydigan narx. Lis kaliti yo'q bo'lsa — `lisConfigured:false`,
+// narxlar null (UI "Tez orada ishga tushadi" ko'rsatadi).
+app.get("/api/instant-sell/quote", auth, async (req, res) => {
+    const u = req.user;
+    if (!u) return res.status(404).json({ error: "User not found" });
+    const base = {
+        lisConfigured: lisSkinsPrice.isLisConfigured(),
+        maxItems: instantSellManager.MAX_ITEMS_PER_REQUEST,
+        botTradeUrl: getBotTradeUrl(),
+        holdMs: instantSellManager.SELL_HOLD_MS,
+    };
+    if (!u.steamId64) return res.json({ ...base, steamConnected: false, items: [] });
+
+    let items;
+    try { items = await fetchUserInventory(u.steamId64, req.query.refresh === "1"); }
+    catch (err) { return res.status(500).json({ error: err.message }); }
+
+    let prices = null;
+    if (base.lisConfigured) {
+        const names = items.filter(it => it.tradable !== false).map(it => skinUtils.marketHashName(it.name, it.float));
+        try { prices = await lisSkinsPrice.getInstantSellPricesSom(names); }
+        catch (err) { console.log("LIS PRICE ERROR:", err.message); }
+    }
+    res.json({ ...base, steamConnected: true, items: items.map(it => sellItemView(it, prices)) });
+});
+
+// POST /api/instant-sell — { assetIds: [...] } — tanlangan skinlarni sotish
+// so'rovi. Pul DARHOL tushmaydi: user skinni trade linkimizga yuboradi,
+// admin Telegram'da "Oldim"ni bosgach tushadi.
+const INSTANT_SELL_ERRORS = {
+    no_key: "Skin sotish tez orada ishga tushadi",
+    empty: "Hech qanday skin tanlanmagan",
+    too_many: "Bir martada ko'pi bilan 30 ta skin sotish mumkin",
+    too_many_open: "Sizda tasdiqlanmagan so'rovlar ko'p. Admin ko'rib chiqishini kuting",
+    already_requested: "Bu skin(lar) uchun so'rov allaqachon yuborilgan",
+    price_not_found: "Ba'zi skinlarning narxi topilmadi",
+    not_tradable: "Ba'zi skinlarni hozir yuborib bo'lmaydi (trade lock)",
+    not_found: "Skin inventaringizda topilmadi (sahifani yangilang)",
+};
 app.post("/api/instant-sell", auth, async (req, res) => {
     const u = req.user;
     if (!u) return res.status(404).json({ error: "User not found" });
     if (!u.steamId64) return res.status(400).json({ error: "Avval Steam hisobingizni ulang" });
-    if (!u.tradeLink) return res.status(400).json({ error: "Avval Trade Link kiriting" });
+    if (!lisSkinsPrice.isLisConfigured()) return res.status(400).json({ error: INSTANT_SELL_ERRORS.no_key, code: "no_key" });
 
-    const assetId = req.body.assetId;
-    if (!assetId) return res.status(400).json({ error: "assetId kerak" });
+    const raw = Array.isArray(req.body.assetIds) ? req.body.assetIds : (req.body.assetId ? [req.body.assetId] : []);
+    const assetIds = [...new Set(raw.map(String))];
+    if (!assetIds.length) return res.status(400).json({ error: INSTANT_SELL_ERRORS.empty, code: "empty" });
+    if (assetIds.length > instantSellManager.MAX_ITEMS_PER_REQUEST) return res.status(400).json({ error: INSTANT_SELL_ERRORS.too_many, code: "too_many" });
 
-    let items;
-    try { items = await fetchUserInventory(u.steamId64); }
+    let inv;
+    try { inv = await fetchUserInventory(u.steamId64); }
     catch (err) { return res.status(500).json({ error: err.message }); }
-    const item = items.find(it => String(it.assetId) === String(assetId));
-    if (!item) return res.status(404).json({ error: "Item topilmadi (kesh eskirgan)" });
-    // `marketHashName` relay javobida YO'Q — Task 2'da qo'shilgan
-    // skinUtils.marketHashName orqali Steam formatiga mos hosil qilinadi.
-    const marketHashName = skinUtils.marketHashName(item.name, item.float);
+    const byId = new Map(inv.map(it => [String(it.assetId), it]));
+    const notFound = assetIds.filter(a => !byId.has(a));
+    if (notFound.length) return res.status(400).json({ error: INSTANT_SELL_ERRORS.not_found, code: "not_found", assetIds: notFound });
+    const locked = assetIds.filter(a => byId.get(a).tradable === false);
+    if (locked.length) return res.status(400).json({ error: INSTANT_SELL_ERRORS.not_tradable, code: "not_tradable", assetIds: locked });
 
-    const result = await instantSellManager.createInstantSellRequest(u.id, item.assetId, marketHashName, u.steamId64);
-    if (result.error) return res.status(400).json({ error: result.error });
-    res.json({ request: result.request, botTradeUrl: process.env.BOT_STEAM_TRADE_URL || null });
+    const items = assetIds.map(a => {
+        const v = sellItemView(byId.get(a), null);
+        return { assetId: v.assetId, marketHashName: v.marketHashName, name: v.name, imageUrl: v.imageUrl, float: v.float };
+    });
+
+    let result;
+    try { result = await instantSellManager.createSellRequest(u.id, items); }
+    catch (err) { return res.status(500).json({ error: err.message }); }
+    if (result.error) {
+        return res.status(400).json({ error: INSTANT_SELL_ERRORS[result.error] || result.error, code: result.error, assetIds: result.assetIds });
+    }
+    const request = result.request;
+
+    if (process.env.ADMIN_ID) {
+        const lines = request.items.slice(0, 15).map((it, i) =>
+            `${i + 1}. ${it.marketHashName}${it.float != null ? ` (float ${it.float.toFixed(4)})` : ""} — ${it.priceSom.toLocaleString()} so'm`);
+        if (request.items.length > 15) lines.push(`… va yana ${request.items.length - 15} ta`);
+        tgSendMessage(
+            Number(process.env.ADMIN_ID),
+            `💸 *SKIN SOTISH SO'ROVI #${request.id}*\n\n` +
+            `👤 ${mdEscape(u.name ?? String(u.id))}\n🪪 \`${u.id}\`\n🎮 Steam: \`${u.steamId64}\`\n\n` +
+            `${lines.map(mdEscape).join("\n")}\n\n💰 Jami: *${request.totalSom.toLocaleString()} so'm*\n\n` +
+            `Steam'da skin(lar) kelganini tekshiring, keyin "Oldim"ni bosing.`,
+            { inline_keyboard: [[
+                { text: "✅ Oldim", callback_data: `isell_ok_${request.id}` },
+                { text: "❌ Rad etish", callback_data: `isell_no_${request.id}` },
+            ]] }
+        );
+    }
+    res.json({ request, botTradeUrl: getBotTradeUrl() });
 });
 
-// GET /api/instant-sell-mine — mening Instant Sell so'rovlarim tarixi
-app.get("/api/instant-sell-mine", auth, (req, res) => {
+// GET /api/instant-sell-mine — mening sotish so'rovlarim
+app.get("/api/instant-sell-mine", auth, async (req, res) => {
     const u = req.user;
     if (!u) return res.status(404).json({ error: "User not found" });
-    res.json(instantSellManager.getMyInstantSellRequests(u.id));
+    await instantSellManager.refreshRequests();
+    res.json(instantSellManager.getMyInstantSellRequests(u.id).slice(0, 20));
 });
 
 // GET /api/trade-hold-summary — obmendan tushgan (7 kunlik hold) mablag'lar
@@ -2060,6 +2168,34 @@ app.delete("/api/admin/promos/:code", requireAdminPanel, (req, res) => {
     res.json({ success: true });
 });
 
+// ── ADMIN: Skin sotish so'rovlari ────────────────────────────────────────────
+// Asosiy yo'l — Telegram'dagi "Oldim"/"Rad etish" tugmalari (bot). Bu yerdagi
+// endpointlar admin panel uchun zaxira yo'l (bir xil tranzaksiyali funksiyalar).
+app.get("/api/admin/instant-sell", requireAdminPanel, async (req, res) => {
+    await instantSellManager.refreshRequests();
+    const users = getUsers();
+    const list = instantSellManager.getRequestsForAdmin(req.query.status || null).slice(0, 100).map(r => {
+        const usr = users.find(x => x.id === r.userId);
+        return { ...r, userName: usr?.name ?? null, steamId64: usr?.steamId64 ?? null };
+    });
+    res.json(list);
+});
+
+app.post("/api/admin/instant-sell/:id/approve", requireAdminPanel, async (req, res) => {
+    const result = await instantSellManager.approveSellRequest(Number(req.params.id));
+    if (result.error) return res.status(400).json({ error: result.error });
+    notifyUser(result.request.userId, instantSellManager.approvedText(result.request), tgSendMessage);
+    res.json({ request: result.request });
+});
+
+app.post("/api/admin/instant-sell/:id/reject", requireAdminPanel, async (req, res) => {
+    const reason = String(req.body.reason || "").trim().slice(0, 300) || null;
+    const result = await instantSellManager.rejectSellRequest(Number(req.params.id), reason);
+    if (result.error) return res.status(400).json({ error: result.error });
+    notifyUser(result.request.userId, instantSellManager.rejectedText(result.request), tgSendMessage);
+    res.json({ request: result.request });
+});
+
 // ── ADMIN: Sozlamalar ─────────────────────────────────────────────────────────
 
 app.get("/api/admin/settings", requireAdminPanel, (req, res) => {
@@ -2071,6 +2207,8 @@ app.get("/api/admin/settings", requireAdminPanel, (req, res) => {
         tradeFeeTiers: tradeManager.getFeeTiers(),
         instantSellMarginPercent: s.instantSellMarginPercent ?? 12,
         usdToSomRate: s.usdToSomRate ?? 12700,
+        botTradeUrl: s.botTradeUrl || "",
+        lisConfigured: lisSkinsPrice.isLisConfigured(),
     });
 });
 
@@ -2108,9 +2246,17 @@ app.post("/api/admin/settings", requireAdminPanel, (req, res) => {
         if (isNaN(rate) || rate <= 0) return res.status(400).json({ error: "USD to Som kurs musbat raqam bo'lishi kerak" });
         s.usdToSomRate = rate;
     }
+    if (req.body.botTradeUrl !== undefined) {
+        const url = String(req.body.botTradeUrl || "").trim();
+        if (url && !url.startsWith("https://steamcommunity.com/tradeoffer/new/"))
+            return res.status(400).json({ error: "Trade link https://steamcommunity.com/tradeoffer/new/ bilan boshlanishi kerak" });
+        s.botTradeUrl = url || null;
+    }
     write("settings", s);
     res.json({
         success: true,
+        botTradeUrl: s.botTradeUrl || "",
+        lisConfigured: lisSkinsPrice.isLisConfigured(),
         earlyAccessEnabled: s.earlyAccessEnabled !== false,
         steamId64: s.steamId64 || null,
         referralBonus: s.referralBonus ?? 10000,

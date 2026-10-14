@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "build:miniapp": "cd miniapp && npm install && npm run build"
+    "build:miniapp": "cd miniapp && npm install && npm run build",
+    "test": "node --test tests/*.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

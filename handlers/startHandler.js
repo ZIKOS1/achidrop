@@ -2,6 +2,7 @@ const { Markup } = require("telegraf");
 const { read, write } = require("../database/db");
 const { createTelegramUser } = require("../userLifecycle");
 const { attachCodeToPending } = require("../auth-telegram-login");
+const { FEATURES } = require("../features");
 
 function readUsers() {
     const data = read("users");
@@ -29,6 +30,7 @@ const TEXTS = {
         inventory:   "🎒 Inventar",
         obmen:       "🔄 Obmen",
         market:      "🛒 Market",
+        sell:        "💸 Skin sotish",
     },
     ru: {
         welcome:     (name) => `👋 Привет, *${name}*!\nДобро пожаловать в главное меню.`,
@@ -40,6 +42,7 @@ const TEXTS = {
         inventory:   "🎒 Инвентарь",
         obmen:       "🔄 Обмен",
         market:      "🛒 Маркет",
+        sell:        "💸 Продать скин",
     },
 };
 
@@ -52,11 +55,19 @@ function T(user, key, ...args) {
 function mainMenu(user) {
     const lang = user?.lang || "uz";
     const TX   = TEXTS[lang];
-    return Markup.keyboard([
-        [TX.auctions, TX.profile],
-        [TX.balance,  TX.inventory],
-        [TX.obmen,    TX.market],
-    ]).resize();
+    // O'chirilgan bo'limlar (features.js) menyuda ko'rinmaydi.
+    const extra = [
+        ...(FEATURES.auctions ? [TX.auctions] : []),
+        ...(FEATURES.trade ? [TX.obmen] : []),
+        ...(FEATURES.market ? [TX.market] : []),
+    ];
+    const rows = [
+        [TX.sell],
+        [TX.balance, TX.profile],
+        [TX.inventory, ...extra.slice(0, 1)],
+    ];
+    if (extra.length > 1) rows.push(extra.slice(1));
+    return Markup.keyboard(rows).resize();
 }
 
 module.exports = (bot) => {
