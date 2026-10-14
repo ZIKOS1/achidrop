@@ -70,14 +70,14 @@ export default function Modal({ modal, onClose }) {
           </button>
         ) : (
           <>
-            <input
+            {!modal.noInput && <input
               ref={inpRef}
               type={modal.inputType || "text"}
               inputMode={modal.inputType === "number" ? "numeric" : undefined}
               defaultValue={modal.value ?? ""}
               placeholder={modal.placeholder || ""}
               className="mb-3 w-full border border-border bg-secondary px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary"
-            />
+            />}
             <button
               type="button"
               disabled={busy}

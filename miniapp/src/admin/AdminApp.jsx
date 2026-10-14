@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Gavel, Package, Plus, Users, Ticket, Image as ImageIcon, LogOut, Crosshair, Crown, BookOpen, LifeBuoy, ShoppingCart } from "lucide-react";
+import { Gavel, Package, Plus, Users, Ticket, Image as ImageIcon, LogOut, Crosshair, Crown, BookOpen, LifeBuoy, ShoppingCart, Banknote } from "lucide-react";
 import { api } from "./api";
 import { AdminContext } from "./context";
 import Modal from "../components/Modal";
@@ -16,9 +16,11 @@ import AdminBanners from "./pages/AdminBanners";
 import AdminGuides from "./pages/AdminGuides";
 import AdminSupport from "./pages/AdminSupport";
 import CeoAccounts from "./pages/CeoAccounts";
+import AdminSell from "./pages/AdminSell";
 
 const PAGES = {
   home: () => <AdminHome />,
+  "admin-sell": () => <AdminSell />,
   "admin-auctions": () => <AdminAuctions />,
   "admin-auction-form": (data) => <AdminAuctionForm id={data} />,
   "admin-market": () => <AdminMarket />,
@@ -38,6 +40,7 @@ const PAGE_ALIAS = { admin: "home" };
 
 const NAV_ITEMS = [
   { key: "home", label: "Bosh sahifa", icon: Gavel },
+  { key: "admin-sell", label: "Skin sotish", icon: Banknote },
   { key: "admin-auctions", label: "Auksionlar", icon: Package },
   { key: "admin-auction-form", label: "Yangi auksion", icon: Plus, navData: null },
   { key: "admin-market", label: "Market", icon: ShoppingCart },

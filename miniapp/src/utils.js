@@ -194,9 +194,19 @@ function DICT_HAS_ERR(code) {
   return ["not_found", "self", "not_open", "forbidden", "locked", "no_price", "invalid_price", "insufficient_balance", "wrong_state", "promo_not_found", "promo_exhausted", "promo_already_used", "min_price"].includes(code);
 }
 
+// Muzlatilgan pul ochilishigacha qolgan vaqt: "8 kun 11 soat 42 daqiqa".
+export function fmtUnlockLeft(iso, now = Date.now()) {
+  const ms = Math.max(0, new Date(iso).getTime() - now);
+  const d = Math.floor(ms / 86400000);
+  const h = Math.floor((ms % 86400000) / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  return t("balance.timerFmt").replace("{d}", d).replace("{h}", h).replace("{m}", m);
+}
+
 function fmtHoldInfo(hold) {
   const lines = [];
   if (hold.frozen > 0) lines.push(`${t("trade.frozen")}: ${fmtMoney(hold.frozen)}`);
+  if (hold.frozen > 0 && hold.nextUnlockAt) lines.push(`${t("balance.unlockTimer")}: ${fmtUnlockLeft(hold.nextUnlockAt)}`);
   if (hold.available > 0) lines.push(`${t("trade.available")}: ${fmtMoney(hold.available)}`);
   if (hold.pending > 0) lines.push(`${t("trade.pending")}: ${fmtMoney(hold.pending)}`);
   if (!lines.length) lines.push(t("trade.nothingToWithdraw"));

@@ -21,10 +21,12 @@ import Leaderboard from "./pages/Leaderboard";
 import BidHistory from "./pages/BidHistory";
 import BalHistory from "./pages/BalHistory";
 import Notifications from "./pages/Notifications";
+import Sell from "./pages/Sell";
+import { FEATURES } from "./features";
 
 // Nav'ning asosiy (top-level) sahifalari — shulardan boshqasi ochilganda
 // Telegram BackButton ko'rsatiladi va "orqaga" shu xaritaga qarab boradi.
-const TOP_LEVEL_PAGES = ["auctions", "inventory", "profile", "balance", "trade", "market", "login"];
+const TOP_LEVEL_PAGES = ["sell", "auctions", "inventory", "profile", "balance", "trade", "market", "login"];
 
 function parentOf(page) {
   if (page === "auction-detail") return "auctions";
@@ -35,10 +37,24 @@ function parentOf(page) {
   if (page === "bid-history") return "profile";
   if (page === "bal-history") return "profile";
   if (page === "notifications") return "profile";
-  return "auctions";
+  return HOME_PAGE;
+}
+
+// Vaqtincha o'chirilgan bo'limlarning sahifalari (features.js) — URL orqali
+// ochilsa ham bosh sahifaga (Skin sotish) yo'naltiriladi.
+const DISABLED_PAGES = new Set([
+  ...(!FEATURES.auctions ? ["auctions", "auction-detail", "leaderboard"] : []),
+  ...(!FEATURES.trade ? ["trade", "trade-detail"] : []),
+  ...(!FEATURES.market ? ["market", "market-sell", "market-detail"] : []),
+]);
+const HOME_PAGE = FEATURES.auctions ? "auctions" : "sell";
+
+function allowed(p) {
+  return DISABLED_PAGES.has(p.name) ? { name: HOME_PAGE, data: null } : p;
 }
 
 const PAGES = {
+  sell: () => <Sell />,
   auctions: () => <Auctions />,
   "auction-detail": (data) => <LotDetail id={data} />,
   profile: () => <Profile />,
@@ -57,6 +73,10 @@ const PAGES = {
 };
 
 function initialPage() {
+  return allowed(rawInitialPage());
+}
+
+function rawInitialPage() {
   const params = new URLSearchParams(location.search);
   const lot = params.get("lot");
   if (lot && !isNaN(Number(lot))) return { name: "auction-detail", data: Number(lot) };
@@ -66,7 +86,7 @@ function initialPage() {
   if (mkt && !isNaN(Number(mkt))) return { name: "market-detail", data: Number(mkt) };
   const page = params.get("page");
   if (page && PAGES[page]) return { name: page, data: null };
-  return { name: "auctions", data: null };
+  return { name: HOME_PAGE, data: null };
 }
 
 export default function App() {
@@ -100,7 +120,8 @@ export default function App() {
     loadMe().finally(() => setAuthChecked(true));
   }, [loadMe]);
 
-  const navigate = useCallback((name, data = null) => {
+  const navigate = useCallback((rawName, rawData = null) => {
+    const { name, data } = allowed({ name: rawName, data: rawData });
     setPage({ name, data });
     // Brauzer manzilini ham yangilaymiz — orqaga/oldinga tugmalari va sahifani
     // yangilash (F5) joriy sahifani saqlab qolishi uchun. Telegram ichida bu
@@ -117,7 +138,7 @@ export default function App() {
 
   useEffect(() => {
     const onPopState = (e) => {
-      setPage(e.state?.name ? { name: e.state.name, data: e.state.data ?? null } : initialPage());
+      setPage(e.state?.name ? allowed({ name: e.state.name, data: e.state.data ?? null }) : initialPage());
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -145,7 +166,7 @@ export default function App() {
   const closeModal = useCallback(() => setModal((m) => ({ ...m, open: false })), []);
 
   const ctx = { navigate, user, setUser, showToast, openModal, closeModal, tg, refreshMe: loadMe, theme, toggleTheme, lang, setLang };
-  const render = PAGES[page.name] || PAGES.auctions;
+  const render = PAGES[page.name] || PAGES[HOME_PAGE];
 
   // Telegram Mini App ichida (initData bor) — auth tekshiruvi darhol tugaydi.
   // Tashqarida (websaytdan to'g'ridan-to'g'ri) auth tekshirilayotganda ham

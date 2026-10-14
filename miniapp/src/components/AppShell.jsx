@@ -20,15 +20,19 @@ import { useApp } from "../context";
 import { LANGS, t } from "../i18n";
 import { openWithdrawModal } from "../utils";
 import { TelegramLogo } from "./BrandIcons";
+import { FEATURES } from "../features";
 
+// `feature` — features.js'da o'chirilgan bo'lsa menyuda ko'rinmaydi.
 const NAV = [
-  { key: "auctions", labelKey: "nav.auctions", icon: Gavel, group: ["auctions", "auction-detail", "leaderboard"] },
+  { key: "sell", labelKey: "nav.sell", icon: Banknote, group: ["sell"] },
+  { key: "auctions", labelKey: "nav.auctions", icon: Gavel, group: ["auctions", "auction-detail", "leaderboard"], feature: "auctions" },
   { key: "inventory", labelKey: "nav.inventory", icon: Package, group: ["inventory"] },
-  { key: "trade", labelKey: "nav.trade", icon: Repeat, group: ["trade", "trade-detail"] },
-  { key: "market", labelKey: "nav.market", icon: ShoppingBag, group: ["market", "market-sell", "market-detail"] },
+  { key: "trade", labelKey: "nav.trade", icon: Repeat, group: ["trade", "trade-detail"], feature: "trade" },
+  { key: "market", labelKey: "nav.market", icon: ShoppingBag, group: ["market", "market-sell", "market-detail"], feature: "market" },
   { key: "profile", labelKey: "nav.profile", icon: Wallet, group: ["profile", "bid-history", "bal-history", "notifications"] },
   { key: "balance", labelKey: "nav.balance", icon: CreditCard, group: ["balance"] },
-];
+].filter((item) => !item.feature || FEATURES[item.feature]);
+const HOME = FEATURES.auctions ? "auctions" : "sell";
 
 function Brand({ onClick, compact }) {
   return (
@@ -198,7 +202,7 @@ export default function AppShell({ page, children }) {
       {/* Sidebar (desktop) */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-border bg-sidebar shadow-panel-lg lg:flex">
         <div className="flex h-16 items-center border-b border-border px-5">
-          <Brand onClick={() => navigate("auctions")} />
+          <Brand onClick={() => navigate(HOME)} />
         </div>
         <div className="flex-1 overflow-y-auto p-3">
           <NavLinks page={page} navigate={navigate} />
@@ -227,7 +231,7 @@ export default function AppShell({ page, children }) {
 
       {/* Mobile top bar */}
       <div className="sticky top-0 z-40 flex h-14 items-center justify-between gap-2 border-b border-border bg-sidebar/95 px-3 shadow-[0_8px_24px_-16px_var(--shadow-color)] backdrop-blur lg:hidden">
-        <Brand onClick={() => navigate("auctions")} compact />
+        <Brand onClick={() => navigate(HOME)} compact />
         <div className="flex shrink-0 items-center gap-2">
           <BalanceOrLogin user={user} navigate={navigate} compact />
           <button
@@ -247,7 +251,7 @@ export default function AppShell({ page, children }) {
           <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setOpen(false)} aria-hidden />
           <div className="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-border bg-sidebar">
             <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
-              <Brand onClick={() => { navigate("auctions"); setOpen(false); }} compact />
+              <Brand onClick={() => { navigate(HOME); setOpen(false); }} compact />
               <button type="button" aria-label={t("common.close")} onClick={() => setOpen(false)} className="flex size-9 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
                 <X className="size-5" />
               </button>

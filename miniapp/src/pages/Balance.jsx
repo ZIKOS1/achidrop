@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { Check, Copy, ShieldCheck, Wallet, Gift, Snowflake } from "lucide-react";
+import { Check, Copy, ShieldCheck, Wallet, Gift, Snowflake, Timer } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
-import { fmtMoney, openWithdrawModal } from "../utils";
+import { fmtMoney, fmtUnlockLeft, openWithdrawModal } from "../utils";
 import { t } from "../i18n";
 import Empty from "../components/Empty";
 import { TelegramLogo } from "../components/BrandIcons";
@@ -14,6 +14,29 @@ const METHOD_ACCENT = {
   paynet: "oklch(0.68 0.19 45)",
   uzumbank: "oklch(0.6 0.2 300)",
 };
+
+// Eng yaqin muzlatilgan summa ochilishigacha jonli taymer (har 30 soniyada
+// yangilanadi, vaqt tugasa hold ma'lumoti qayta yuklanadi).
+function UnlockTimer({ iso, onDone }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  const left = new Date(iso).getTime() - now;
+  useEffect(() => {
+    if (left <= 0) onDone?.();
+  }, [left <= 0]);
+  return (
+    <div className="flex items-center justify-between gap-3 border border-accent/40 bg-accent/10 px-3 py-2">
+      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Timer className="size-3.5 text-accent" />
+        {t("balance.unlockTimer")}
+      </span>
+      <span className="font-heading text-sm font-bold text-accent">{fmtUnlockLeft(iso, now)}</span>
+    </div>
+  );
+}
 
 export default function Balance() {
   const { navigate, user, tg, showToast, openModal, closeModal, refreshMe } = useApp();
@@ -197,6 +220,7 @@ export default function Balance() {
               <p className="mt-1 text-xs text-muted-foreground">{t("trade.frozenFundsDesc")}</p>
               <dl className="mt-3 space-y-2 text-sm">
                 {hold.frozen > 0 && <Row label={t("trade.frozen")} value={fmtMoney(hold.frozen)} />}
+                {hold.frozen > 0 && hold.nextUnlockAt && <UnlockTimer iso={hold.nextUnlockAt} onDone={loadHold} />}
                 {hold.available > 0 && <Row label={t("trade.available")} value={fmtMoney(hold.available)} highlight />}
                 {hold.pending > 0 && <Row label={t("trade.pending")} value={fmtMoney(hold.pending)} />}
               </dl>
