@@ -28,11 +28,19 @@ Market e'loni (`trades`, `kind: "market"`) ga yangi maydonlar:
 - `priceMode: "auto" | "pinned"` — yo'q bo'lsa `"pinned"` deb hisoblanadi (eski e'lonlar o'zgarmaydi).
 - `marketHashName` — e'lon yaratilganda skin'dan hosil qilinadi (`skinUtils.marketHashName`).
 - `priceUpdatedAt` — oxirgi avto-yangilanish vaqti.
+- `costSom` — skin bizga necha so'mga tushgani (ixtiyoriy). Autosell orqali olingan skin uchun avtomatik — odamga to'langan summa (ko'p skinli so'rovda har item o'z `priceSom`i). Boshqa yo'l bilan qo'shilgan skinlarda yo'q; admin xohlasa qo'lda kiritadi.
+
+### Minimal foyda qoidasi (olingan narxdan arzon sotilmaydi)
+- `costSom` bo'lsa: **narx ≥ costSom × (1 + minFoyda%)**, bu yerda `minFoyda%` pog'ona bo'yicha olinadi — pog'ona `costSom / kurs` ($) bo'yicha tanlanadi.
+- Standart pog'onalar (admin panelda tahrirlanadi): **≤ 10$ → 15%**, **10–50$ → 10%**, **> 50$ → 7%**.
+- Avto narx = `max(MIN_TRADE_PRICE, Lis × kurs × (1 + ustama%), costSom × (1 + minFoyda%))`, so'mga yaxlitlanadi (yuqoriga).
+- Qoida **qotirilgan (pinned) narxlarga ham** qo'llanadi: admin `costSom × (1 + minFoyda%)` dan past narx kiritsa, server rad etadi va minimal ruxsat etilgan narxni ko'rsatadi.
+- Bulk-list taklif narxi ham shu formula bilan hisoblanadi.
 
 ### Avto-yangilash (bot jarayoni, `index.js` setInterval, har 60 daqiqa)
 1. `refresh("trades")`, barcha `status: "open"`, `priceMode: "auto"` e'lonlar olinadi.
 2. Noyob `marketHashName`lar bitta batch so'rov bilan narxlanadi.
-3. Har bir e'lon uchun yangi narx = `max(MIN_TRADE_PRICE, round(usd × kurs × (1 + ustama%)))`.
+3. Har bir e'lon uchun yangi narx — yuqoridagi "Avto narx" formulasi (minimal foyda qoidasi bilan).
 4. Yozish **tranzaksiya ichida**, faqat e'lon hali `open` bo'lsa (xarid bilan to'qnashuvdan himoya). Odam xaridni bosgan paytdagi narxda sotib oladi.
 5. Lis narx bermasa (topilmadi/API xato) — eski narx qoladi.
 6. Natija `settings.lisPriceSync = { at, updated, skipped, error }` ga yoziladi (admin holat qatori uchun).
@@ -61,6 +69,7 @@ Market e'loni (`trades`, `kind: "market"`) ga yangi maydonlar:
 ### Yetkazish va kreditlash
 - Bot odamning trade link'iga **o'zi bitta trade offer yuboradi** (odamdan belgilangan skinlarni so'raydi, o'zi hech narsa bermaydi). Bu relay'ga yangi imkoniyat talab qiladi: "itemlarni so'rovchi offer yaratish" + holatni so'rash.
 - Offer `accepted` bo'lganda: kelgan itemlar `marketHashName` bo'yicha so'rov bilan solishtiriladi; mos kelsa `totalSom` mavjud `creditTradeProceeds` orqali, **7 kunlik hold** bilan, tranzaksiyada kreditlanadi (mavjud ikki-bosqichli tekshiruv saqlanadi).
+- **Olingan narxni saqlash:** Steam item botga o'tganda yangi `assetId` beradi. Relay accepted offer uchun kelgan itemlarning YANGI assetId'larini qaytaradi; backend `itemCosts` kolleksiyasiga `{ botAssetId, marketHashName, costSom, instantSellRequestId, at }` yozadi (kreditlash bilan bir tranzaksiyada). Admin bu itemni Marketga qo'yganda `costSom` shu yerdan avtomatik olinadi. Relay yangi assetId bermasa (eski relay) — `costSom` yozilmaydi, admin qo'lda kiritadi.
 - Offer rad etilsa/15 daqiqada qabul qilinmasa → so'rov `expired`, offer bekor qilinadi.
 - Odamning trade link'i yo'q bo'lsa — avval uni kiritishga yo'naltiriladi (mavjud onboarding).
 
@@ -73,8 +82,9 @@ Relay VPS'dagi haqiqiy `server.js` hali o'qilmagan va deploy qilinmagan (oldingi
 - `marketMarkupPercent` (standart 10) — Market ustamasi.
 - `instantSellMarginPercent` (mavjud, standart 12) — Autosell marjasi.
 - `usdToSomRate` (mavjud, standart 12 700).
+- `minProfitTiers` (standart `[{ maxUsd: 10, percent: 15 }, { maxUsd: 50, percent: 10 }, { maxUsd: null, percent: 7 }]`) — minimal foyda pog'onalari; oxirgisi `maxUsd: null` (cheksiz).
 
-Sahifada: uchala qiymatni tahrirlash (validatsiya: foizlar 0–90, kurs > 0), "Narxlarni hozir yangilash" tugmasi, holat qatori ("Lis API: ulangan / kalit yo'q", oxirgi yangilanish vaqti, yangilangan e'lonlar soni). Route'lar `requireAdminPanel` bilan himoyalangan.
+Sahifada: barcha qiymatlarni tahrirlash (validatsiya: foizlar 0–90, kurs > 0, pog'onalar o'sish tartibida, oxirgisi cheksiz), admin e'longa `costSom` kiritishi mumkin, "Narxlarni hozir yangilash" tugmasi, holat qatori ("Lis API: ulangan / kalit yo'q", oxirgi yangilanish vaqti, yangilangan e'lonlar soni). Route'lar `requireAdminPanel` bilan himoyalangan.
 
 "Hozir yangilash" Vercel'dan (miniapp/admin server) chaqirilganda sinxronni o'sha jarayonda bajaradi (bir martalik, `maxDuration` 30s ichida); soatlik sinxron bot jarayonida qoladi.
 
@@ -90,7 +100,7 @@ Sahifada: uchala qiymatni tahrirlash (validatsiya: foizlar 0–90, kurs > 0), "N
 
 ## 7. Tekshiruv
 
-- Unit testlar: narx formulalari (ustama/marja/yaxlitlash/minimal narx), `marketHashName` bo'yicha guruhlash, batch narxlash soxta Lis javobi bilan (NaN, bo'sh, topilmagan nom), avto-yangilash faqat `open`+`auto` e'lonlarga tegishi.
+- Unit testlar: narx formulalari (ustama/marja/yaxlitlash/minimal narx), minimal foyda pog'onalari (chegaralar: aniq 10$ va 50$, `costSom` yo'q holat, pinned narx rad etilishi), `marketHashName` bo'yicha guruhlash, batch narxlash soxta Lis javobi bilan (NaN, bo'sh, topilmagan nom), avto-yangilash faqat `open`+`auto` e'lonlarga tegishi.
 - `npm run build` (miniapp + admin) muvaffaqiyatli.
 - Qo'lda: telefon va kompyuter kengligida Sotish sahifasi ko'rinishi.
 - Haqiqiy Lis API va relay bilan sinov — kalit va relay deploy'idan keyin.
