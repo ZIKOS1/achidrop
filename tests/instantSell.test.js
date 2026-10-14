@@ -26,27 +26,73 @@ test("fetchLisPricesUsd: kalit yo'q bo'lsa so'rov yubormaydi, hammasi null", asy
     } finally { global.fetch = orig; }
 });
 
-test("fetchLisPricesUsd: bitta so'rovda ko'p nom, eng arzon narx, noto'g'ri narx e'tiborsiz", async () => {
+// Soxta Lis API: haqiqiy API kabi so'ralgan nomlarning qatorlarini narx
+// bo'yicha o'sish tartibida, BITTA sahifada (200 qator) qaytaradi.
+function fakeLis(rowsByName) {
+    const urls = [];
+    const fetch = async (url) => {
+        urls.push(url);
+        const names = new URL(url).searchParams.getAll("names[]");
+        const rows = names.flatMap(n => rowsByName[n] || [])
+            .sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0))
+            .slice(0, 200);
+        return { ok: true, json: async () => ({ data: rows, meta: { next_cursor: rows.length === 200 ? "x" : null } }) };
+    };
+    return { urls, fetch };
+}
+
+test("fetchLisPricesUsd: har nom alohida so'raladi, eng arzon narx, noto'g'ri narx e'tiborsiz", async () => {
     process.env.LIS_SKINS_API_KEY = "test";
     lis._clearCache();
     const orig = global.fetch;
-    const urls = [];
-    global.fetch = async (url) => {
-        urls.push(url);
-        return { ok: true, json: async () => ({ data: [
-            { name: "A", price: 5.5 }, { name: "A", price: 4.2 },
-            { name: "B", price: "abc" }, { name: "C", price: 0 },
-        ] }) };
-    };
+    const fake = fakeLis({
+        A: [{ name: "A", price: 5.5 }, { name: "A", price: 4.2 }],
+        B: [{ name: "B", price: "abc" }],
+        C: [{ name: "C", price: 0 }],
+    });
+    global.fetch = fake.fetch;
     try {
         const m = await lis.fetchLisPricesUsd(["A", "B", "C", "A"]);
-        assert.equal(urls.length, 1);
+        assert.equal(fake.urls.length, 3);
         assert.equal(m.get("A"), 4.2);
         assert.equal(m.get("B"), null);
         assert.equal(m.get("C"), null);
         // Kesh: ikkinchi chaqiruv A uchun so'rov yubormaydi
         await lis.fetchLisPricesUsd(["A"]);
-        assert.equal(urls.length, 1);
+        assert.equal(fake.urls.length, 3);
+    } finally { global.fetch = orig; delete process.env.LIS_SKINS_API_KEY; lis._clearCache(); }
+});
+
+test("fetchLisPricesUsd: arzon skin minglab e'lon bilan sahifani to'ldirsa ham qimmat skin narxi topiladi", async () => {
+    process.env.LIS_SKINS_API_KEY = "test";
+    lis._clearCache();
+    const orig = global.fetch;
+    const caseRows = Array.from({ length: 5000 }, (_, i) => ({ name: "Fracture Case", price: 0.37 + i / 10000 }));
+    const fake = fakeLis({
+        "Fracture Case": caseRows,
+        "AWP | Asiimov (Field-Tested)": [{ name: "AWP | Asiimov (Field-Tested)", price: 97.96 }],
+    });
+    global.fetch = fake.fetch;
+    try {
+        const m = await lis.fetchLisPricesUsd(["Fracture Case", "AWP | Asiimov (Field-Tested)"]);
+        assert.equal(m.get("Fracture Case"), 0.37);
+        assert.equal(m.get("AWP | Asiimov (Field-Tested)"), 97.96);
+    } finally { global.fetch = orig; delete process.env.LIS_SKINS_API_KEY; lis._clearCache(); }
+});
+
+test("fetchLisPricesUsd: bitta nom uchun API xatosi boshqalarini buzmaydi", async () => {
+    process.env.LIS_SKINS_API_KEY = "test";
+    lis._clearCache();
+    const orig = global.fetch;
+    const fake = fakeLis({ A: [{ name: "A", price: 2 }] });
+    global.fetch = async (url) => {
+        if (new URL(url).searchParams.getAll("names[]").includes("BAD")) return { ok: false, status: 500 };
+        return fake.fetch(url);
+    };
+    try {
+        const m = await lis.fetchLisPricesUsd(["A", "BAD"]);
+        assert.equal(m.get("A"), 2);
+        assert.equal(m.get("BAD"), null);
     } finally { global.fetch = orig; delete process.env.LIS_SKINS_API_KEY; lis._clearCache(); }
 });
 

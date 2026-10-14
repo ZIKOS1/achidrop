@@ -1,19 +1,18 @@
 // Lis-Skins'dan CS2 skin narxini olish — Skin sotish (biz userdan sotib
 // olamiz) narxini hisoblash uchun asos. Narxlar skin TURI (market_hash_name
-// = nom + wear) bo'yicha, BITTA so'rovda ko'p nom uchun (chunk'lab) olinadi.
+// = nom + wear) bo'yicha, har nom uchun bitta so'rov (fetchOne izohiga qarang).
 //
 // Natija 1 soatga keshlanadi. Narx TOPILMAGAN (null) natija esa faqat 1
 // daqiqaga — API javob shakli kutilganidan farq qilsa (yoki kalit endigina
 // sozlansa), soat davomida "narx yo'q" deb qotib qolmasligi uchun.
 //
-// ⚠ API javob shakli hali TASDIQLANMAGAN (kalit olinmagan). Kalit kelgach
-// `extractRows`/`rowName`/`rowPrice` haqiqiy javobga moslab tekshirilsin.
+// API javob shakli haqiqiy kalit bilan tasdiqlangan (2026-10-14): `data[]`,
+// har qatorda `name` va `price` ($), `game=csgo` parametri majburiy.
 // Kalit (LIS_SKINS_API_KEY) yo'q bo'lsa — hech qanday so'rov yuborilmaydi,
 // barcha narxlar null (UI "Tez orada" ko'rsatadi).
 const CACHE_MS = 60 * 60 * 1000;
 const NULL_CACHE_MS = 60 * 1000;
-const CHUNK = 50;
-const MAX_PAGES = 10;
+const CONCURRENCY = 8;
 const priceCache = new Map(); // marketHashName -> { usd, ts }
 
 function isLisConfigured() {
@@ -35,33 +34,34 @@ function rowPrice(row) {
     return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-async function fetchChunk(names, apiKey) {
-    const found = new Map(); // name -> min usd
-    let cursor = null;
-    for (let page = 0; page < MAX_PAGES; page++) {
+// Har bir nom uchun ALOHIDA so'rov. Bitta so'rovga ko'p nom berilsa, API
+// ularning hammasini narx bo'yicha bitta ro'yxatga aralashtiradi — minglab
+// e'loni bor arzon skin (masalan case) birinchi sahifalarni to'ldirib, qimmat
+// skinlar hech qachon topilmasdi (haqiqiy kalit bilan 10 sahifada faqat case
+// narxi chiqqan). Bitta nom so'ralsa birinchi qator (lowest_price) — eng
+// arzoni, shu sabab sahifalash kerak emas. Xato bo'lsa faqat shu nom null.
+async function fetchOne(name, apiKey) {
+    try {
         const params = new URLSearchParams();
         params.set("game", "csgo");
         params.set("sort_by", "lowest_price");
-        for (const n of names) params.append("names[]", n);
-        if (cursor) params.set("cursor", cursor);
+        params.append("names[]", name);
         const resp = await fetch(`https://api.lis-skins.com/v1/market/search?${params}`, {
             headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
         });
-        if (!resp.ok) throw new Error(`Lis-Skins API xato (HTTP ${resp.status})`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const body = await resp.json();
+        let min = null;
         for (const row of extractRows(body)) {
-            const name = rowName(row);
+            if (rowName(row) !== name) continue;
             const usd = rowPrice(row);
-            if (!name || usd == null) continue;
-            const prev = found.get(name);
-            if (prev == null || usd < prev) found.set(name, usd);
+            if (usd != null && (min == null || usd < min)) min = usd;
         }
-        cursor = body?.meta?.next_cursor || null;
-        // Hamma nomning narxi topilgan bo'lsa — keyingi sahifa kerak emas
-        // (lowest_price bo'yicha tartiblangan, birinchi uchragani eng arzoni).
-        if (!cursor || names.every(n => found.has(n))) break;
+        return min;
+    } catch (err) {
+        console.log(`LIS NARX XATO (${name}):`, err.message);
+        return null;
     }
-    return found;
 }
 
 // names[] → Map(name -> usd|null). Kalit yo'q bo'lsa hammasi null.
@@ -81,11 +81,13 @@ async function fetchLisPricesUsd(names) {
         else missing.push(n);
     }
 
-    for (let i = 0; i < missing.length; i += CHUNK) {
-        const chunk = missing.slice(i, i + CHUNK);
-        const found = await fetchChunk(chunk, apiKey);
-        for (const n of chunk) {
-            const usd = found.get(n) ?? null;
+    // CONCURRENCY tadan parallel — 100 xil skinli inventar ham bir necha
+    // soniyada narxlanadi, API'ni esa bir zumda yuzlab so'rov bilan bosmaydi.
+    for (let i = 0; i < missing.length; i += CONCURRENCY) {
+        const chunk = missing.slice(i, i + CONCURRENCY);
+        const prices = await Promise.all(chunk.map(n => fetchOne(n, apiKey)));
+        for (const [j, n] of chunk.entries()) {
+            const usd = prices[j];
             priceCache.set(n, { usd, ts: Date.now() });
             result.set(n, usd);
         }
