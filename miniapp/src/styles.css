@@ -37,44 +37,43 @@
 
 :root {
   color-scheme: dark;
-  /* CS2 tactical dark theme */
-  --background: oklch(0.16 0.004 260);
-  --foreground: oklch(0.96 0.005 250);
-  --card: oklch(0.205 0.005 260);
-  --card-foreground: oklch(0.96 0.005 250);
-  --popover: oklch(0.2 0.005 260);
-  --popover-foreground: oklch(0.96 0.005 250);
-  /* orange-red CS2 accent */
-  --primary: oklch(0.68 0.19 45);
-  --primary-foreground: oklch(0.16 0.01 260);
-  --secondary: oklch(0.27 0.006 260);
-  --secondary-foreground: oklch(0.96 0.005 250);
-  --muted: oklch(0.25 0.006 260);
-  --muted-foreground: oklch(0.68 0.01 260);
-  /* neon cyan highlight */
-  --accent: oklch(0.78 0.13 205);
-  --accent-foreground: oklch(0.16 0.01 260);
-  --destructive: oklch(0.62 0.22 25);
-  --destructive-foreground: oklch(0.16 0.01 260);
+  /* Dark — qizil + qora (brend palitrasi, 2026-10-15) */
+  --background: #0B0B0C;
+  --foreground: #EDE6DA;        /* asosiy matn (suyak-oq) */
+  --heading: #F6F1E8;           /* sarlavha matni */
+  --card: #18181B;
+  --card-foreground: #EDE6DA;
+  --popover: #151517;           /* karta (to'qroq) */
+  --popover-foreground: #EDE6DA;
+  --primary: #D62A24;           /* qizil (asosiy) */
+  --primary-foreground: #F6F1E8;
+  --secondary: #111113;         /* ikkinchi fon */
+  --secondary-foreground: #EDE6DA;
+  --muted: #151517;
+  --muted-foreground: #A7A198;  /* ikkinchi matn */
+  --accent: #FF5A52;            /* qizil matn / link */
+  --accent-foreground: #0B0B0C;
+  --destructive: #FF5A52;
+  --destructive-foreground: #0B0B0C;
   --success: oklch(0.7 0.17 150);
   --success-foreground: oklch(0.16 0.01 260);
   --warning: oklch(0.78 0.16 75);
   --warning-foreground: oklch(0.16 0.01 260);
-  --border: oklch(1 0 0 / 9%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.68 0.19 45);
-  --sidebar: oklch(0.18 0.004 260);
-  --sidebar-foreground: oklch(0.96 0.005 250);
-  --sidebar-border: oklch(1 0 0 / 9%);
+  --border: #222226;
+  --input: #2E2E33;             /* border (och) */
+  --ring: #D62A24;
+  --sidebar: #111113;
+  --sidebar-foreground: #EDE6DA;
+  --sidebar-border: #222226;
   /* Hero/balans kartochkalaridagi burchak gradienti — narx foni doim to'q
      bo'lishi kerak edi, chunki oldin qiymatlar rangga qattiq yozilgan edi
      (light rejimda matn ko'rinmay qolardi). Endi shu ikkita o'zgaruvchidan. */
-  --hero-a: oklch(0.2 0.02 45);
-  --hero-b: oklch(0.19 0.005 260);
+  --hero-a: color-mix(in oklch, #D62A24 14%, #111113);
+  --hero-b: #111113;
   /* Depth tokens — panellar/hero'lar uchun uch pog'onali soya. Har ikki
      rejimda ham mazmunli bo'lishi uchun rangi qora emas, --foreground'dan
      kelib chiqadi (dark'da deyarli qora, light'da yumshoq kulrang). */
-  --shadow-color: oklch(0.05 0.01 260 / 55%);
+  --shadow-color: rgb(0 0 0 / 60%);
   --shadow-sm: 0 2px 10px -4px var(--shadow-color);
   --shadow-md: 0 14px 34px -12px var(--shadow-color), 0 2px 8px -2px var(--shadow-color);
   --shadow-lg: 0 28px 64px -20px var(--shadow-color), 0 8px 20px -8px var(--shadow-color);
@@ -87,41 +86,50 @@
    emas. */
 :root[data-theme="light"] {
   color-scheme: light;
-  --background: oklch(0.98 0.003 260);
-  --foreground: oklch(0.2 0.012 260);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.012 260);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.012 260);
-  --primary: oklch(0.6 0.19 45);
-  --primary-foreground: oklch(0.99 0.005 250);
-  --secondary: oklch(0.94 0.004 260);
-  --secondary-foreground: oklch(0.2 0.012 260);
-  --muted: oklch(0.94 0.004 260);
-  --muted-foreground: oklch(0.46 0.014 260);
-  --accent: oklch(0.52 0.12 205);
-  --accent-foreground: oklch(0.99 0.005 250);
-  --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(0.99 0.005 250);
+  /* Light — oltin + oq (brend palitrasi, 2026-10-15) */
+  --background: #FFFFFF;
+  --foreground: #17140E;        /* asosiy matn / qora */
+  --heading: #17140E;
+  --card: #FFFFFF;
+  --card-foreground: #17140E;
+  --popover: #FFFFFF;
+  --popover-foreground: #17140E;
+  --primary: #C9A24A;           /* oltin (asosiy) */
+  --primary-foreground: #17140E;
+  --secondary: #FAF6EC;         /* ikkinchi fon */
+  --secondary-foreground: #17140E;
+  --muted: #FAF6EC;
+  --muted-foreground: #5E574A;  /* ikkinchi matn */
+  --accent: #8A6418;            /* oltin matn */
+  --accent-foreground: #FFFFFF;
+  --destructive: #B3261E;
+  --destructive-foreground: #FFFFFF;
   --success: oklch(0.5 0.15 150);
   --success-foreground: oklch(0.99 0.005 250);
   --warning: oklch(0.62 0.17 75);
   --warning-foreground: oklch(0.2 0.012 260);
-  --border: oklch(0 0 0 / 10%);
-  --input: oklch(0 0 0 / 14%);
-  --ring: oklch(0.6 0.19 45);
-  --sidebar: oklch(0.97 0.003 260);
-  --sidebar-foreground: oklch(0.2 0.012 260);
-  --sidebar-border: oklch(0 0 0 / 10%);
-  --hero-a: oklch(0.93 0.03 45);
-  --hero-b: oklch(0.97 0.004 260);
-  --shadow-color: oklch(0.35 0.02 260 / 16%);
+  --border: #ECE3CF;
+  --input: #E2D6BA;             /* border (to'qroq) */
+  --ring: #C9A24A;
+  --sidebar: #FAF6EC;
+  --sidebar-foreground: #17140E;
+  --sidebar-border: #ECE3CF;
+  --hero-a: #FAF6EC;
+  --hero-b: #FFFFFF;
+  --shadow-color: rgb(138 100 24 / 14%);
   --shadow-sm: 0 2px 10px -4px var(--shadow-color);
   --shadow-md: 0 14px 34px -12px var(--shadow-color), 0 2px 8px -2px var(--shadow-color);
   --shadow-lg: 0 28px 64px -20px var(--shadow-color), 0 8px 20px -8px var(--shadow-color);
 }
 
 * { -webkit-tap-highlight-color: transparent; }
+
+/* Brend palitrasida asosiy rang (qizil / oltin) fon va tugmalar uchun,
+   MATN uchun esa alohida o'qiladigan varianti bor (qizil matn #FF5A52,
+   oltin matn #8A6418 = --accent). Oltin #C9A24A oq fonda matn sifatida
+   deyarli ko'rinmaydi — shu sabab text-primary matni --accent'dan olinadi. */
+.text-primary { color: var(--accent); }
+.font-heading.text-foreground { color: var(--heading); }
 html, body, #root { height: 100%; }
 body {
   @apply bg-background text-foreground;

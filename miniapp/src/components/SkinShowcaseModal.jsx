@@ -36,10 +36,10 @@ export default function SkinShowcaseModal({ skin, onClose }) {
             </button>
 
             <div className="overflow-hidden border border-border bg-card">
-              <RarityBar color={rarityColor(skin.rarity)} rarity={skin.rarity} />
+              <RarityBar color={rarityColor(skin.rarity, skin.name)} rarity={skin.rarity} />
               <div
                 className="relative aspect-[16/11] bg-[radial-gradient(circle_at_50%_40%,color-mix(in_oklch,var(--foreground)_6%,var(--card)),var(--card))]"
-                style={{ boxShadow: `inset 0 0 120px -20px ${rarityColor(skin.rarity)}33` }}
+                style={{ boxShadow: `inset 0 0 120px -20px ${rarityColor(skin.rarity, skin.name)}33` }}
               >
                 {skin.imageUrl ? (
                   <img

@@ -18,7 +18,7 @@ export default function AuctionCard({ a, style, className }) {
   const [favBusy, setFavBusy] = useState(false);
 
   const locked = a.earlyAccessLocked && a.earlyAccessUntilMs > Date.now();
-  const rColor = rarityColor(a.rarity);
+  const rColor = rarityColor(a.rarity, a.name);
   const { weapon, skin } = parseSkinName(a.name);
   const isFavorited = (user?.favorites || []).includes(a.id);
 

@@ -70,18 +70,25 @@ export function wearClasses(float) {
 // (masalan "Covert", "Classified") bo'yicha rasmiy ranglar. Bu qiymat auksionga
 // Steam inventar pickeridan tanlanganda saqlanadi (server.js, steam-relay) —
 // eski (Steam orqali qo'shilmagan) yozuvlarda bo'lmasligi mumkin.
+// Covert/Classified/Restricted va pichoq (★) — brend palitrasidagi ranglar.
 export const RARITY_COLORS = {
   "Consumer Grade": "#B0C3D9",
   "Industrial Grade": "#5E98D9",
   "Mil-Spec": "#4B69FF",
-  "Restricted": "#8847FF",
-  "Classified": "#D32CE6",
-  "Covert": "#EB4B4B",
+  "Restricted": "#6B3FB8",
+  "Classified": "#A0247E",
+  "Covert": "#C62828",
   "Contraband": "#E4AE39",
 };
 const RARITY_COLOR_DEFAULT = "#B0C3D9";
+const COVERT_LIGHT = "#B3261E";
+export const KNIFE_COLOR = "#8A6418";
 
-export function rarityColor(rarity) {
+// Hex qaytaradi (chaqiruvchilar unga "33" kabi shaffoflik qo'shadi).
+// `name` berilsa va "★" bo'lsa (pichoq/qo'lqop) — alohida oltin rang.
+export function rarityColor(rarity, name) {
+  if (name && name.includes("★")) return KNIFE_COLOR;
+  if (rarity === "Covert" && typeof document !== "undefined" && document.documentElement.getAttribute("data-theme") === "light") return COVERT_LIGHT;
   return RARITY_COLORS[rarity] || RARITY_COLOR_DEFAULT;
 }
 
