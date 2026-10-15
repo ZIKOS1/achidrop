@@ -59,6 +59,76 @@ async function fetchUserInventory(steamId64, force = false) {
     return body;
 }
 
+// ── Skin sotish uchun: relay'SIZ, to'g'ridan-to'g'ri steamcommunity.com ──────
+// Skin sotishda bot hech narsa yubormaydi/qabul qilmaydi (hammasi qo'lda) —
+// faqat userning ochiq inventarini ko'rsatish kerak, relay (va uning Steam
+// sessiyasi) shart emas. Float bu yerda yo'q, lekin Lis narxi uchun float
+// kerak emas: Steam `market_hash_name`ni (wear bilan) o'zi beradi.
+// ⚠ Yuqoridagi izohdagi datacenter-IP blok hali ham amal qilishi mumkin —
+// Steam 429 qaytarsa userga tushunarli xato chiqadi.
+const COMMUNITY_IMG = "https://community.akamai.steamstatic.com/economy/image/";
+const WEAR_BY_TAG = { WearCategory0: "FN", WearCategory1: "MW", WearCategory2: "FT", WearCategory3: "WW", WearCategory4: "BS" };
+const communityInvCache = new Map(); // steamId64 -> { data, ts }
+
+// Sof funksiya (testlanadi). marketable:0 itemlar (medal, coin va h.k.)
+// umuman sotib bo'lmagani uchun tashlab yuboriladi.
+function parseCommunityInventory(body) {
+    const descs = new Map();
+    for (const d of body?.descriptions || []) descs.set(`${d.classid}_${d.instanceid}`, d);
+    const items = [];
+    for (const a of body?.assets || []) {
+        const d = descs.get(`${a.classid}_${a.instanceid}`);
+        if (!d || !d.marketable) continue;
+        const tags = d.tags || [];
+        const exterior = tags.find(t => t.category === "Exterior");
+        const rarity = tags.find(t => t.category === "Rarity");
+        items.push({
+            assetId: String(a.assetid),
+            name: d.name || d.market_hash_name,
+            marketHashName: d.market_hash_name,
+            wear: exterior ? WEAR_BY_TAG[exterior.internal_name] || null : null,
+            float: null,
+            image: d.icon_url ? `${COMMUNITY_IMG}${d.icon_url}/256fx256f` : null,
+            rarity: rarity ? rarity.localized_tag_name : null,
+            tradable: !!d.tradable,
+            stickers: [],
+        });
+    }
+    return items;
+}
+
+async function fetchCommunityInventory(steamId64, force = false) {
+    if (!steamId64) throw new Error("Steam hisobingiz ulanmagan");
+    const cached = communityInvCache.get(steamId64);
+    if (!force && cached && Date.now() - cached.ts < CACHE_MS) return cached.data;
+
+    const items = [];
+    let start = null;
+    for (let page = 0; page < 5; page++) {
+        const url = `https://steamcommunity.com/inventory/${steamId64}/730/2?l=english&count=2000${start ? `&start_assetid=${start}` : ""}`;
+        const ac = new AbortController();
+        const timer = setTimeout(() => ac.abort(), 20000);
+        let resp;
+        try {
+            resp = await fetch(url, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0" }, signal: ac.signal });
+        } catch (err) {
+            throw new Error(err.name === "AbortError" ? "Steam javob bermadi, keyinroq urinib ko'ring" : "Steam bilan bog'lanishda xato");
+        } finally {
+            clearTimeout(timer);
+        }
+        if (resp.status === 403) throw new Error("Steam inventaringiz yopiq (private). Uni Steam sozlamalarida ochiq (public) qiling");
+        if (resp.status === 429) throw new Error("Steam hozir band, 1-2 daqiqadan keyin urinib ko'ring");
+        if (!resp.ok) throw new Error(`Steam xato qaytardi (HTTP ${resp.status})`);
+        const body = await resp.json().catch(() => null);
+        if (!body) break; // bo'sh inventar Steam'da bo'sh javob qaytaradi
+        items.push(...parseCommunityInventory(body));
+        if (!body.more_items || !body.last_assetid) break;
+        start = body.last_assetid;
+    }
+    communityInvCache.set(steamId64, { data: items, ts: Date.now() });
+    return items;
+}
+
 async function fetchInventory(force = false) {
     const steamId = getConfiguredSteamId();
     if (!steamId) throw new Error("Steam ID sozlanmagan (.env STEAM_ID64 yoki Admin Panel > Sozlamalar > Steam)");
@@ -69,4 +139,4 @@ async function fetchInventory(force = false) {
     return body;
 }
 
-module.exports = { fetchInventory, fetchUserInventory };
+module.exports = { fetchInventory, fetchUserInventory, fetchCommunityInventory, parseCommunityInventory };

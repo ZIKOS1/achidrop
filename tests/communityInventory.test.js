@@ -1,0 +1,61 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+
+const steam = require("../steam");
+
+// steamcommunity.com/inventory/<id>/730/2 javobining qisqartirilgan nusxasi
+// (haqiqiy javob shakli, 2026-10-15 kuni tekshirilgan).
+const body = {
+    assets: [
+        { appid: 730, contextid: "2", assetid: "111", classid: "c1", instanceid: "0", amount: "1" },
+        { appid: 730, contextid: "2", assetid: "222", classid: "c2", instanceid: "0", amount: "1" },
+        { appid: 730, contextid: "2", assetid: "333", classid: "c1", instanceid: "0", amount: "1" },
+        { appid: 730, contextid: "2", assetid: "444", classid: "c3", instanceid: "9", amount: "1" },
+    ],
+    descriptions: [
+        {
+            classid: "c1", instanceid: "0", tradable: 1, marketable: 1,
+            name: "AK-47 | Redline", market_hash_name: "AK-47 | Redline (Field-Tested)",
+            icon_url: "ICON1",
+            tags: [
+                { category: "Exterior", internal_name: "WearCategory2", localized_tag_name: "Field-Tested" },
+                { category: "Rarity", internal_name: "Rarity_Legendary_Weapon", localized_tag_name: "Classified" },
+            ],
+        },
+        {
+            classid: "c2", instanceid: "0", tradable: 0, marketable: 1,
+            name: "Fracture Case", market_hash_name: "Fracture Case", icon_url: "ICON2", tags: [],
+        },
+        {
+            classid: "c3", instanceid: "9", tradable: 1, marketable: 0,
+            name: "Service Medal", market_hash_name: "Service Medal", icon_url: "ICON3", tags: [],
+        },
+    ],
+    total_inventory_count: 4,
+    success: 1,
+};
+
+test("parseCommunityInventory: Steam nomi Lis narxi uchun to'g'ridan-to'g'ri olinadi", () => {
+    const items = steam.parseCommunityInventory(body);
+    const ak = items.find(i => i.assetId === "111");
+    assert.equal(ak.marketHashName, "AK-47 | Redline (Field-Tested)");
+    assert.equal(ak.name, "AK-47 | Redline");
+    assert.equal(ak.wear, "FT");
+    assert.equal(ak.float, null);
+    assert.equal(ak.tradable, true);
+    assert.equal(ak.rarity, "Classified");
+    assert.match(ak.image, /^https:\/\/community\.[a-z.]+\/economy\/image\/ICON1/);
+});
+
+test("parseCommunityInventory: bir xil classid'li ikki skin ikkita alohida item, lock va sotib bo'lmaydiganlar belgilanadi", () => {
+    const items = steam.parseCommunityInventory(body);
+    assert.deepEqual(items.map(i => i.assetId), ["111", "222", "333"]);
+    assert.equal(items.find(i => i.assetId === "222").tradable, false);
+    // marketable:0 (medal va h.k.) — umuman sotib bo'lmaydi, ro'yxatga kirmaydi
+    assert.equal(items.some(i => i.assetId === "444"), false);
+});
+
+test("parseCommunityInventory: bo'sh yoki buzilgan javob bo'sh ro'yxat", () => {
+    assert.deepEqual(steam.parseCommunityInventory(null), []);
+    assert.deepEqual(steam.parseCommunityInventory({ success: 1 }), []);
+});
