@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Banknote, Check, CheckCircle2, Clock, Copy, ExternalLink, Lock, Package, RefreshCw, Search, XCircle } from "lucide-react";
+import { Banknote, Check, CheckCircle2, Clock, Copy, ExternalLink, Layers, Lock, Package, RefreshCw, Search, Wallet, XCircle } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
-import { imgSrc, wearClasses, fmtMoney, hap } from "../utils";
+import { imgSrc, wearClasses, fmtMoney, hap, rarityColor } from "../utils";
 import { t } from "../i18n";
 import { cn } from "../lib/cn";
 import Empty from "../components/Empty";
@@ -24,56 +24,72 @@ function StatusBadge({ status }) {
   const Icon = m.icon;
   const label = map[status] ? t(`sell.status.${status}`) : t("sell.status.other");
   return (
-    <span className={cn("inline-flex items-center gap-1 border px-2 py-0.5 text-[11px] font-semibold", m.cls)}>
+    <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold", m.cls)}>
       <Icon className="size-3" />
       {label}
     </span>
   );
 }
 
+// Kartochka: rasm ortida nodirlik rangidagi yumshoq nur va pastda rangli
+// chiziq (pichoq ★ — oltin), tanlanganda brend rangidagi halqa.
 function SkinCard({ item, selected, disabled, priced, onToggle }) {
+  const rColor = rarityColor(item.rarity, item.name);
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onToggle}
       className={cn(
-        "group relative flex flex-col border bg-card p-2.5 text-left transition-all duration-150",
-        selected ? "border-primary shadow-[0_0_0_1px_var(--primary)]" : "border-border",
-        disabled ? "cursor-not-allowed opacity-50" : "hover:-translate-y-0.5 hover:border-primary/50"
+        "group relative flex flex-col overflow-hidden rounded-xl border bg-card text-left transition-all duration-200 ease-out",
+        selected
+          ? "border-primary shadow-[0_0_0_1px_var(--primary),0_14px_32px_-14px_color-mix(in_oklch,var(--primary)_70%,transparent)]"
+          : "border-border",
+        disabled
+          ? "cursor-not-allowed opacity-45 grayscale-[35%]"
+          : "hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_18px_36px_-18px_color-mix(in_oklch,var(--primary)_55%,transparent)]"
       )}
     >
       <span
         className={cn(
-          "absolute right-2 top-2 z-10 flex size-5 items-center justify-center border",
-          selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background/80"
+          "absolute right-2.5 top-2.5 z-10 flex size-6 items-center justify-center rounded-full border-2 transition-colors",
+          selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background/80 group-hover:border-primary/60"
         )}
       >
         {selected && <Check className="size-3.5" strokeWidth={3} />}
       </span>
       {item.wear && (
-        <span className={cn("absolute left-2 top-2 z-10 border px-1.5 py-0.5 text-[10px] font-bold", wearClasses(item.float))}>{item.wear}</span>
+        <span className={cn("absolute left-2.5 top-2.5 z-10 rounded-md border px-1.5 py-0.5 text-[10px] font-bold", wearClasses(item.float))}>{item.wear}</span>
       )}
-      <span className="flex aspect-[4/3] items-center justify-center">
+      <span
+        className="relative flex aspect-[4/3] items-center justify-center px-3 pt-6"
+        style={{ background: `radial-gradient(ellipse 70% 60% at 50% 55%, ${rColor}2e, transparent 70%)` }}
+      >
         {item.imageUrl ? (
-          <img src={imgSrc(item.imageUrl)} alt="" loading="lazy" className="max-h-full max-w-full object-contain" />
+          <img src={imgSrc(item.imageUrl)} alt="" loading="lazy" className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105" />
         ) : (
           <Package className="size-8 text-muted-foreground" />
         )}
       </span>
-      <p className="mt-1.5 line-clamp-2 min-h-[2.5em] text-xs font-medium leading-tight text-foreground">{item.name}</p>
-      {item.float != null && <p className="mt-0.5 text-[10px] text-muted-foreground">{item.float.toFixed(4)}</p>}
-      <div className="mt-1.5 flex items-center justify-between gap-1">
-        {!item.tradable ? (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-warning">
-            <Lock className="size-3" />
-            {t("sell.locked")}
-          </span>
-        ) : priced ? (
-          <span className="font-heading text-sm font-bold text-success">{fmtMoney(item.priceSom)}</span>
-        ) : (
-          <span className="text-[11px] text-muted-foreground">{t("sell.noPrice")}</span>
-        )}
+      <span className="h-0.5 w-full" style={{ backgroundColor: rColor }} />
+      <div className="flex flex-1 flex-col p-3">
+        <p className="line-clamp-2 min-h-[2.5em] text-xs font-medium leading-tight text-foreground">{item.name}</p>
+        {item.float != null && <p className="mt-0.5 text-[10px] text-muted-foreground">{item.float.toFixed(4)}</p>}
+        <div className="mt-auto pt-2">
+          {!item.tradable ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-warning">
+              <Lock className="size-3" />
+              {t("sell.locked")}
+            </span>
+          ) : priced ? (
+            <>
+              <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">{t("sell.youGet")}</span>
+              <span className="font-heading text-base font-bold leading-tight text-foreground">{fmtMoney(item.priceSom)}</span>
+            </>
+          ) : (
+            <span className="text-[11px] text-muted-foreground">{t("sell.noPrice")}</span>
+          )}
+        </div>
       </div>
     </button>
   );
@@ -283,24 +299,44 @@ export default function Sell() {
   }
 
   const steps = [t("sell.step1"), t("sell.step2"), t("sell.step3")];
+  const sellableItems = items.filter(sellable);
+  const inventoryValue = sellableItems.reduce((sum, i) => sum + i.priceSom, 0);
 
   return (
     <div className="space-y-5 pb-28">
-      <div className="border border-border bg-card p-5 shadow-panel">
-        <h1 className="font-heading text-xl font-bold uppercase tracking-wide text-foreground">{t("sell.title")}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t("sell.subtitle")}</p>
-        <ol className="mt-4 grid gap-2 sm:grid-cols-3">
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-[linear-gradient(135deg,var(--hero-a),var(--hero-b))] p-5 shadow-panel sm:p-6">
+        <div className="pointer-events-none absolute -right-16 -top-20 size-64 rounded-full bg-primary/15 blur-3xl" />
+        <div className="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground sm:text-3xl">{t("sell.title")}</h1>
+            <p className="mt-1 max-w-md text-sm text-muted-foreground">{t("sell.subtitle")}</p>
+          </div>
+          {quote?.lisConfigured && sellableItems.length > 0 && (
+            <div className="flex gap-3">
+              <div className="rounded-xl border border-border bg-background/60 px-4 py-2.5">
+                <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground"><Wallet className="size-3.5" />{t("sell.inventoryValue")}</p>
+                <p className="font-heading text-lg font-bold text-foreground">{fmtMoney(inventoryValue)}</p>
+              </div>
+              <div className="rounded-xl border border-border bg-background/60 px-4 py-2.5">
+                <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground"><Layers className="size-3.5" />{t("sell.sellableCount")}</p>
+                <p className="font-heading text-lg font-bold text-foreground">{sellableItems.length}</p>
+              </div>
+            </div>
+          )}
+        </div>
+        <ol className="relative mt-5 grid gap-2 sm:grid-cols-3 sm:gap-0">
           {steps.map((s, i) => (
-            <li key={i} className="flex items-center gap-2 border border-border bg-secondary/30 px-3 py-2 text-xs text-foreground">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary font-heading text-[11px] font-bold text-primary-foreground">{i + 1}</span>
-              {s}
+            <li key={i} className="relative flex items-center gap-2.5 text-xs text-foreground sm:pr-4">
+              <span className="relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full bg-primary font-heading text-xs font-bold text-primary-foreground shadow-[0_0_16px_-4px_var(--primary)]">{i + 1}</span>
+              <span className="font-medium">{s}</span>
+              {i < steps.length - 1 && <span className="ml-auto hidden h-px flex-1 bg-gradient-to-r from-primary/50 to-border sm:block" />}
             </li>
           ))}
         </ol>
       </div>
 
       {quote && !quote.lisConfigured && (
-        <div className="flex items-start gap-3 border border-warning/40 bg-warning/10 p-4">
+        <div className="flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4">
           <Clock className="mt-0.5 size-5 shrink-0 text-warning" />
           <div>
             <p className="font-heading text-sm font-bold text-foreground">{t("sell.comingSoon")}</p>
@@ -310,9 +346,9 @@ export default function Sell() {
       )}
 
       {!user.steamId64 || quote?.steamConnected === false ? (
-        <div className="flex flex-col items-center gap-3 border border-border bg-card px-4 py-12 text-center shadow-panel">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card px-4 py-12 text-center shadow-panel">
           <p className="text-sm text-muted-foreground">{t("sell.connectSteam")}</p>
-          <button type="button" onClick={connectSteam} className="flex items-center gap-2 bg-primary px-5 py-2.5 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90">
+          <button type="button" onClick={connectSteam} className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90">
             <SteamLogo className="size-4" />
             {t("trade.connectSteam")}
           </button>
@@ -320,7 +356,7 @@ export default function Sell() {
       ) : (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex min-w-[180px] flex-1 items-center gap-2 border border-border bg-card px-3">
+            <div className="flex min-w-[180px] flex-1 items-center gap-2 rounded-lg border border-border bg-card px-3 transition-colors focus-within:border-primary/60">
               <Search className="size-4 text-muted-foreground" />
               <input
                 value={query}
@@ -330,11 +366,11 @@ export default function Sell() {
               />
             </div>
             {quote?.lisConfigured && (
-              <button type="button" onClick={selected.size ? () => setSelected(new Set()) : selectAll} className="border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary/40">
+              <button type="button" onClick={selected.size ? () => setSelected(new Set()) : selectAll} className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary/40">
                 {selected.size ? t("sell.clear") : t("sell.selectAll")}
               </button>
             )}
-            <button type="button" onClick={() => load(true)} disabled={loading} className="flex items-center gap-1.5 border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary/40 disabled:opacity-50">
+            <button type="button" onClick={() => load(true)} disabled={loading} className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary/40 disabled:opacity-50">
               <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
               {t("sell.refresh")}
             </button>
@@ -343,15 +379,15 @@ export default function Sell() {
           {loading && !quote ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="space-y-2 border border-border bg-card p-2.5">
-                  <div className="skeleton aspect-[4/3] w-full" />
+                <div key={i} className="space-y-2 overflow-hidden rounded-xl border border-border bg-card p-2.5">
+                  <div className="skeleton aspect-[4/3] w-full rounded-lg" />
                   <div className="skeleton h-3 w-4/5" />
                   <div className="skeleton h-3 w-1/2" />
                 </div>
               ))}
             </div>
           ) : error ? (
-            <p className="border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+            <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
           ) : !items.length ? (
             <Empty icon={Package} title={t("sell.empty")} desc={t("sell.emptyDesc")} />
           ) : (
@@ -372,14 +408,23 @@ export default function Sell() {
       )}
 
       {mine.length > 0 && (
-        <div className="border border-border bg-card p-4 shadow-panel">
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-panel sm:p-5">
           <h2 className="mb-3 font-heading text-sm font-bold uppercase tracking-wide text-foreground">{t("sell.myRequests")}</h2>
           <ul className="divide-y divide-border">
             {mine.map((r) => (
-              <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">#{r.id} · {t("sell.items", { n: (r.items || [r]).length })}</p>
-                  <p className="text-[11px] text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</p>
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex -space-x-3">
+                    {(r.items || []).slice(0, 3).map((it) => (
+                      <span key={it.assetId} className="flex size-10 items-center justify-center rounded-lg border border-border bg-secondary">
+                        {it.imageUrl ? <img src={imgSrc(it.imageUrl)} alt="" className="max-h-full max-w-full object-contain" /> : <Package className="size-4 text-muted-foreground" />}
+                      </span>
+                    ))}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">#{r.id} · {t("sell.items", { n: (r.items || [r]).length })}</p>
+                    <p className="text-[11px] text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-foreground">{fmtMoney(r.totalSom ?? r.priceSom)}</span>
@@ -403,18 +448,27 @@ export default function Sell() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 80, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 px-4 py-3 shadow-panel-lg backdrop-blur lg:left-64"
+            className="fixed inset-x-0 bottom-0 z-30 px-3 pb-3 lg:left-64"
           >
-            <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">{t("sell.selected", { n: selected.size })}</p>
-                <p className="font-heading text-lg font-bold text-success">{fmtMoney(total)}</p>
+            <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-panel-lg">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="hidden -space-x-3 sm:flex">
+                  {selectedItems.slice(0, 4).map((it) => (
+                    <span key={it.assetId} className="flex size-10 items-center justify-center rounded-lg border border-border bg-secondary">
+                      {it.imageUrl ? <img src={imgSrc(it.imageUrl)} alt="" className="max-h-full max-w-full object-contain" /> : <Package className="size-4 text-muted-foreground" />}
+                    </span>
+                  ))}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">{t("sell.selected", { n: selected.size })}</p>
+                  <p className="font-heading text-xl font-bold text-foreground">{fmtMoney(total)}</p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={confirmSell}
                 disabled={submitting}
-                className="flex items-center gap-2 bg-primary px-6 py-3 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                className="flex items-center gap-2 rounded-xl bg-primary px-6 py-3 shadow-[0_10px_26px_-10px_var(--primary)] font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
               >
                 <Banknote className="size-4" />
                 {t("sell.sellBtn")}

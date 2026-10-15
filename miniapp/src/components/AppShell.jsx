@@ -177,10 +177,10 @@ function NavLinks({ page, navigate, onNavigate }) {
             type="button"
             onClick={() => { navigate(item.key); onNavigate?.(); }}
             className={cn(
-              "group flex items-center gap-3 border-l-2 px-3 py-2.5 text-left text-sm font-medium uppercase tracking-wide transition-colors",
+              "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium uppercase tracking-wide transition-colors",
               active
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-transparent text-muted-foreground hover:border-border hover:bg-secondary hover:text-foreground"
+                ? "bg-primary/12 text-primary before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-primary"
+                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
             )}
           >
             <Icon className="size-[18px] shrink-0" />

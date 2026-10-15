@@ -1306,6 +1306,7 @@ function sellItemView(it, prices) {
         assetId: String(it.assetId), name: it.name, marketHashName,
         imageUrl: it.image || null, float: it.float ?? null,
         wear: it.wear ?? skinUtils.wearCode(it.float),
+        rarity: it.rarity ?? null,
         tradable: it.tradable !== false,
         priceSom,
     };
