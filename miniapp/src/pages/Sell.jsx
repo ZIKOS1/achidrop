@@ -292,7 +292,7 @@ export default function Sell() {
         <ol className="mt-4 grid gap-2 sm:grid-cols-3">
           {steps.map((s, i) => (
             <li key={i} className="flex items-center gap-2 border border-border bg-secondary/30 px-3 py-2 text-xs text-foreground">
-              <span className="flex size-5 shrink-0 items-center justify-center bg-primary font-heading text-[11px] font-bold text-primary-foreground">{i + 1}</span>
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary font-heading text-[11px] font-bold text-primary-foreground">{i + 1}</span>
               {s}
             </li>
           ))}
