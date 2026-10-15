@@ -149,3 +149,45 @@ test("creditRequestInTx: balans + tarix + ledger (holdMs bilan) yoziladi", () =>
 
     assert.equal(ism.creditRequestInTx([], [], request, now), false);
 });
+
+test("marginPercentForUsd: narx pog'onasiga qarab marja tanlanadi (chegara pog'onaga kiradi)", () => {
+    const tiers = [{ maxUsd: 10, percent: 20 }, { maxUsd: 50, percent: 15 }, { maxUsd: null, percent: 10 }];
+    assert.equal(lis.marginPercentForUsd(0.37, tiers), 20);
+    assert.equal(lis.marginPercentForUsd(10, tiers), 20);
+    assert.equal(lis.marginPercentForUsd(10.01, tiers), 15);
+    assert.equal(lis.marginPercentForUsd(50, tiers), 15);
+    assert.equal(lis.marginPercentForUsd(160, tiers), 10);
+});
+
+test("normalizeMarginTiers: to'g'ri pog'onalar qabul qilinadi, noto'g'rilari rad etiladi", () => {
+    assert.deepEqual(
+        lis.normalizeMarginTiers([{ maxUsd: "10", percent: "20" }, { maxUsd: "", percent: "10" }]),
+        [{ maxUsd: 10, percent: 20 }, { maxUsd: null, percent: 10 }]
+    );
+    // oxirgisi cheksiz bo'lishi shart
+    assert.equal(lis.normalizeMarginTiers([{ maxUsd: 10, percent: 20 }]), null);
+    // o'sish tartibida bo'lishi shart
+    assert.equal(lis.normalizeMarginTiers([{ maxUsd: 50, percent: 20 }, { maxUsd: 10, percent: 15 }, { maxUsd: null, percent: 10 }]), null);
+    // foiz 0–99
+    assert.equal(lis.normalizeMarginTiers([{ maxUsd: null, percent: 100 }]), null);
+    assert.equal(lis.normalizeMarginTiers([{ maxUsd: null, percent: -1 }]), null);
+    assert.equal(lis.normalizeMarginTiers([]), null);
+    // o'rtadagi pog'ona cheksiz bo'lolmaydi
+    assert.equal(lis.normalizeMarginTiers([{ maxUsd: null, percent: 20 }, { maxUsd: null, percent: 10 }]), null);
+});
+
+test("getMarginTiers: sozlanmagan bo'lsa eski bitta marja hamma narxga qo'llanadi", () => {
+    assert.deepEqual(lis.marginTiersFromSettings({}), [{ maxUsd: null, percent: 12 }]);
+    assert.deepEqual(lis.marginTiersFromSettings({ instantSellMarginPercent: 8 }), [{ maxUsd: null, percent: 8 }]);
+    const tiers = [{ maxUsd: 10, percent: 20 }, { maxUsd: null, percent: 10 }];
+    assert.deepEqual(lis.marginTiersFromSettings({ instantSellMarginPercent: 8, instantSellMarginTiers: tiers }), tiers);
+    // buzilgan saqlangan qiymat — eski marjaga qaytadi
+    assert.deepEqual(lis.marginTiersFromSettings({ instantSellMarginPercent: 8, instantSellMarginTiers: [{ maxUsd: 5, percent: 1 }] }), [{ maxUsd: null, percent: 8 }]);
+});
+
+test("instantSellPriceSomTiered: arzon va qimmat skinga turli marja", () => {
+    const tiers = [{ maxUsd: 10, percent: 20 }, { maxUsd: null, percent: 10 }];
+    assert.equal(lis.instantSellPriceSomTiered(5, 12700, tiers), Math.floor(5 * 12700 * 0.8));
+    assert.equal(lis.instantSellPriceSomTiered(100, 12700, tiers), Math.floor(100 * 12700 * 0.9));
+    assert.equal(lis.instantSellPriceSomTiered(null, 12700, tiers), null);
+});

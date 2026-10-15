@@ -2211,6 +2211,7 @@ app.get("/api/admin/settings", requireAdminPanel, (req, res) => {
         referralBonus: s.referralBonus ?? 10000,
         tradeFeeTiers: tradeManager.getFeeTiers(),
         instantSellMarginPercent: s.instantSellMarginPercent ?? 12,
+        instantSellMarginTiers: lisSkinsPrice.marginTiersFromSettings(s),
         usdToSomRate: s.usdToSomRate ?? 12700,
         botTradeUrl: s.botTradeUrl || "",
         lisConfigured: lisSkinsPrice.isLisConfigured(),
@@ -2246,6 +2247,11 @@ app.post("/api/admin/settings", requireAdminPanel, (req, res) => {
         if (isNaN(m) || m < 0 || m > 100) return res.status(400).json({ error: "Instant Sell margin 0-100% orasida bo'lishi kerak" });
         s.instantSellMarginPercent = m;
     }
+    if (req.body.instantSellMarginTiers !== undefined) {
+        const tiers = lisSkinsPrice.normalizeMarginTiers(req.body.instantSellMarginTiers);
+        if (!tiers) return res.status(400).json({ error: "Marja pog'onalari noto'g'ri: foiz 0–99, narx chegaralari o'sish tartibida, oxirgisi cheksiz bo'lishi kerak" });
+        s.instantSellMarginTiers = tiers;
+    }
     if (req.body.usdToSomRate !== undefined) {
         const rate = Number(req.body.usdToSomRate);
         if (isNaN(rate) || rate <= 0) return res.status(400).json({ error: "USD to Som kurs musbat raqam bo'lishi kerak" });
@@ -2267,6 +2273,7 @@ app.post("/api/admin/settings", requireAdminPanel, (req, res) => {
         referralBonus: s.referralBonus ?? 10000,
         tradeFeeTiers: tradeManager.getFeeTiers(),
         instantSellMarginPercent: s.instantSellMarginPercent ?? 12,
+        instantSellMarginTiers: lisSkinsPrice.marginTiersFromSettings(s),
         usdToSomRate: s.usdToSomRate ?? 12700,
     });
 });

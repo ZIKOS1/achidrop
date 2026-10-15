@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Banknote, CheckCircle2, Clock, Package, RefreshCw, Settings2, XCircle } from "lucide-react";
+import { Banknote, CheckCircle2, Clock, Package, Plus, RefreshCw, Settings2, Trash2, XCircle } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
 import { fmtMoney, hap, imgSrc } from "../../utils";
@@ -16,30 +16,75 @@ const FILTERS = [
   { key: "", label: "Hammasi" },
 ];
 
+// Server lisSkinsPrice.marginPercentForUsd bilan bir xil: usd <= maxUsd
+// bo'lgan birinchi pog'ona, oxirgisi cheksiz.
+function marginFor(usd, tiers) {
+  const tier = tiers.find((t) => t.maxUsd === "" || t.maxUsd == null || usd <= Number(t.maxUsd)) || tiers[tiers.length - 1];
+  return Number(tier?.percent) || 0;
+}
+
+// Saqlangan pog'onalar formaga. Hali bitta (eski) marja bo'lsa — 10 $ / 50 $ /
+// qolgani pog'onalari o'sha foiz bilan taklif qilinadi (saqlanmaguncha narx
+// o'zgarmaydi).
+function tiersToForm(tiers) {
+  const list = Array.isArray(tiers) && tiers.length ? tiers : [{ maxUsd: null, percent: 12 }];
+  if (list.length === 1) {
+    const p = String(list[0].percent);
+    return [{ maxUsd: "10", percent: p }, { maxUsd: "50", percent: p }, { maxUsd: "", percent: p }];
+  }
+  return list.map((t) => ({ maxUsd: t.maxUsd == null ? "" : String(t.maxUsd), percent: String(t.percent) }));
+}
+
 function SettingsCard() {
   const { showToast } = useApp();
   const [s, setS] = useState(null);
-  const [form, setForm] = useState({ margin: "", rate: "", url: "" });
+  const [form, setForm] = useState({ rate: "", url: "" });
+  const [tiers, setTiers] = useState([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     api("/api/admin/settings").then((r) => {
       setS(r);
-      setForm({ margin: String(r.instantSellMarginPercent ?? 12), rate: String(r.usdToSomRate ?? 12700), url: r.botTradeUrl || "" });
+      setForm({ rate: String(r.usdToSomRate ?? 12700), url: r.botTradeUrl || "" });
+      setTiers(tiersToForm(r.instantSellMarginTiers));
     }).catch(() => {});
   }, []);
 
+  function setTier(i, key, value) {
+    setTiers((list) => list.map((t, j) => (j === i ? { ...t, [key]: value } : t)));
+  }
+  function addTier() {
+    // Oxirgi (cheksiz) pog'onadan oldin qo'shiladi.
+    setTiers((list) => {
+      const prev = list.length > 1 ? Number(list[list.length - 2].maxUsd) || 0 : 0;
+      return [...list.slice(0, -1), { maxUsd: String(prev + 50), percent: list[list.length - 1].percent }, list[list.length - 1]];
+    });
+  }
+  function removeTier(i) {
+    setTiers((list) => list.filter((_, j) => j !== i));
+  }
+
   async function save() {
-    const margin = Number(form.margin), rate = Number(form.rate);
-    if (!Number.isFinite(margin) || margin < 0 || margin >= 100) return showToast("Marja 0–99% bo'lishi kerak", "err");
+    const rate = Number(form.rate);
     if (!Number.isFinite(rate) || rate <= 0) return showToast("Kurs musbat raqam bo'lishi kerak", "err");
+    for (const [i, t] of tiers.entries()) {
+      const p = Number(t.percent);
+      if (t.percent === "" || !Number.isFinite(p) || p < 0 || p >= 100) return showToast("Marja 0–99% bo'lishi kerak", "err");
+      if (i < tiers.length - 1) {
+        const m = Number(t.maxUsd);
+        if (!Number.isFinite(m) || m <= 0) return showToast("Narx chegarasi musbat bo'lishi kerak", "err");
+        if (i > 0 && m <= Number(tiers[i - 1].maxUsd)) return showToast("Narx chegaralari o'sib borishi kerak (masalan 10, 50, ...)", "err");
+      }
+    }
+    const payloadTiers = tiers.map((t, i) => ({ maxUsd: i === tiers.length - 1 ? null : Number(t.maxUsd), percent: Number(t.percent) }));
     setSaving(true);
     try {
       const r = await api("/api/admin/settings", {
         method: "POST",
-        body: JSON.stringify({ instantSellMarginPercent: margin, usdToSomRate: rate, botTradeUrl: form.url.trim() }),
+        body: JSON.stringify({ instantSellMarginTiers: payloadTiers, usdToSomRate: rate, botTradeUrl: form.url.trim() }),
       });
       setS(r);
+      setTiers(tiersToForm(r.instantSellMarginTiers));
       hap("notif", "success");
       showToast("Saqlandi", "ok");
     } catch (e) {
@@ -60,10 +105,35 @@ function SettingsCard() {
       <p className={s.lisConfigured ? "text-xs text-success" : "text-xs text-warning"}>
         {s.lisConfigured ? "✅ Lis-Skins API ulangan — skin sotish ishlayapti" : "⏳ Lis-Skins API kaliti hali yo'q — userlarda \"Tez orada\" ko'rinadi"}
       </p>
-      <label className="block space-y-1">
-        <span className="text-xs text-muted-foreground">Marja (%) — userga Lis narxidan shuncha arzon to'lanadi</span>
-        <input type="number" inputMode="decimal" value={form.margin} onChange={(e) => setForm({ ...form, margin: e.target.value })} className={input} />
-      </label>
+      <div className="space-y-2">
+        <span className="block text-xs text-muted-foreground">Marja (%) — userga Lis narxidan shuncha arzon to'lanadi. Skin narxiga qarab pog'onali:</span>
+        {tiers.map((t, i) => {
+          const last = i === tiers.length - 1;
+          const from = i === 0 ? 0 : Number(tiers[i - 1].maxUsd) || 0;
+          return (
+            <div key={i} className="flex items-center gap-2">
+              {last ? (
+                <span className="w-32 shrink-0 text-xs text-foreground">{tiers.length > 1 ? `${from} $ dan qimmat` : "Hamma narxlar"}</span>
+              ) : (
+                <span className="flex w-32 shrink-0 items-center gap-1 text-xs text-foreground">
+                  <input type="number" inputMode="decimal" value={t.maxUsd} onChange={(e) => setTier(i, "maxUsd", e.target.value)} className={input + " !w-16 !px-2 !py-1.5"} />
+                  $ gacha
+                </span>
+              )}
+              <input type="number" inputMode="decimal" value={t.percent} onChange={(e) => setTier(i, "percent", e.target.value)} className={input + " !py-1.5"} />
+              <span className="text-xs text-muted-foreground">%</span>
+              {!last ? (
+                <button type="button" onClick={() => removeTier(i)} className="shrink-0 p-1.5 text-muted-foreground hover:text-destructive" aria-label="O'chirish">
+                  <Trash2 className="size-4" />
+                </button>
+              ) : <span className="w-7 shrink-0" />}
+            </div>
+          );
+        })}
+        <button type="button" onClick={addTier} className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
+          <Plus className="size-3.5" /> Pog'ona qo'shish
+        </button>
+      </div>
       <label className="block space-y-1">
         <span className="text-xs text-muted-foreground">Dollar kursi (1 $ = ? so'm)</span>
         <input type="number" inputMode="numeric" value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value })} className={input} />
@@ -72,9 +142,13 @@ function SettingsCard() {
         <span className="text-xs text-muted-foreground">Bizning Steam trade link (userlar skinni shunga yuboradi)</span>
         <input type="text" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://steamcommunity.com/tradeoffer/new/?partner=...&token=..." className={input} />
       </label>
-      <p className="text-xs text-muted-foreground">
-        Misol: Lis narxi 10 $ bo'lsa, userga {fmtMoney(Math.floor(10 * (Number(form.rate) || 0) * (1 - (Number(form.margin) || 0) / 100)))} to'lanadi.
-      </p>
+      <div className="space-y-0.5 text-xs text-muted-foreground">
+        {[5, 30, 100].map((usd) => (
+          <p key={usd}>
+            Misol: Lis narxi {usd} $ bo'lsa ({marginFor(usd, tiers)}% marja), userga {fmtMoney(Math.floor(usd * (Number(form.rate) || 0) * (1 - marginFor(usd, tiers) / 100)))} to'lanadi.
+          </p>
+        ))}
+      </div>
       <button type="button" disabled={saving} onClick={save} className="w-full bg-primary py-2.5 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground disabled:opacity-50">
         {saving ? "..." : "Saqlash"}
       </button>

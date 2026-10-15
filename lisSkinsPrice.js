@@ -117,13 +117,55 @@ function instantSellPriceSom(usd, rate, marginPercent) {
     return som > 0 ? som : null;
 }
 
+// ── Pog'onali marja ──────────────────────────────────────────────────────────
+// Skinning Lis narxiga ($) qarab turli marja: masalan 10 $ gacha 20%,
+// 50 $ gacha 15%, qolgani 10%. Pog'ona: usd <= maxUsd bo'lgan birinchisi;
+// oxirgisi har doim maxUsd:null (cheksiz). Saqlanmagan bo'lsa — eski bitta
+// `instantSellMarginPercent` hamma narxga qo'llanadi (narxlar o'zgarmaydi).
+
+// Admin kiritgan pog'onalarni tekshiradi va sonlarga o'tkazadi; noto'g'ri
+// bo'lsa null.
+function normalizeMarginTiers(tiers) {
+    if (!Array.isArray(tiers) || !tiers.length) return null;
+    const out = [];
+    for (const [i, t] of tiers.entries()) {
+        const last = i === tiers.length - 1;
+        const rawMax = t?.maxUsd;
+        const maxUsd = rawMax === null || rawMax === undefined || rawMax === "" ? null : Number(rawMax);
+        const percent = Number(t?.percent);
+        if (!Number.isFinite(percent) || percent < 0 || percent >= 100) return null;
+        if (last ? maxUsd !== null : !(Number.isFinite(maxUsd) && maxUsd > 0)) return null;
+        if (!last && out.length && maxUsd <= out[out.length - 1].maxUsd) return null;
+        out.push({ maxUsd, percent });
+    }
+    return out;
+}
+
+function marginTiersFromSettings(s) {
+    const saved = normalizeMarginTiers(s?.instantSellMarginTiers);
+    if (saved) return saved;
+    const single = Number.isFinite(s?.instantSellMarginPercent) ? s.instantSellMarginPercent : 12;
+    return [{ maxUsd: null, percent: single }];
+}
+function getMarginTiers() { return marginTiersFromSettings(getSettings()); }
+
+function marginPercentForUsd(usd, tiers) {
+    const tier = tiers.find(t => t.maxUsd === null || usd <= t.maxUsd) || tiers[tiers.length - 1];
+    return tier.percent;
+}
+
+function instantSellPriceSomTiered(usd, rate, tiers) {
+    if (!Number.isFinite(usd) || usd <= 0) return null;
+    return instantSellPriceSom(usd, rate, marginPercentForUsd(usd, tiers));
+}
+
 // names[] → Map(name -> priceSom|null)
 async function getInstantSellPricesSom(names) {
     const usdMap = await fetchLisPricesUsd(names);
     const rate = getUsdToSomRate();
-    const margin = getInstantSellMarginPercent();
+    const tiers = getMarginTiers();
     const out = new Map();
-    for (const [name, usd] of usdMap) out.set(name, instantSellPriceSom(usd, rate, margin));
+    for (const [name, usd] of usdMap) out.set(name, instantSellPriceSomTiered(usd, rate, tiers));
     return out;
 }
 
@@ -147,4 +189,5 @@ module.exports = {
     isLisConfigured, fetchLisPricesUsd, instantSellPriceSom,
     getInstantSellPricesSom, getInstantSellPriceSom, getListPriceSom,
     getInstantSellMarginPercent, getUsdToSomRate, _clearCache,
+    normalizeMarginTiers, marginTiersFromSettings, getMarginTiers, marginPercentForUsd, instantSellPriceSomTiered,
 };
