@@ -217,6 +217,13 @@ async function showProfile(ctx, user, edit = false) {
 }
 
 async function showBalance(ctx, user, edit = false) {
+    if (!FEATURES.topup) {
+        // To'ldirish o'chiq — faqat balans va pul yechish (Skin sotish puli).
+        const text = `💰 *Balansingiz: ${(user.balance ?? 0).toLocaleString()} so'm*`;
+        const opts = { parse_mode: "Markdown", ...Markup.inlineKeyboard([[Markup.button.callback("💸 Pul yechish / muzlatilgan mablag'", "wd_summary")]]) };
+        try { return edit ? await ctx.editMessageText(text, opts) : await ctx.reply(text, opts); } catch {}
+        return;
+    }
     const text = `💰 *Balansingiz: ${(user.balance ?? 0).toLocaleString()} so'm*\n\n💳 To'lov usulini tanlang:`;
     const keyboard = Markup.inlineKeyboard([
         [Markup.button.callback("🔵 Payme", "topup_payme"), Markup.button.callback("🟢 Click", "topup_click")],
@@ -658,6 +665,7 @@ module.exports = (bot) => {
 
     // ── 🎒 Inventar ──────────────────────────────────────────────────────────
     bot.hears([TEXTS.uz.inventory, TEXTS.ru.inventory], async (ctx) => {
+        if (!FEATURES.inventory) return;
         if (isAdmin(ctx)) return;
         const user = getUser(ctx.from.id);
         if (!user) return ctx.reply("⚠️ Avval /start bosing.");
@@ -804,7 +812,7 @@ module.exports = (bot) => {
     ["payme","click","paynet","uzumbank"].forEach(bank => {
         bot.action(`topup_${bank}`, async (ctx) => {
             await ctx.answerCbQuery();
-            if (isAdmin(ctx)) return;
+            if (isAdmin(ctx) || !FEATURES.topup) return;
             const user = getUser(ctx.from.id);
             if (!user) return;
             const info = getPaymentCards()[bank];

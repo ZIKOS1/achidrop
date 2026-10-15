@@ -6,6 +6,7 @@ import { fmtMoney, fmtUnlockLeft, openWithdrawModal } from "../utils";
 import { t } from "../i18n";
 import Empty from "../components/Empty";
 import { TelegramLogo } from "../components/BrandIcons";
+import { FEATURES } from "../features";
 
 const presets = [500_000, 1_000_000, 2_000_000, 5_000_000];
 const METHOD_ACCENT = {
@@ -99,12 +100,14 @@ export default function Balance() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground">{t("balance.title")}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t("balance.subtitle")}</p>
+        <h1 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground">{t(FEATURES.topup ? "balance.title" : "balance.titleOnly")}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t(FEATURES.topup ? "balance.subtitle" : "balance.subtitleOnly")}</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+      <div className={"grid grid-cols-1 gap-6 " + (FEATURES.topup ? "lg:grid-cols-3" : "max-w-xl")}>
+        {/* To'ldirish (features.js'da o'chirilishi mumkin) — pul yechish va
+            muzlatilgan mablag' bloki har doim qoladi (Skin sotish puli). */}
+        {FEATURES.topup && <div className="space-y-6 lg:col-span-2">
           <section className="border border-border bg-card p-5 shadow-panel">
             <SectionTitle step={1} title={t("balance.step1")} />
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -193,10 +196,22 @@ export default function Balance() {
               {t("balance.goToBot")}
             </button>
           </section>
-        </div>
+        </div>}
 
         <div className="space-y-6">
-          <div className="border border-border bg-card p-5 shadow-panel-lg">
+          {!FEATURES.topup && (
+            <div className="border border-border bg-card p-5 shadow-panel-lg">
+              <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
+                <Wallet className="size-4 text-primary" />
+                {t("profile.currentBalance")}
+              </p>
+              <p className="mt-2 font-heading text-3xl font-bold text-foreground">{fmtMoney(user.balance ?? 0)}</p>
+              {!(hold && (hold.frozen > 0 || hold.available > 0 || hold.pending > 0)) && (
+                <p className="mt-2 text-xs text-muted-foreground">{t("balance.nothingYet")}</p>
+              )}
+            </div>
+          )}
+          {FEATURES.topup && <div className="border border-border bg-card p-5 shadow-panel-lg">
             <h2 className="font-heading text-sm font-bold uppercase tracking-wide text-foreground">{t("balance.summary")}</h2>
             <dl className="mt-4 space-y-3 text-sm">
               <Row label={t("balance.method")} value={selected?.name ?? t("balance.notSelected")} />
@@ -209,7 +224,7 @@ export default function Balance() {
               <ShieldCheck className="mt-0.5 size-4 shrink-0 text-success" />
               <p>{t("balance.securityNote")}</p>
             </div>
-          </div>
+          </div>}
 
           {hold && (hold.frozen > 0 || hold.available > 0 || hold.pending > 0) && (
             <div className="border border-border bg-card p-5 shadow-panel">

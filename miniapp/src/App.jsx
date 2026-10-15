@@ -46,6 +46,7 @@ const DISABLED_PAGES = new Set([
   ...(!FEATURES.auctions ? ["auctions", "auction-detail", "leaderboard"] : []),
   ...(!FEATURES.trade ? ["trade", "trade-detail"] : []),
   ...(!FEATURES.market ? ["market", "market-sell", "market-detail"] : []),
+  ...(!FEATURES.inventory ? ["inventory"] : []),
 ]);
 const HOME_PAGE = FEATURES.auctions ? "auctions" : "sell";
 

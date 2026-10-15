@@ -4,4 +4,6 @@ export const FEATURES = {
   auctions: false,
   market: false,
   trade: false, // Obmen
+  inventory: false, // Inventar
+  topup: false, // Balansni to'ldirish (pul yechish QOLADI)
 };

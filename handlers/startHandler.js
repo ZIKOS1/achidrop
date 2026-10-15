@@ -61,12 +61,12 @@ function mainMenu(user) {
         ...(FEATURES.trade ? [TX.obmen] : []),
         ...(FEATURES.market ? [TX.market] : []),
     ];
+    if (FEATURES.inventory) extra.unshift(TX.inventory);
     const rows = [
         [TX.sell],
         [TX.balance, TX.profile],
-        [TX.inventory, ...extra.slice(0, 1)],
     ];
-    if (extra.length > 1) rows.push(extra.slice(1));
+    for (let i = 0; i < extra.length; i += 2) rows.push(extra.slice(i, i + 2));
     return Markup.keyboard(rows).resize();
 }
 

@@ -7,6 +7,8 @@ const FEATURES = {
     auctions: false,
     market: false,
     trade: false, // Obmen
+    inventory: false, // Inventar (yutilgan/sotib olingan skinlar)
+    topup: false,     // Balansni to'ldirish (pul yechish va muzlatilgan mablag' QOLADI)
 };
 
 module.exports = { FEATURES };

@@ -26,11 +26,11 @@ import { FEATURES } from "../features";
 const NAV = [
   { key: "sell", labelKey: "nav.sell", icon: Banknote, group: ["sell"] },
   { key: "auctions", labelKey: "nav.auctions", icon: Gavel, group: ["auctions", "auction-detail", "leaderboard"], feature: "auctions" },
-  { key: "inventory", labelKey: "nav.inventory", icon: Package, group: ["inventory"] },
+  { key: "inventory", labelKey: "nav.inventory", icon: Package, group: ["inventory"], feature: "inventory" },
   { key: "trade", labelKey: "nav.trade", icon: Repeat, group: ["trade", "trade-detail"], feature: "trade" },
   { key: "market", labelKey: "nav.market", icon: ShoppingBag, group: ["market", "market-sell", "market-detail"], feature: "market" },
   { key: "profile", labelKey: "nav.profile", icon: Wallet, group: ["profile", "bid-history", "bal-history", "notifications"] },
-  { key: "balance", labelKey: "nav.balance", icon: CreditCard, group: ["balance"] },
+  { key: "balance", labelKey: FEATURES.topup ? "nav.balance" : "nav.balanceOnly", icon: CreditCard, group: ["balance"] },
 ].filter((item) => !item.feature || FEATURES[item.feature]);
 const HOME = FEATURES.auctions ? "auctions" : "sell";
 
@@ -105,7 +105,7 @@ function BalanceOrLogin({ user, navigate, compact }) {
             className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-secondary"
           >
             <PlusCircle className="size-4 text-primary" />
-            {t("balance.topUpAction")}
+            {t(FEATURES.topup ? "balance.topUpAction" : "nav.balanceOnly")}
           </button>
           <button
             type="button"

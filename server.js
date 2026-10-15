@@ -5,7 +5,8 @@ const rateLimit   = require("express-rate-limit");
 const crypto  = require("crypto");
 const path    = require("path");
 const { read, write, refresh } = require("./database/db");
-const { fetchInventory, fetchUserInventory, fetchCommunityInventory } = require("./steam");
+const { fetchInventory, fetchUserInventory } = require("./steam");
+const inventoryBridge = require("./inventoryBridge");
 const { createPendingAuth, peekPendingAuth, consumePendingAuth, getSteamAuth, steamConnectedHtml } = require("./auth-steam");
 const { createPendingLogin, consumePendingLogin } = require("./auth-telegram-login");
 const { finishAuction, cancelAuction } = require("./auctionLifecycle");
@@ -1295,8 +1296,8 @@ function mdEscape(text) {
     return String(text).replace(/([_*`\[])/g, "\\$1");
 }
 
-// Skin sotish inventari relay'siz steamcommunity'dan keladi (steam.js
-// fetchCommunityInventory) — u yerda Steam'ning o'z market_hash_name'i bor,
+// Skin sotish inventari relay'siz steamcommunity'dan keladi (bot orqali —
+// inventoryBridge.js) — u yerda Steam'ning o'z market_hash_name'i bor,
 // float esa yo'q, shu sabab nom float'dan emas, Steam'dan olinadi.
 function sellItemView(it, prices) {
     const marketHashName = it.marketHashName || skinUtils.marketHashName(it.name, it.float);
@@ -1325,7 +1326,8 @@ app.get("/api/instant-sell/quote", auth, async (req, res) => {
     if (!u.steamId64) return res.json({ ...base, steamConnected: false, items: [] });
 
     let items;
-    try { items = await fetchCommunityInventory(u.steamId64, req.query.refresh === "1"); }
+    // Vercel IP'si Steam'da bloklangan — inventarni bot (uy IP'si) olib beradi.
+    try { items = await inventoryBridge.requestInventory(u.steamId64, { force: req.query.refresh === "1" }, inventoryBridge.mongoDeps()); }
     catch (err) { return res.status(500).json({ error: err.message }); }
 
     let prices = null;
@@ -1362,7 +1364,7 @@ app.post("/api/instant-sell", auth, async (req, res) => {
     if (assetIds.length > instantSellManager.MAX_ITEMS_PER_REQUEST) return res.status(400).json({ error: INSTANT_SELL_ERRORS.too_many, code: "too_many" });
 
     let inv;
-    try { inv = await fetchCommunityInventory(u.steamId64); }
+    try { inv = await inventoryBridge.requestInventory(u.steamId64, {}, inventoryBridge.mongoDeps()); }
     catch (err) { return res.status(500).json({ error: err.message }); }
     const byId = new Map(inv.map(it => [String(it.assetId), it]));
     const notFound = assetIds.filter(a => !byId.has(a));

@@ -22,7 +22,8 @@ async function connect() {
     console.log("✅ MongoDB ulandi");
 
     const docs = await Store.find({}).lean();
-    for (const doc of docs) cache[doc._id] = doc.data;
+    // inv_/invReq_ — inventoryBridge'ning vaqtinchalik hujjatlari, keshga kerak emas.
+    for (const doc of docs) if (!/^inv(Req)?_/.test(doc._id)) cache[doc._id] = doc.data;
     console.log("✅ Ma'lumotlar keshga yuklandi:", Object.keys(cache).join(", ") || "(bo'sh)");
 
     // Websaytdan Steam orqali (Telegramsiz) kiruvchi foydalanuvchilar qo'shilishi
@@ -118,4 +119,24 @@ function writeTx(session, file, data) {
   return Store.updateOne({ _id: file }, { $set: { data } }, { session, upsert: true });
 }
 
-module.exports = { read, write, connect, refresh, withTransaction, readTx, writeTx };
+// ── Keshsiz, to'g'ridan-to'g'ri bitta hujjat bilan ishlash ──────────────────
+// Jarayonlar o'rtasida qisqa xabar almashish uchun (inventoryBridge.js: sayt
+// so'rov qoldiradi, bot javob yozadi). Keshga tegilmaydi — har chaqiruv
+// Mongo'dagi eng yangi holatni ko'radi.
+async function readDoc(id) {
+  const doc = await Store.findOne({ _id: id }).lean();
+  return doc ? doc.data : null;
+}
+async function writeDoc(id, data) {
+  await Store.updateOne({ _id: id }, { $set: { data } }, { upsert: true });
+}
+async function removeDoc(id) {
+  await Store.deleteOne({ _id: id });
+}
+async function listIds(prefix) {
+  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const docs = await Store.find({ _id: { $regex: `^${escaped}` } }, { _id: 1 }).lean();
+  return docs.map(d => d._id);
+}
+
+module.exports = { read, write, connect, refresh, withTransaction, readTx, writeTx, readDoc, writeDoc, removeDoc, listIds };
