@@ -185,9 +185,12 @@ test("getMarginTiers: sozlanmagan bo'lsa eski bitta marja hamma narxga qo'llanad
     assert.deepEqual(lis.marginTiersFromSettings({ instantSellMarginPercent: 8, instantSellMarginTiers: [{ maxUsd: 5, percent: 1 }] }), [{ maxUsd: null, percent: 8 }]);
 });
 
-test("instantSellPriceSomTiered: arzon va qimmat skinga turli marja", () => {
+test("instantSellPriceSomTiered: Lis narxi × 0.89 × kurs, keyin pog'onali marja", () => {
+    assert.equal(lis.SELL_PRICE_RATIO, 0.89);
+    // marja 0%: aynan Lis × 0.89 × kurs ($104.03 → so'm)
+    assert.equal(lis.instantSellPriceSomTiered(104.03, 12700, [{ maxUsd: null, percent: 0 }]), Math.floor(104.03 * 0.89 * 12700));
     const tiers = [{ maxUsd: 10, percent: 20 }, { maxUsd: null, percent: 10 }];
-    assert.equal(lis.instantSellPriceSomTiered(5, 12700, tiers), Math.floor(5 * 12700 * 0.8));
-    assert.equal(lis.instantSellPriceSomTiered(100, 12700, tiers), Math.floor(100 * 12700 * 0.9));
+    assert.equal(lis.instantSellPriceSomTiered(5, 12700, tiers), Math.floor(5 * 0.89 * 12700 * 0.8));
+    assert.equal(lis.instantSellPriceSomTiered(100, 12700, tiers), Math.floor(100 * 0.89 * 12700 * 0.9));
     assert.equal(lis.instantSellPriceSomTiered(null, 12700, tiers), null);
 });

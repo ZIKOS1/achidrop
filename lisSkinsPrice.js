@@ -154,9 +154,14 @@ function marginPercentForUsd(usd, tiers) {
     return tier.percent;
 }
 
+// Skin sotish narxi Lis'dagi eng arzon narxning shu qismidan boshlanadi (egasi
+// belgilagan). Admin paneldagi marja (0% bo'lishi mumkin) shundan keyin ayriladi.
+const SELL_PRICE_RATIO = 0.89;
+
+// Pog'ona Lis bozor narxi bo'yicha tanlanadi (admin shu narxni ko'radi).
 function instantSellPriceSomTiered(usd, rate, tiers) {
     if (!Number.isFinite(usd) || usd <= 0) return null;
-    return instantSellPriceSom(usd, rate, marginPercentForUsd(usd, tiers));
+    return instantSellPriceSom(usd * SELL_PRICE_RATIO, rate, marginPercentForUsd(usd, tiers));
 }
 
 // names[] → Map(name -> priceSom|null)
@@ -189,5 +194,5 @@ module.exports = {
     isLisConfigured, fetchLisPricesUsd, instantSellPriceSom,
     getInstantSellPricesSom, getInstantSellPriceSom, getListPriceSom,
     getInstantSellMarginPercent, getUsdToSomRate, _clearCache,
-    normalizeMarginTiers, marginTiersFromSettings, getMarginTiers, marginPercentForUsd, instantSellPriceSomTiered,
+    normalizeMarginTiers, marginTiersFromSettings, getMarginTiers, marginPercentForUsd, instantSellPriceSomTiered, SELL_PRICE_RATIO,
 };

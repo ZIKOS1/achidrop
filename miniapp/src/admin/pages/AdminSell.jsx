@@ -16,6 +16,9 @@ const FILTERS = [
   { key: "", label: "Hammasi" },
 ];
 
+// Server lisSkinsPrice.SELL_PRICE_RATIO bilan bir xil: narx Lis × shu son dan boshlanadi.
+const SELL_PRICE_RATIO = 0.89;
+
 // Server lisSkinsPrice.marginPercentForUsd bilan bir xil: usd <= maxUsd
 // bo'lgan birinchi pog'ona, oxirgisi cheksiz.
 function marginFor(usd, tiers) {
@@ -145,7 +148,7 @@ function SettingsCard() {
       <div className="space-y-0.5 text-xs text-muted-foreground">
         {[5, 30, 100].map((usd) => (
           <p key={usd}>
-            Misol: Lis narxi {usd} $ bo'lsa ({marginFor(usd, tiers)}% marja), userga {fmtMoney(Math.floor(usd * (Number(form.rate) || 0) * (1 - marginFor(usd, tiers) / 100)))} to'lanadi.
+            Misol: Lis narxi {usd} $ bo'lsa (× {SELL_PRICE_RATIO}, {marginFor(usd, tiers)}% marja), userga {fmtMoney(Math.floor(usd * SELL_PRICE_RATIO * (Number(form.rate) || 0) * (1 - marginFor(usd, tiers) / 100)))} to'lanadi.
           </p>
         ))}
       </div>
