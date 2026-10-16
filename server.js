@@ -5,7 +5,7 @@ const rateLimit   = require("express-rate-limit");
 const crypto  = require("crypto");
 const path    = require("path");
 const { read, write, refresh } = require("./database/db");
-const { fetchInventory, fetchUserInventory } = require("./steam");
+const { fetchInventory, fetchUserInventory, fetchCommunityInventory, steamApisGet } = require("./steam");
 const inventoryBridge = require("./inventoryBridge");
 const { createPendingAuth, peekPendingAuth, consumePendingAuth, getSteamAuth, steamConnectedHtml } = require("./auth-steam");
 const { createPendingLogin, consumePendingLogin } = require("./auth-telegram-login");
@@ -1296,6 +1296,14 @@ function mdEscape(text) {
     return String(text).replace(/([_*`\[])/g, "\\$1");
 }
 
+// Skin sotish inventari. Vercel IP'si Steam'da bloklangan: STEAMAPIS_KEY bo'lsa
+// SteamApis orqali to'g'ridan-to'g'ri (steam.js steamApisGet), aks holda VPS'dagi
+// inventory-worker orqali (inventoryBridge.js).
+function getSellInventory(steamId64, force) {
+    if (process.env.STEAMAPIS_KEY) return fetchCommunityInventory(steamId64, force, steamApisGet);
+    return inventoryBridge.requestInventory(steamId64, { force }, inventoryBridge.mongoDeps());
+}
+
 // Skin sotish inventari relay'siz steamcommunity'dan keladi (bot orqali —
 // inventoryBridge.js) — u yerda Steam'ning o'z market_hash_name'i bor,
 // float esa yo'q, shu sabab nom float'dan emas, Steam'dan olinadi.
@@ -1327,8 +1335,7 @@ app.get("/api/instant-sell/quote", auth, async (req, res) => {
     if (!u.steamId64) return res.json({ ...base, steamConnected: false, items: [] });
 
     let items;
-    // Vercel IP'si Steam'da bloklangan — inventarni bot (uy IP'si) olib beradi.
-    try { items = await inventoryBridge.requestInventory(u.steamId64, { force: req.query.refresh === "1" }, inventoryBridge.mongoDeps()); }
+    try { items = await getSellInventory(u.steamId64, req.query.refresh === "1"); }
     catch (err) { return res.status(500).json({ error: err.message }); }
 
     let prices = null;
@@ -1365,7 +1372,7 @@ app.post("/api/instant-sell", auth, async (req, res) => {
     if (assetIds.length > instantSellManager.MAX_ITEMS_PER_REQUEST) return res.status(400).json({ error: INSTANT_SELL_ERRORS.too_many, code: "too_many" });
 
     let inv;
-    try { inv = await inventoryBridge.requestInventory(u.steamId64, {}, inventoryBridge.mongoDeps()); }
+    try { inv = await getSellInventory(u.steamId64, false); }
     catch (err) { return res.status(500).json({ error: err.message }); }
     const byId = new Map(inv.map(it => [String(it.assetId), it]));
     const notFound = assetIds.filter(a => !byId.has(a));

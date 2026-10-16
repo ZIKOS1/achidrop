@@ -126,6 +126,14 @@ function curlGet(url) {
     });
 }
 
+// SteamApis.com (pullik) — o'z IP'lari orqali Steam'dan oladi, Vercel'dan to'g'ridan-to'g'ri
+// chaqirsa bo'ladi (bot/worker shart emas). Javobi steamcommunity bilan bir xil format,
+// butun inventar bitta javobda keladi. steamcommunity URL'ini SteamApis'nikiga almashtiradi.
+function steamApisGet(url) {
+    const m = url.match(/\/inventory\/(\d+)\/(\d+)\/(\d+)/);
+    return fetchGet(`https://api.steamapis.com/steam/inventory/${m[1]}/${m[2]}/${m[3]}?api_key=${encodeURIComponent(process.env.STEAMAPIS_KEY)}`);
+}
+
 let steamBusyUntil = 0;
 
 async function fetchCommunityInventory(steamId64, force = false, get = fetchGet) {
@@ -165,4 +173,4 @@ async function fetchInventory(force = false) {
     return body;
 }
 
-module.exports = { fetchInventory, fetchUserInventory, fetchCommunityInventory, parseCommunityInventory, curlGet };
+module.exports = { fetchInventory, fetchUserInventory, fetchCommunityInventory, parseCommunityInventory, curlGet, steamApisGet };
