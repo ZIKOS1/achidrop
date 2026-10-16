@@ -36,6 +36,8 @@ async function requestInventory(steamId64, { force = false } = {}, deps) {
             return res.items;
         }
     }
+    // Bot javob bermadi (o'chiq/band) — avval olingan inventar bo'lsa, xato o'rniga o'shani ko'rsatamiz.
+    if (cached && !cached.error) return cached.items;
     throw new Error("Inventarni hozir yuklab bo'lmadi, keyinroq qayta urinib ko'ring");
 }
 

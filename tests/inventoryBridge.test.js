@@ -70,6 +70,15 @@ test("bridge: bot ishlamasa vaqt tugaganda tushunarli xato", async () => {
     await assert.rejects(bridge.requestInventory("765", {}, deps), /keyinroq/);
 });
 
+test("bridge: bot ishlamasa, lekin avval olingan inventar bo'lsa — xato o'rniga o'sha qaytadi", async () => {
+    const store = fakeStore();
+    let now = 9_000_000;
+    // 2 soat oldingi natija: "yangi" emas, lekin bot javob bermasa shu ko'rsatiladi
+    await store.writeDoc("inv_765", { items: ITEMS, fetchedAt: now - 2 * 3600_000, error: null });
+    const deps = { ...store, now: () => now, sleep: async (ms) => { now += ms; } };
+    assert.deepEqual(await bridge.requestInventory("765", { force: true }, deps), ITEMS);
+});
+
 test("bridge: eski natija (so'rovdan oldingi) yangi so'rovga javob deb olinmaydi", async () => {
     const store = fakeStore();
     let now = 9_000_000;
