@@ -6,7 +6,6 @@ import {
   Package,
   Repeat,
   ShoppingBag,
-  Crosshair,
   Menu,
   X,
   LogIn,
@@ -37,12 +36,9 @@ const HOME = FEATURES.auctions ? "auctions" : "sell";
 function Brand({ onClick, compact }) {
   return (
     <button type="button" onClick={onClick} className="flex min-w-0 items-center gap-2.5">
-      <span className="flex size-9 shrink-0 items-center justify-center bg-primary text-primary-foreground shadow-[0_0_18px_-4px_color-mix(in_oklch,var(--primary)_65%,transparent)] clip-tactical">
-        <Crosshair className="size-5" strokeWidth={2.5} />
-      </span>
       <span className="flex min-w-0 flex-col items-start leading-none">
         <span className="truncate font-heading text-lg font-bold uppercase tracking-wider text-foreground">
-          Ziko<span className="text-primary">Auction</span>
+          Achi<span className="text-primary">Drop</span>
         </span>
         {!compact && (
           <span className="truncate text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">

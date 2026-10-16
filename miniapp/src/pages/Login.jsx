@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Crosshair, KeyRound, Gavel, ShieldCheck, Wallet } from "lucide-react";
+import { KeyRound, Gavel, ShieldCheck, Wallet } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
 import { t } from "../i18n";
@@ -84,12 +84,9 @@ export default function Login() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,color-mix(in_oklch,var(--primary)_22%,transparent),transparent_60%)]" />
         <div className="absolute bottom-0 right-0 h-2/3 w-2/3 bg-[radial-gradient(circle_at_90%_100%,color-mix(in_oklch,var(--accent)_16%,transparent),transparent_65%)]" />
         <div className="relative space-y-6">
-          <span className="flex size-14 items-center justify-center bg-primary text-primary-foreground shadow-[0_0_36px_-6px_color-mix(in_oklch,var(--primary)_70%,transparent)] clip-tactical">
-            <Crosshair className="size-7" strokeWidth={2.5} />
-          </span>
           <div>
             <h1 className="font-heading text-4xl font-bold uppercase tracking-wide text-foreground">
-              Ziko<span className="text-primary text-glow-primary">Auction</span>
+              Achi<span className="text-primary text-glow-primary">Drop</span>
             </h1>
             <p className="mt-2 max-w-xs text-sm leading-relaxed text-muted-foreground">
               {t("auctions.heroTitle1")} {t("auctions.heroTitleAccent")} {t("auctions.heroTitle2")} — {t("nav.headerSlogan")}
@@ -115,7 +112,7 @@ export default function Login() {
       {/* Auth panel */}
       <div className="flex flex-col justify-center gap-1 p-8 sm:p-10">
         <h2 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground lg:hidden">
-          Ziko<span className="text-primary">Auction</span>{t("login.welcome")}
+          Achi<span className="text-primary">Drop</span>{t("login.welcome")}
         </h2>
         <p className="mb-6 text-sm text-muted-foreground">{t("login.subtitle")}</p>
 
