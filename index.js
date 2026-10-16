@@ -3,8 +3,6 @@ const { Telegraf, Markup } = require("telegraf");
 const { read, connect, refresh } = require("./database/db");
 const { notifyUser } = require("./notify");
 const { finishAuction } = require("./auctionLifecycle");
-const inventoryBridge = require("./inventoryBridge");
-const { fetchCommunityInventory, curlGet } = require("./steam");
 
 // Vaqtni chiroyli ko'rsatish
 function timeLeft(endTime) {
@@ -63,25 +61,8 @@ async function main() {
             .catch((err) => console.log("KESH YANGILASH XATO:", err.message));
     }, 4_000);
 
-    // ── Skin sotish: saytdan kelgan inventar so'rovlarini bajarish ─────────
-    //    Vercel IP'si Steam'da bloklangan, bot esa uy IP'sida — sayt Mongo'da
-    //    so'rov qoldiradi, bot shu yerda Steam'dan olib, javobni yozadi
-    //    (inventoryBridge.js). Tez bo'lishi kerak: user sahifada kutib turadi.
-    let invBridgeRunning = false;
-    setInterval(async () => {
-        if (invBridgeRunning) return;
-        invBridgeRunning = true;
-        try {
-            await inventoryBridge.processPendingRequests({
-                ...inventoryBridge.mongoDeps(),
-                fetchInventory: (sid, force) => fetchCommunityInventory(sid, force, curlGet),
-            });
-        } catch (err) {
-            console.log("INVENTAR SO'ROV XATO:", err.message);
-        } finally {
-            invBridgeRunning = false;
-        }
-    }, 1_500);
+    // Skin sotish inventar so'rovlarini (inventoryBridge.js) faqat inventory-worker.js
+    // bajaradi — bot ham bajarsa Steam'ga har so'rov ikki marta ketib, IP 429 olardi.
 
     // ── Obmen: 24 soat javobsiz qolgan (buyer qo'shilgan) obmenlarni avtomatik
     //    bekor qilish va band qilingan mablag'ni qaytarish ─────────────────────

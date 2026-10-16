@@ -126,6 +126,8 @@ function curlGet(url) {
     });
 }
 
+let steamBusyUntil = 0;
+
 async function fetchCommunityInventory(steamId64, force = false, get = fetchGet) {
     if (!steamId64) throw new Error("Steam hisobingiz ulanmagan");
     const cached = communityInvCache.get(steamId64);
@@ -135,13 +137,10 @@ async function fetchCommunityInventory(steamId64, force = false, get = fetchGet)
     let start = null;
     for (let page = 0; page < 5; page++) {
         const url = `https://steamcommunity.com/inventory/${steamId64}/730/2?l=english&count=2000${start ? `&start_assetid=${start}` : ""}`;
-        let resp;
-        // 429 ko'pincha bir lahzalik — sayt 22s kutadi, shu ichida 2 marta qayta urinamiz.
-        for (let attempt = 0; attempt < 3; attempt++) {
-            if (attempt) await new Promise(r => setTimeout(r, 3000));
-            resp = await get(url);
-            if (resp.status !== 429) break;
-        }
+        // 429 dan keyin qayta urinish IP cheklovini uzaytiradi — 1 daqiqa umuman so'ramaymiz.
+        if (Date.now() < steamBusyUntil) throw new Error("Steam hozir band, 1-2 daqiqadan keyin urinib ko'ring");
+        const resp = await get(url);
+        if (resp.status === 429) steamBusyUntil = Date.now() + 60_000;
         if (resp.status === 403) throw new Error("Steam inventaringiz yopiq (private). Uni Steam sozlamalarida ochiq (public) qiling");
         if (resp.status === 429) throw new Error("Steam hozir band, 1-2 daqiqadan keyin urinib ko'ring");
         if (resp.status < 200 || resp.status >= 300) throw new Error(`Steam xato qaytardi (HTTP ${resp.status})`);
