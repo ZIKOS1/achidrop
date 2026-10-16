@@ -370,9 +370,10 @@ export default function Sell() {
                 {selected.size ? t("sell.clear") : t("sell.selectAll")}
               </button>
             )}
-            <button type="button" onClick={() => load(true)} disabled={loading} className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary/40 disabled:opacity-50">
+            <button type="button" onClick={() => load(true)} disabled={loading} aria-label={t("sell.refresh")} title={t("sell.refresh")} className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary/40 disabled:opacity-50">
               <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
-              {t("sell.refresh")}
+              {/* Telefonda faqat belgi — qidiruv qatori ikkiga bo'linib ketmasin */}
+              <span className="hidden sm:inline">{t("sell.refresh")}</span>
             </button>
           </div>
 

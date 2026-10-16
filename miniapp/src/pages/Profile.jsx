@@ -128,7 +128,7 @@ export default function Profile() {
                 onClick={() => navigate("balance")}
                 className="inline-flex items-center justify-center gap-2 bg-primary px-5 py-3 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground shadow-[0_10px_28px_-10px_color-mix(in_oklch,var(--primary)_75%,transparent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90"
               >
-                <Plus className="size-4" />
+                {FEATURES.topup ? <Plus className="size-4" /> : <Wallet className="size-4" />}
                 {t(FEATURES.topup ? "profile.topUp" : "nav.balanceOnly")}
               </button>
             </div>
@@ -140,11 +140,11 @@ export default function Profile() {
             </div>
             <div className="divide-y divide-border">
               {[
-                { icon: BarChart3, labelKey: "profile.bidHistory", page: "bid-history" },
+                { icon: BarChart3, labelKey: "profile.bidHistory", page: "bid-history", feature: "auctions" },
                 { icon: CreditCard, labelKey: "profile.balHistory", page: "bal-history" },
-                { icon: Trophy, labelKey: "profile.leaderboard", page: "leaderboard" },
+                { icon: Trophy, labelKey: "profile.leaderboard", page: "leaderboard", feature: "auctions" },
                 { icon: Bell, labelKey: "profile.notifications", page: "notifications" },
-              ].map((l) => {
+              ].filter((l) => !l.feature || FEATURES[l.feature]).map((l) => {
                 const Icon = l.icon;
                 return (
                   <button
@@ -178,6 +178,8 @@ export default function Profile() {
 
         {/* Right column */}
         <div className="space-y-6">
+          {/* Trade link faqat skin YUBORADIGAN bo'limlarga kerak (Skin sotishda biz skin olamiz). */}
+          {(FEATURES.auctions || FEATURES.market || FEATURES.trade) && (
           <div className="border border-border bg-card p-5 shadow-panel">
             <h2 className="flex items-center gap-2 font-heading text-sm font-bold uppercase tracking-wide text-foreground">
               <Link2 className="size-4 text-accent" />
@@ -207,6 +209,7 @@ export default function Profile() {
               </button>
             </div>
           </div>
+          )}
 
           <div className="border border-border bg-card p-5 shadow-panel">
             <h2 className="flex items-center gap-2 font-heading text-sm font-bold uppercase tracking-wide text-foreground">
@@ -230,6 +233,7 @@ export default function Profile() {
             </div>
           </div>
 
+          {FEATURES.auctions && (<>
           <div className="border border-border bg-card shadow-panel">
             <div className="flex items-center gap-2 border-b border-border px-4 py-3">
               <Gavel className="size-4 text-primary" />
@@ -284,6 +288,7 @@ export default function Profile() {
               </ul>
             )}
           </div>
+          </>)}
         </div>
       </div>
     </div>
