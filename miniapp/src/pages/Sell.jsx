@@ -657,7 +657,7 @@ export default function Sell() {
       )}
 
       {mine.length > 0 && (
-        <div className="rounded-3xl border border-border bg-card p-4 shadow-panel sm:p-5">
+        <div id="my-requests" className="scroll-mt-20 rounded-3xl border border-border bg-card p-4 shadow-panel sm:p-5">
           <h2 className="mb-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{t("sell.myRequests")}</h2>
           <ul>
             {mine.map((r) => (

@@ -174,7 +174,7 @@ export function HowItWorks() {
     { icon: Wallet, key: "s4" },
   ];
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-panel sm:p-6">
+    <section id="how" className="scroll-mt-20 rounded-2xl border border-border bg-card p-5 shadow-panel sm:p-6">
       <h2 className="flex items-center gap-2 font-heading text-base font-bold uppercase tracking-wide text-foreground">
         <Sparkles className="size-4 text-primary" />
         {t("sellx.how.title")}
@@ -200,7 +200,7 @@ export function Faq() {
   const [open, setOpen] = useState(0);
   const qs = ["q1", "q2", "q3", "q4", "q5", "q6"];
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-panel sm:p-6">
+    <section id="faq" className="scroll-mt-20 rounded-2xl border border-border bg-card p-5 shadow-panel sm:p-6">
       <h2 className="font-heading text-base font-bold uppercase tracking-wide text-foreground">{t("sellx.faq.title")}</h2>
       <div className="mt-3 divide-y divide-border">
         {qs.map((q, i) => {

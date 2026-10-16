@@ -71,6 +71,11 @@
   --row-sel: rgba(217, 191, 132, 0.07);
   --row-hov: rgba(255, 255, 255, 0.035);
   --gold-grad: linear-gradient(140deg, #E3CC98, #C3A15E);
+  /* Mayin gradient: och oltin -> oltin -> mis */
+  --g1: #E9D3A0; --g2: #D4B172; --g3: #C48C5C;
+  --grad-card-in: radial-gradient(120% 90% at 100% 0%, rgba(196,140,92,.08), transparent 55%), linear-gradient(160deg, #181613, #121110);
+  --grad-card-bd: linear-gradient(135deg, rgba(217,191,132,.38), rgba(196,140,92,.12) 55%, rgba(255,255,255,.04));
+  --orb-a: rgba(196,140,92,.09); --orb-b: rgba(217,191,132,.06);
   --page-glow: radial-gradient(80% 45% at 85% -5%, rgba(217,191,132,.10), transparent 62%), radial-gradient(60% 35% at -5% 105%, rgba(214,42,36,.06), transparent 60%);
   --shadow-color: rgb(0 0 0 / 60%);
   --shadow-sm: 0 2px 10px -4px var(--shadow-color);
@@ -115,6 +120,10 @@
   --row-sel: rgba(201, 162, 74, 0.11);
   --row-hov: rgba(34, 29, 22, 0.035);
   --gold-grad: linear-gradient(140deg, #E8D3A0, #C9A24A);
+  --g1: #D9B465; --g2: #BE9440; --g3: #A8703F;
+  --grad-card-in: radial-gradient(120% 90% at 100% 0%, rgba(201,162,74,.08), transparent 55%), #FFFFFF;
+  --grad-card-bd: linear-gradient(135deg, rgba(190,148,64,.45), rgba(168,112,63,.15) 55%, #E7E1D4);
+  --orb-a: rgba(201,162,74,.10); --orb-b: rgba(168,112,63,.05);
   --page-glow: radial-gradient(80% 45% at 85% -5%, rgba(201,162,74,.14), transparent 62%), radial-gradient(60% 35% at -5% 105%, rgba(214,42,36,.04), transparent 60%);
   --shadow-color: rgb(60 48 30 / 16%);
   --shadow-sm: 0 2px 10px -4px var(--shadow-color);
@@ -402,4 +411,48 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .tick-pop, .menu-in, .swap-in { animation: none !important; }
+}
+
+/* ===== Mayin gradientlar (Menyu va Gradient dizayni) ===== */
+.text-grad {
+  background: linear-gradient(100deg, var(--g1), var(--g2) 30%, var(--g3) 50%, var(--g2) 70%, var(--g1));
+  background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: grad-flow 10s linear infinite;
+}
+@keyframes grad-flow { to { background-position: -200% 0; } }
+.bg-grad { background-image: linear-gradient(120deg, var(--g1), var(--g2) 65%, var(--g3)); color: #1A150E; }
+.btn-grad {
+  position: relative; overflow: hidden; isolation: isolate;
+  background-image: linear-gradient(120deg, var(--g1), var(--g2) 65%, var(--g3)); color: #1A150E;
+  box-shadow: 0 14px 30px -20px rgba(212,177,114,.55);
+  transition: transform .2s ease, box-shadow .2s ease, opacity .2s ease;
+}
+.btn-grad:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 18px 34px -16px rgba(212,177,114,.7); }
+.btn-grad::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.28) 50%, transparent 60%);
+  transform: translateX(-120%); animation: btn-shine 6s ease-in-out infinite 1.5s;
+}
+@keyframes btn-shine { 0%, 80% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+.grad-card { position: relative; border-radius: 22px; padding: 1px; background: var(--grad-card-bd); }
+.grad-card > .grad-in { border-radius: 21px; background: var(--grad-card-in); height: 100%; }
+.grad-line { height: 1px; background: linear-gradient(90deg, transparent, rgba(217,191,132,.45), rgba(196,140,92,.3), transparent); }
+.aurora { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.aurora::before, .aurora::after { content: ""; position: absolute; border-radius: 50%; filter: blur(60px); }
+.aurora::before { width: 46vmax; height: 34vmax; right: -12vmax; top: -10vmax; background: var(--orb-a); animation: orb-a 28s ease-in-out infinite alternate; }
+.aurora::after { width: 40vmax; height: 34vmax; left: -14vmax; top: 30vh; background: var(--orb-b); animation: orb-b 32s ease-in-out infinite alternate; }
+@keyframes orb-a { to { transform: translate(-8vmax, 6vmax) scale(1.08); } }
+@keyframes orb-b { to { transform: translate(7vmax, -5vmax) scale(.94); } }
+.drawer-in { animation: drawer-in .28s cubic-bezier(.22,.8,.3,1) both; }
+@keyframes drawer-in { from { transform: translateX(-100%); } }
+.scrim-in { animation: scrim-in .25s ease both; }
+@keyframes scrim-in { from { opacity: 0; } }
+.stagger > * { animation: fade-up-s .32s ease both; }
+@keyframes fade-up-s { from { opacity: 0; transform: translateY(6px); } }
+@keyframes bar-fill { from { transform: scaleX(0); } }
+.bar-fill { transform-origin: left; animation: bar-fill .6s cubic-bezier(.22,.8,.3,1) .15s both; }
+.bar-frozen { background: repeating-linear-gradient(135deg, rgba(143,195,232,.55) 0 4px, rgba(143,195,232,.3) 4px 8px); }
+@media (prefers-reduced-motion: reduce) {
+  .text-grad, .btn-grad::after, .aurora::before, .aurora::after, .drawer-in, .scrim-in, .stagger > *, .bar-fill { animation: none !important; }
 }

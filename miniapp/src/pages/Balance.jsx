@@ -1,294 +1,199 @@
 import { useEffect, useState } from "react";
-import { Check, Copy, ShieldCheck, Wallet, Gift, Snowflake, Timer } from "lucide-react";
+import { ArrowRight, Check, Copy, Gem, Snowflake, Wallet } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
-import { fmtMoney, fmtUnlockLeft, openWithdrawModal } from "../utils";
+import { fmtUnlockLeft, hap, openWithdrawModal } from "../utils";
 import { t } from "../i18n";
+import { cn } from "../lib/cn";
 import Empty from "../components/Empty";
-import { TelegramLogo } from "../components/BrandIcons";
 import { FEATURES } from "../features";
+import { HistoryRow, LockedHint, Ring, SkeletonRows, fmtNum, useCountUp } from "../components/MoneyBits";
+import BalanceLegacy from "./BalanceLegacy";
 
-const presets = [500_000, 1_000_000, 2_000_000, 5_000_000];
-const METHOD_ACCENT = {
-  payme: "oklch(0.62 0.19 200)",
-  click: "oklch(0.7 0.16 150)",
-  paynet: "oklch(0.68 0.19 45)",
-  uzumbank: "oklch(0.6 0.2 300)",
-};
+// Skin sotishdan tushgan pul Steam trade himoyasi tugaguncha qulfda turadi.
+const HOLD_MS = (8 * 24 + 12) * 3600 * 1000;
 
-// Eng yaqin muzlatilgan summa ochilishigacha jonli taymer (har 30 soniyada
-// yangilanadi, vaqt tugasa hold ma'lumoti qayta yuklanadi).
-function UnlockTimer({ iso, onDone }) {
+export default function Balance() {
+  // To'ldirish yoqilsa — eski sahifa (to'lov usullari, summa, chek).
+  if (FEATURES.topup) return <BalanceLegacy />;
+  return <BalanceView />;
+}
+
+function Part({ color, label, value, tone, boxed }) {
+  return (
+    <div className={cn("flex items-center justify-between gap-2 lg:block lg:rounded-2xl lg:px-4 lg:py-3.5", boxed ? "lg:bg-[var(--row-sel)]" : "lg:border lg:border-border")}>
+      <span className="flex items-center gap-2 text-[12.5px] text-muted-foreground lg:text-xs">
+        <span className="size-2 shrink-0 rounded-[3px]" style={{ background: color }} />
+        {label}
+      </span>
+      <span className={cn("font-heading text-base font-semibold tabular-nums lg:mt-1 lg:block lg:text-2xl", tone)}>
+        {fmtNum(value)} {t("common.somWithAmount")}
+      </span>
+    </div>
+  );
+}
+
+function BalanceView() {
+  const { navigate, user, showToast, openModal, closeModal, refreshMe } = useApp();
+  const [hold, setHold] = useState(null);
+  const [hist, setHist] = useState(null);
+  const [botUsername, setBotUsername] = useState(null);
+  const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const balance = useCountUp(user?.balance ?? 0);
+
+  function loadHold() {
+    api("/api/trade-hold-summary").then(setHold).catch(() => setHold({}));
+  }
+  useEffect(() => {
+    if (!user) return;
+    loadHold();
+    api("/api/balance-history").then(setHist).catch(() => setHist([]));
+    api("/api/bot-info").then((r) => setBotUsername(r.username)).catch(() => {});
+  }, [user?.id]);
+
+  // Taymer har 30 soniyada yangilanadi; vaqt tugasa qulf ma'lumoti qayta yuklanadi.
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
   }, []);
-  const left = new Date(iso).getTime() - now;
+  const unlockAt = hold?.frozen > 0 && hold?.nextUnlockAt ? new Date(hold.nextUnlockAt).getTime() : null;
   useEffect(() => {
-    if (left <= 0) onDone?.();
-  }, [left <= 0]);
-  return (
-    <div className="flex items-center justify-between gap-3 border border-accent/40 bg-accent/10 px-3 py-2">
-      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Timer className="size-3.5 text-accent" />
-        {t("balance.unlockTimer")}
-      </span>
-      <span className="font-heading text-sm font-bold text-accent">{fmtUnlockLeft(iso, now)}</span>
-    </div>
-  );
-}
-
-export default function Balance() {
-  const { navigate, user, tg, showToast, openModal, closeModal, refreshMe } = useApp();
-  const [cards, setCards] = useState(null);
-  const [method, setMethod] = useState(null);
-  const [amount, setAmount] = useState(1_000_000);
-  const [copied, setCopied] = useState(false);
-  const [refLink, setRefLink] = useState("");
-  const [botUsername, setBotUsername] = useState(null);
-  const [hold, setHold] = useState(null);
-
-  function loadHold() {
-    api("/api/trade-hold-summary").then(setHold).catch(() => {});
-  }
-
-  useEffect(() => {
-    api("/api/payment-cards").then(setCards).catch(() => {});
-    api("/api/bot-info").then((r) => setBotUsername(r.username)).catch(() => {});
-    loadHold();
-  }, []);
-
-  function withdraw() {
-    openWithdrawModal({ openModal, closeModal, showToast, refreshMe: () => { refreshMe(); loadHold(); } });
-  }
-
-  useEffect(() => {
-    if (!user || !botUsername) return;
-    setRefLink(`https://t.me/${botUsername}?start=ref_${user.id}`);
-  }, [user, botUsername]);
+    if (unlockAt && unlockAt <= now) loadHold();
+  }, [unlockAt != null && unlockAt <= now]);
 
   if (!user) {
     return (
       <Empty icon={Wallet} title={t("common.loginRequired")}>
-        <button
-          type="button"
-          onClick={() => navigate("login")}
-          className="bg-primary px-5 py-2.5 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-primary/90"
-        >
-          {t("common.login")}
-        </button>
+        <button type="button" onClick={() => navigate("login")} className="btn-grad rounded-2xl px-5 py-2.5 text-sm font-semibold">{t("common.login")}</button>
       </Empty>
     );
   }
 
-  const selected = cards && method ? cards[method] : null;
+  const available = hold?.available || 0;
+  const frozen = hold?.frozen || 0;
+  const pending = hold?.pending || 0;
+  const parts = available + frozen + pending;
+  const isEmpty = hold && !(user.balance > 0) && parts === 0;
+  const refLink = botUsername ? `https://t.me/${botUsername}?start=ref_${user.id}` : "";
+  const progress = unlockAt ? 1 - (unlockAt - now) / HOLD_MS : 0;
 
-  function copyAccount() {
-    if (!selected) return;
-    navigator.clipboard?.writeText(selected.card);
+  function withdraw() {
+    openWithdrawModal({ openModal, closeModal, showToast, refreshMe: () => { refreshMe(); loadHold(); } });
+  }
+  function copyRef() {
+    if (!refLink) return;
+    navigator.clipboard?.writeText(refLink);
+    hap("impact", "light");
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
 
-  function openBot() {
-    const url = `https://t.me/${botUsername}`;
-    if (tg?.openTelegramLink) tg.openTelegramLink(url);
-    else window.open(url, "_blank");
-  }
+  const withdrawBtn = available > 0 ? (
+    <button type="button" onClick={withdraw} className="btn-grad flex w-full items-center justify-center gap-2 rounded-[14px] px-[26px] py-3.5 text-sm font-semibold lg:w-auto">
+      {t("pb.toCard")} <ArrowRight className="size-4" />
+    </button>
+  ) : (
+    <button type="button" disabled className="flex w-full cursor-not-allowed items-center justify-center rounded-[14px] bg-secondary px-[26px] py-3.5 text-[13.5px] font-semibold text-muted-foreground lg:w-auto">
+      {unlockAt ? <LockedHint text={t("pb.lockedFor", { t: fmtUnlockLeft(hold.nextUnlockAt, now) })} /> : t("pb.toCard")}
+    </button>
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="stagger space-y-3 lg:space-y-[18px]">
       <div>
-        <h1 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground">{t(FEATURES.topup ? "balance.title" : "balance.titleOnly")}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t(FEATURES.topup ? "balance.subtitle" : "balance.subtitleOnly")}</p>
+        <h1 className="font-heading text-[26px] font-semibold text-[var(--heading)] lg:text-[30px]">{t("balance.titleOnly")}</h1>
+        <p className="mt-0.5 text-[12.5px] text-muted-foreground lg:mt-1 lg:text-[13px]">{t("balance.subtitleOnly")}</p>
       </div>
 
-      <div className={"grid grid-cols-1 gap-6 " + (FEATURES.topup ? "lg:grid-cols-3" : "max-w-xl")}>
-        {/* To'ldirish (features.js'da o'chirilishi mumkin) — pul yechish va
-            muzlatilgan mablag' bloki har doim qoladi (Skin sotish puli). */}
-        {FEATURES.topup && <div className="space-y-6 lg:col-span-2">
-          <section className="border border-border bg-card p-5 shadow-panel">
-            <SectionTitle step={1} title={t("balance.step1")} />
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {cards && Object.entries(cards).map(([key, m]) => {
-                const active = method === key;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setMethod(key)}
-                    className={"hover-lift relative flex flex-col items-center gap-2 border-2 bg-secondary/50 p-4 transition-all " + (active ? "border-primary" : "border-transparent hover:border-border")}
-                    style={active ? { boxShadow: `0 0 28px -8px ${METHOD_ACCENT[key]}` } : undefined}
-                  >
-                    {active && (
-                      <span className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center bg-primary text-primary-foreground">
-                        <Check className="size-3.5" />
-                      </span>
-                    )}
-                    <span className="flex size-11 items-center justify-center font-heading text-lg font-bold text-white shadow-panel clip-tactical" style={{ backgroundColor: METHOD_ACCENT[key] }}>
-                      {m.name?.[0]?.toUpperCase()}
-                    </span>
-                    <span className="font-heading text-sm font-bold text-foreground">{m.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {selected && (
-              <div className="mt-4 flex items-center justify-between border border-border bg-secondary/40 px-4 py-3">
+      {isEmpty ? (
+        <div className="mx-auto max-w-md rounded-[20px] border border-border bg-card p-6 text-center">
+          <span className="mx-auto flex size-[54px] items-center justify-center rounded-[18px] bg-[var(--row-sel)] text-primary"><Gem className="size-6" /></span>
+          <p className="mt-3 font-heading text-3xl font-semibold text-[var(--heading)]">0 <span className="text-[15px] text-primary">{t("common.somWithAmount")}</span></p>
+          <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{t("balance.nothingYet")}</p>
+          <button type="button" onClick={() => navigate("sell")} className="btn-grad mt-4 flex w-full items-center justify-center gap-2 rounded-[14px] py-3 text-[13px] font-semibold">
+            {t("nav.sell")} <ArrowRight className="size-4" />
+          </button>
+        </div>
+      ) : (
+        <div className="grid gap-3 lg:grid-cols-[1.5fr_1fr] lg:gap-3.5">
+          {/* Balans kartasi */}
+          <div className="grad-card">
+            <div className="grad-in relative overflow-hidden p-[18px] lg:px-7 lg:py-[26px]">
+              <div className="pointer-events-none absolute -right-20 -top-28 h-80 w-96 rounded-full bg-[var(--orb-a)] blur-[50px]" />
+              <div className="relative lg:flex lg:items-end lg:justify-between">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{selected.name} {t("balance.cardNumber")}</p>
-                  <p className="font-heading text-base font-bold tracking-wider text-foreground">{selected.card}</p>
-                  <p className="text-xs text-muted-foreground">{selected.owner}</p>
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{t("profile.currentBalance")}</p>
+                  <p className="mt-2 flex items-baseline gap-2">
+                    <span className="font-heading text-[42px] font-semibold leading-none tabular-nums text-[var(--heading)] lg:text-[52px]">{fmtNum(balance)}</span>
+                    <span className="font-heading text-lg text-primary lg:text-[22px]">{t("common.somWithAmount")}</span>
+                  </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={copyAccount}
-                  className="inline-flex items-center gap-1.5 border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-accent"
-                >
-                  <Copy className="size-3.5" />
-                  {copied ? t("balance.copied") : t("balance.copy")}
-                </button>
+                <div className="hidden lg:block">{withdrawBtn}</div>
+              </div>
+              {parts > 0 && (
+                <div className="relative mt-4 flex h-2 overflow-hidden rounded-full bg-secondary lg:mt-6 lg:h-2.5">
+                  <span className="bar-fill bg-grad" style={{ width: `${(available / parts) * 100}%` }} />
+                  <span className="bar-fill bar-frozen" style={{ width: `${(frozen / parts) * 100}%` }} />
+                  <span className="bar-fill bg-input" style={{ width: `${(pending / parts) * 100}%` }} />
+                </div>
+              )}
+              <div className="relative mt-3.5 flex flex-col gap-2 lg:mt-[18px] lg:grid lg:grid-cols-3 lg:gap-3.5">
+                <Part color="var(--primary)" label={t("trade.available")} value={available} tone="text-primary" boxed />
+                <Part color="rgba(143,195,232,.6)" label={t("pb.frozen")} value={frozen} tone="text-[var(--heading)]" />
+                <Part color="var(--input)" label={t("trade.pending")} value={pending} tone="text-muted-foreground" />
+              </div>
+              <div className="relative mt-4 lg:hidden">{withdrawBtn}</div>
+            </div>
+          </div>
+
+          <div className="space-y-3 lg:space-y-3.5">
+            {unlockAt && (
+              <div className="flex items-center gap-3.5 rounded-[18px] border border-border bg-card px-4 py-3.5 lg:rounded-[20px] lg:px-5 lg:py-[18px]">
+                <Ring progress={progress} size={52}><Snowflake className="size-4 text-[#8FC3E8]" /></Ring>
+                <div className="min-w-0">
+                  <p className="text-[11.5px] text-muted-foreground lg:text-xs">{t("pb.nextUnlock")}</p>
+                  <p className="mt-0.5 font-heading text-lg font-semibold tabular-nums text-[var(--heading)] lg:text-[22px]">{fmtUnlockLeft(hold.nextUnlockAt, now)}</p>
+                  <p className="mt-0.5 hidden text-[11px] text-muted-foreground lg:block">{t("pb.holdNote")}</p>
+                </div>
               </div>
             )}
-          </section>
-
-          <section className="border border-border bg-card p-5 shadow-panel">
-            <SectionTitle step={2} title={t("balance.step2")} />
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {presets.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setAmount(p)}
-                  className={"border px-2 py-2.5 font-heading text-sm font-bold transition-all duration-200 " + (amount === p ? "border-primary bg-primary/10 text-primary shadow-[0_0_20px_-8px_color-mix(in_oklch,var(--primary)_60%,transparent)]" : "border-border text-muted-foreground hover:-translate-y-0.5 hover:text-foreground")}
-                >
-                  {fmtMoney(p)}
-                </button>
-              ))}
-            </div>
-            <div className="mt-3">
-              <label className="text-xs uppercase tracking-wide text-muted-foreground">{t("balance.customAmount")}</label>
-              <input
-                type="number"
-                value={amount}
-                min={0}
-                step={50_000}
-                onChange={(e) => setAmount(Number(e.target.value))}
-                className="mt-1 w-full border border-border bg-secondary px-3 py-2.5 font-heading text-lg font-bold text-foreground outline-none focus:border-primary"
-              />
-            </div>
-          </section>
-
-          <section className="border border-border bg-card p-5 shadow-panel">
-            <SectionTitle step={3} title={t("balance.step3")} />
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("balance.step3Desc", { amount: fmtMoney(amount) })}
-            </p>
-            <button
-              type="button"
-              disabled={!method || !botUsername}
-              onClick={openBot}
-              className="mt-4 flex w-full items-center justify-center gap-2 bg-primary py-3 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground shadow-[0_10px_28px_-10px_color-mix(in_oklch,var(--primary)_75%,transparent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
-            >
-              <TelegramLogo className="size-4" />
-              {t("balance.goToBot")}
-            </button>
-          </section>
-        </div>}
-
-        <div className="space-y-6">
-          {!FEATURES.topup && (
-            <div className="border border-border bg-card p-5 shadow-panel-lg">
-              <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
-                <Wallet className="size-4 text-primary" />
-                {t("profile.currentBalance")}
-              </p>
-              <p className="mt-2 font-heading text-3xl font-bold text-foreground">{fmtMoney(user.balance ?? 0)}</p>
-              {!(hold && (hold.frozen > 0 || hold.available > 0 || hold.pending > 0)) && (
-                <p className="mt-2 text-xs text-muted-foreground">{t("balance.nothingYet")}</p>
-              )}
-            </div>
-          )}
-          {FEATURES.topup && <div className="border border-border bg-card p-5 shadow-panel-lg">
-            <h2 className="font-heading text-sm font-bold uppercase tracking-wide text-foreground">{t("balance.summary")}</h2>
-            <dl className="mt-4 space-y-3 text-sm">
-              <Row label={t("balance.method")} value={selected?.name ?? t("balance.notSelected")} />
-              <Row label={t("balance.amount")} value={fmtMoney(amount)} highlight />
-              <div className="border-t border-border pt-3">
-                <Row label={t("balance.total")} value={fmtMoney(amount)} bold />
+            {refLink && (
+              <div id="referral" className="scroll-mt-20 rounded-[20px] border border-border bg-card px-5 py-[18px]">
+                <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{t("menu.invite")}</p>
+                <p className="mt-1.5 text-xs text-muted-foreground">{t("balance.referralDesc")}</p>
+                <div className="mt-3 flex gap-2">
+                  <div className={cn("min-w-0 flex-1 truncate rounded-[13px] border bg-secondary px-3 py-2.5 text-xs text-foreground transition-colors", copied ? "border-success/40" : "border-border")}>
+                    {refLink.replace("https://", "")}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={copyRef}
+                    className={cn("swap-in flex shrink-0 items-center gap-1.5 rounded-[13px] px-3.5 text-xs font-semibold transition-colors", copied ? "bg-success/12 text-success" : "border border-border text-foreground hover:border-ring/60")}
+                    key={copied ? "c" : "n"}
+                  >
+                    {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                    {t(copied ? "sell.copied" : "pb.copy")}
+                  </button>
+                </div>
               </div>
-            </dl>
-            <div className="mt-4 flex items-start gap-2 border-t border-border pt-4 text-xs text-muted-foreground">
-              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-success" />
-              <p>{t("balance.securityNote")}</p>
-            </div>
-          </div>}
-
-          {hold && (hold.frozen > 0 || hold.available > 0 || hold.pending > 0) && (
-            <div className="border border-border bg-card p-5 shadow-panel">
-              <h2 className="flex items-center gap-2 font-heading text-sm font-bold uppercase tracking-wide text-foreground">
-                <Snowflake className="size-4 text-accent" />
-                {t("trade.frozenFunds")}
-              </h2>
-              <p className="mt-1 text-xs text-muted-foreground">{t("trade.frozenFundsDesc")}</p>
-              <dl className="mt-3 space-y-2 text-sm">
-                {hold.frozen > 0 && <Row label={t("trade.frozen")} value={fmtMoney(hold.frozen)} />}
-                {hold.frozen > 0 && hold.nextUnlockAt && <UnlockTimer iso={hold.nextUnlockAt} onDone={loadHold} />}
-                {hold.available > 0 && <Row label={t("trade.available")} value={fmtMoney(hold.available)} highlight />}
-                {hold.pending > 0 && <Row label={t("trade.pending")} value={fmtMoney(hold.pending)} />}
-              </dl>
-              {hold.available > 0 && (
-                <button
-                  type="button"
-                  onClick={withdraw}
-                  className="mt-3 flex w-full items-center justify-center gap-2 bg-primary py-2.5 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-primary/90"
-                >
-                  {t("trade.withdraw")}
-                </button>
-              )}
-            </div>
-          )}
-
-          {refLink && (
-            <div className="border border-border bg-card p-5 shadow-panel">
-              <h2 className="flex items-center gap-2 font-heading text-sm font-bold uppercase tracking-wide text-foreground">
-                <Gift className="size-4 text-accent" />
-                {t("balance.referral")}
-              </h2>
-              <p className="mt-1 text-xs text-muted-foreground">{t("balance.referralDesc")}</p>
-              <div className="mt-3 break-all border border-border bg-secondary/40 px-3 py-2 text-xs text-foreground">{refLink}</div>
-              <button
-                type="button"
-                onClick={() => navigator.clipboard?.writeText(refLink)}
-                className="mt-2 inline-flex w-full items-center justify-center gap-1.5 border border-border py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-accent"
-              >
-                <Copy className="size-3.5" />
-                {t("balance.copyLink")}
-              </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
-    </div>
-  );
-}
+      )}
 
-function SectionTitle({ step, title }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="flex size-7 items-center justify-center bg-primary/15 font-heading text-sm font-bold text-primary shadow-[0_0_14px_-4px_color-mix(in_oklch,var(--primary)_60%,transparent)]">{step}</span>
-      <h2 className="font-heading text-base font-bold uppercase tracking-wide text-foreground">{title}</h2>
-    </div>
-  );
-}
-
-function Row({ label, value, highlight, bold }) {
-  return (
-    <div className="flex items-center justify-between">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className={"font-heading font-bold " + (highlight || bold ? "text-primary" : "text-foreground") + (bold ? " text-xl text-glow-primary" : "")}>{value}</dd>
+      {/* So'nggi amallar */}
+      {(hist === null || hist.length > 0) && (
+        <div className="overflow-hidden rounded-[20px] border border-border bg-card">
+          <div className="flex items-center justify-between px-5 pb-2 pt-4">
+            <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{t("pb.recent")}</span>
+            <button type="button" onClick={() => navigate("bal-history")} className="text-xs text-primary hover:underline">{t("profile.balHistory")} ›</button>
+          </div>
+          <div className="border-t border-border">
+            {hist === null ? <SkeletonRows n={3} /> : hist.slice(0, 5).map((h, i) => <HistoryRow key={i} h={h} />)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

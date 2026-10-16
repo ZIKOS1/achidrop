@@ -1,73 +1,91 @@
 import { useEffect, useState } from "react";
+import { ArrowRight, Bell, ChevronRight, History, LogOut, Wallet } from "lucide-react";
 import { FEATURES } from "../features";
-import {
-  Plus,
-  Link2,
-  CheckCircle2,
-  Trophy,
-  Gavel,
-  Wallet,
-  Save,
-  BarChart3,
-  CreditCard,
-  Bell,
-  LogOut,
-} from "lucide-react";
 import { api, initData } from "../api";
 import { useApp } from "../context";
-import { fmtMoney, imgSrc } from "../utils";
 import { t } from "../i18n";
+import { cn } from "../lib/cn";
 import Empty from "../components/Empty";
-import { SteamLogo } from "../components/BrandIcons";
+import { SteamLogo, TelegramLogo } from "../components/BrandIcons";
+import { StatusTag, fmtDate, fmtNum, useCountUp } from "../components/MoneyBits";
+import ProfileLegacy from "./ProfileLegacy";
+
+function Avatar({ user, size }) {
+  const initials = (user.name || "?").replace(/^#/, "").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  return (
+    <span className={cn("relative block shrink-0 rounded-[18px] bg-grad p-[2px] lg:rounded-3xl", size)}>
+      {user.steamAvatar ? (
+        <img src={user.steamAvatar} alt="" className="size-full rounded-2xl object-cover lg:rounded-[22px]" />
+      ) : (
+        <span className="flex size-full items-center justify-center rounded-2xl bg-[#1F1C17] font-heading text-[22px] font-bold text-[#E9D3A0] lg:rounded-[22px] lg:text-3xl">{initials}</span>
+      )}
+      {user.steamId64 && <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-success shadow-[0_0_0_3px_var(--background)] lg:size-3" />}
+    </span>
+  );
+}
+
+function Stat({ label, value, unit, gold, className }) {
+  return (
+    <div className={cn("min-w-0 rounded-2xl border border-border bg-card p-3 lg:rounded-[18px] lg:px-[18px] lg:py-4", className)}>
+      <p className="truncate text-[9px] uppercase tracking-[0.08em] text-muted-foreground lg:text-[10px] lg:tracking-[0.16em]">{label}</p>
+      <p className={cn("mt-1 whitespace-nowrap font-heading text-xl font-semibold tabular-nums lg:text-[28px]", gold ? "text-primary" : "text-[var(--heading)]")}>
+        {value}
+        {unit && <span className="ml-1 font-sans text-[11px] font-normal text-muted-foreground lg:text-[13px]">{unit}</span>}
+      </p>
+    </div>
+  );
+}
+
+function MenuRow({ icon: Icon, label, badge, extra, onClick, tgStyle }) {
+  return (
+    <button type="button" onClick={onClick} className="group flex w-full items-center gap-3 border-b border-border px-4 py-[13px] text-left text-[13px] transition-colors last:border-b-0 hover:bg-[var(--row-hov)] active:bg-[var(--row-sel)]">
+      <span className={cn("flex size-[34px] shrink-0 items-center justify-center rounded-[11px]", tgStyle ? "bg-[rgba(111,169,210,.1)] text-[#6FA9D2]" : "bg-[var(--row-sel)] text-primary")}>
+        <Icon className="size-4" />
+      </span>
+      <span className="flex-1 text-foreground">{label}</span>
+      {extra && <span className="text-[11px] text-muted-foreground">{extra}</span>}
+      {badge > 0 && <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#C9392F] px-[5px] text-[10px] font-bold text-white">{badge}</span>}
+      <ChevronRight className="size-4 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+    </button>
+  );
+}
 
 export default function Profile() {
-  const { navigate, user, setUser, showToast, tg } = useApp();
-  const [tradeLink, setTradeLink] = useState(user?.tradeLink || "");
-  const [saving, setSaving] = useState(false);
-  const [activeBids, setActiveBids] = useState(null);
-  const [wins, setWins] = useState(null);
+  // Auksion/market yoqilsa — eski to'liq profil (stavkalar, yutuqlar, trade link).
+  if (FEATURES.auctions || FEATURES.market || FEATURES.trade) return <ProfileLegacy />;
+  return <ProfileView />;
+}
+
+function ProfileView() {
+  const { navigate, user, showToast, tg } = useApp();
+  const [mine, setMine] = useState(null);
+  const [hold, setHold] = useState(null);
+  const [unread, setUnread] = useState(0);
+  const [botUsername, setBotUsername] = useState(null);
+  const balance = useCountUp(user?.balance ?? 0);
 
   useEffect(() => {
     if (!user) return;
-    api("/api/auctions")
-      .then((list) => setActiveBids(list.filter((a) => a.lastBidder === user.id).slice(0, 5)))
-      .catch(() => setActiveBids([]));
-    api("/api/inventory").then(setWins).catch(() => setWins([]));
+    api("/api/instant-sell-mine").then(setMine).catch(() => setMine([]));
+    api("/api/trade-hold-summary").then(setHold).catch(() => {});
+    api("/api/notifications").then((l) => setUnread(l.filter((n) => !n.read).length)).catch(() => {});
+    api("/api/bot-info").then((r) => setBotUsername(r.username)).catch(() => {});
   }, [user?.id]);
 
   if (!user) {
     return (
       <Empty icon={Wallet} title={t("common.loginRequired")}>
-        <button
-          type="button"
-          onClick={() => navigate("login")}
-          className="bg-primary px-5 py-2.5 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-primary/90"
-        >
+        <button type="button" onClick={() => navigate("login")} className="btn-grad rounded-2xl px-5 py-2.5 text-sm font-semibold">
           {t("common.login")}
         </button>
       </Empty>
     );
   }
 
-  const initials = user.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-
-  async function saveTradeLink() {
-    const link = tradeLink.trim();
-    if (link && !link.startsWith("https://steamcommunity.com/tradeoffer/new/")) {
-      showToast(t("profile.invalidLinkFormat"), "err");
-      return;
-    }
-    setSaving(true);
-    try {
-      await api("/api/trade-link", { method: "POST", body: JSON.stringify({ tradeLink: link || null }) });
-      setUser((u) => (u ? { ...u, tradeLink: link || null } : u));
-      showToast(t("profile.tradeLinkSaved"), "ok");
-    } catch (e) {
-      showToast(e.error || t("common.genericError"), "err");
-    } finally {
-      setSaving(false);
-    }
-  }
+  const credited = (mine || []).filter((r) => r.status === "credited");
+  const soldSkins = credited.reduce((n, r) => n + (r.items?.length || 0), 0);
+  const paid = credited.reduce((n, r) => n + (r.totalSom || 0), 0);
+  const waiting = (mine || []).filter((r) => r.status === "awaiting_admin").length;
 
   async function connectSteam() {
     try {
@@ -78,217 +96,134 @@ export default function Profile() {
       showToast(e.error || t("common.genericError"), "err");
     }
   }
-
+  function openTg() {
+    const url = botUsername ? `https://t.me/${botUsername}` : "https://t.me";
+    if (tg?.openTelegramLink && botUsername) tg.openTelegramLink(url);
+    else window.open(url, "_blank", "noopener");
+  }
   async function logout() {
     try { await api("/api/auth/logout", { method: "POST" }); } catch {}
     location.href = "/";
   }
 
-  const wonAuctions = (wins || []).slice(-5).reverse();
+  const steamTag = user.steamId64 ? (
+    <span className="flex flex-wrap items-center gap-2">
+      <span className="rounded-full bg-success/12 px-2 py-[3px] text-[10px] font-semibold text-success">● {t("menu.steamOn")}</span>
+      {user.steamUsername && <span className="text-[11px] text-muted-foreground lg:text-xs">{user.steamUsername}</span>}
+    </span>
+  ) : (
+    <button type="button" onClick={connectSteam} className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-primary/40 bg-[var(--row-sel)] px-2.5 py-1 text-[11px] font-semibold text-primary">
+      <SteamLogo className="size-3" /> {t("pb.steamConnect")}
+    </button>
+  );
+
+  const menu = (
+    <div className="overflow-hidden rounded-[20px] border border-border bg-card">
+      <MenuRow icon={History} label={t("profile.balHistory")} onClick={() => navigate("bal-history")} />
+      <MenuRow icon={Bell} label={t("profile.notifications")} badge={unread} onClick={() => navigate("notifications")} />
+      <MenuRow icon={TelegramLogo} label={t("menu.tgHelp")} extra={botUsername ? `@${botUsername}` : null} onClick={openTg} tgStyle />
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        {user.steamAvatar ? (
-          <img src={user.steamAvatar} alt={user.name} className="size-14 shrink-0 border border-border shadow-panel clip-tactical object-cover" />
-        ) : (
-          <span className="flex size-14 shrink-0 items-center justify-center bg-accent/20 font-heading text-xl font-bold text-accent shadow-panel clip-tactical">
-            {initials}
-          </span>
-        )}
-        <div className="flex flex-col gap-1">
-          <h1 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground">{t("profile.title")}</h1>
-          <p className="flex items-center gap-1 text-sm text-muted-foreground">
-            {user.name}
-            {user.steamUsername && (
-              <span className="inline-flex items-center gap-1">
-                · <SteamLogo className="size-3.5" /> {user.steamUsername}
-              </span>
-            )}
-          </p>
+    <div className="stagger space-y-3 lg:space-y-[18px]">
+      {/* Bosh karta */}
+      <div className="grad-card">
+        <div className="grad-in relative flex items-center gap-3.5 overflow-hidden p-4 lg:gap-[22px] lg:px-7 lg:py-[26px]">
+          <div className="pointer-events-none absolute -right-20 -top-32 h-80 w-[420px] rounded-full bg-[var(--orb-a)] blur-[50px]" />
+          <Avatar user={user} size="size-[60px] lg:size-[84px]" />
+          <div className="relative min-w-0 flex-1">
+            <p className="hidden text-[10px] uppercase tracking-[0.16em] text-muted-foreground lg:block">{t("profile.title")}</p>
+            <h1 className="truncate font-heading text-[22px] font-semibold leading-tight text-[var(--heading)] lg:mt-1 lg:text-[32px]">{user.name}</h1>
+            <div className="mt-1.5 lg:mt-2">{steamTag}</div>
+          </div>
+          <div className="relative hidden text-right lg:block">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{t("profile.currentBalance")}</p>
+            <p className="mt-1 font-heading text-[40px] font-semibold leading-none tabular-nums text-[var(--heading)]">
+              {fmtNum(balance)} <span className="text-lg text-primary">{t("common.somWithAmount")}</span>
+            </p>
+            <button type="button" onClick={() => navigate("balance")} className="btn-grad mt-3 inline-flex items-center gap-2 rounded-[14px] px-5 py-[11px] text-[13px] font-semibold">
+              {t("pb.toBalance")} <ArrowRight className="size-4" />
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Left column */}
-        <div className="space-y-6 lg:col-span-2">
-          <div className="corner-brackets surface-grid relative overflow-hidden border border-border bg-[linear-gradient(120deg,var(--hero-a),var(--hero-b))] p-6 shadow-panel-lg sm:p-8">
-            <div className="absolute right-0 top-0 h-full w-1/2 bg-[radial-gradient(circle_at_80%_30%,color-mix(in_oklch,var(--primary)_20%,transparent),transparent_60%)]" />
-            <div className="absolute bottom-0 left-0 h-2/3 w-1/3 bg-[radial-gradient(circle_at_10%_100%,color-mix(in_oklch,var(--accent)_14%,transparent),transparent_65%)]" />
-            <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
-                  <Wallet className="size-4 text-primary" />
-                  {t("profile.currentBalance")}
-                </p>
-                <p className="mt-2 font-heading text-4xl font-bold tracking-tight text-foreground text-glow-primary sm:text-5xl">{fmtMoney(user.balance ?? 0)}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate("balance")}
-                className="inline-flex items-center justify-center gap-2 bg-primary px-5 py-3 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground shadow-[0_10px_28px_-10px_color-mix(in_oklch,var(--primary)_75%,transparent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90"
-              >
-                {FEATURES.topup ? <Plus className="size-4" /> : <Wallet className="size-4" />}
-                {t(FEATURES.topup ? "profile.topUp" : "nav.balanceOnly")}
-              </button>
-            </div>
+      {/* Telefon: balans kartasi */}
+      <div className="relative overflow-hidden rounded-[22px] border border-border bg-card p-[18px] lg:hidden">
+        <div className="pointer-events-none absolute -right-12 -top-16 size-44 rounded-full bg-[var(--orb-a)] blur-[40px]" />
+        <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{t("profile.currentBalance")}</p>
+        <p className="mt-2 flex items-baseline gap-2">
+          <span className="font-heading text-[38px] font-semibold leading-none tabular-nums text-[var(--heading)]">{fmtNum(balance)}</span>
+          <span className="font-heading text-[17px] text-primary">{t("common.somWithAmount")}</span>
+        </p>
+        {hold && (hold.available > 0 || hold.frozen > 0) && (
+          <div className="mt-3 flex flex-wrap gap-x-3.5 gap-y-1 text-[11.5px]">
+            <span className="flex items-center gap-1.5"><span className="size-2 rounded-[3px] bg-primary" /><span className="text-muted-foreground">{t("pb.short.available")}</span><span className="tabular-nums text-[var(--heading)]">{fmtNum(hold.available)}</span></span>
+            <span className="flex items-center gap-1.5"><span className="size-2 rounded-[3px] bg-[rgba(143,195,232,.6)]" /><span className="text-muted-foreground">{t("pb.short.frozen")}</span><span className="tabular-nums text-[var(--heading)]">{fmtNum(hold.frozen)}</span></span>
           </div>
+        )}
+        <button type="button" onClick={() => navigate("balance")} className="btn-grad mt-4 flex w-full items-center justify-center gap-2 rounded-[14px] py-[13px] text-[13.5px] font-semibold">
+          {t("pb.toBalance")} <ArrowRight className="size-4" />
+        </button>
+      </div>
 
-          <div className="border border-border bg-card shadow-panel">
-            <div className="border-b border-border px-4 py-3">
-              <h2 className="font-heading text-sm font-bold uppercase tracking-wide text-foreground">{t("profile.links")}</h2>
-            </div>
-            <div className="divide-y divide-border">
-              {[
-                { icon: BarChart3, labelKey: "profile.bidHistory", page: "bid-history", feature: "auctions" },
-                { icon: CreditCard, labelKey: "profile.balHistory", page: "bal-history" },
-                { icon: Trophy, labelKey: "profile.leaderboard", page: "leaderboard", feature: "auctions" },
-                { icon: Bell, labelKey: "profile.notifications", page: "notifications" },
-              ].filter((l) => !l.feature || FEATURES[l.feature]).map((l) => {
-                const Icon = l.icon;
+      {/* Statistika */}
+      <div className="grid grid-cols-[1fr_1.4fr_1fr] gap-2 lg:grid-cols-4 lg:gap-3.5">
+        <Stat label={<><span className="lg:hidden">{t("pb.soldShort")}</span><span className="hidden lg:inline">{t("pb.sold")}</span></>} value={mine ? soldSkins : "—"} unit={t("pb.skinUnit")} />
+        <Stat label={t("pb.paid")} value={mine ? fmtNum(paid) : "—"} unit={<span className="hidden lg:inline">{t("common.somWithAmount")}</span>} />
+        <Stat label={<><span className="lg:hidden">{t("pb.waitingShort")}</span><span className="hidden lg:inline">{t("pb.waiting")}</span></>} value={mine ? waiting : "—"} gold />
+        <Stat label={t("pb.requests")} value={mine ? mine.length : "—"} className="hidden lg:block" />
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-[1.6fr_1fr] lg:gap-3.5">
+        {/* So'rovlar */}
+        <div className="order-2 overflow-hidden rounded-[20px] border border-border bg-card lg:order-1">
+          <div className="flex items-center justify-between px-5 pb-3 pt-4">
+            <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{t("pb.myRequests")}</span>
+            <button type="button" onClick={() => navigate("sell")} className="text-xs text-primary hover:underline">{t("pb.sellMore")} ›</button>
+          </div>
+          {mine === null ? (
+            <div className="space-y-2 px-5 pb-4">{[0, 1, 2].map((i) => <div key={i} className="skeleton h-9 rounded-lg" />)}</div>
+          ) : mine.length === 0 ? (
+            <p className="border-t border-border px-5 py-6 text-center text-sm text-muted-foreground">{t("pb.noRequests")}</p>
+          ) : (
+            <div className="border-t border-border">
+              <div className="hidden gap-4 border-b border-border px-5 py-3 text-[10px] uppercase tracking-[0.16em] text-muted-foreground lg:flex">
+                <span className="w-[70px]">{t("pb.col.req")}</span><span className="flex-1">{t("pb.col.skins")}</span><span className="w-[130px]">{t("pb.col.date")}</span>
+                <span className="w-[110px] text-right">{t("pb.col.sum")}</span><span className="w-[120px] text-right">{t("pb.col.status")}</span>
+              </div>
+              {mine.slice(0, 6).map((r) => {
+                const first = r.items?.[0]?.name || "—";
+                const more = (r.items?.length || 1) - 1;
                 return (
-                  <button
-                    key={l.page}
-                    type="button"
-                    onClick={() => navigate(l.page)}
-                    className="group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-secondary/40"
-                  >
-                    <span className="flex size-8 shrink-0 items-center justify-center bg-accent/10 text-accent transition-colors group-hover:bg-accent/20">
-                      <Icon className="size-4" />
+                  <div key={r.id} className="flex items-center gap-3 border-b border-border px-5 py-3 text-[13px] last:border-b-0 lg:gap-4">
+                    <span className="w-12 shrink-0 tabular-nums text-muted-foreground lg:w-[70px]">#{r.id}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-foreground">{first}{more > 0 ? `, +${more}` : ""}</span>
+                      <span className="block text-[11px] text-muted-foreground lg:hidden">{fmtDate(r.createdAt)}</span>
                     </span>
-                    <span className="flex-1 text-sm font-medium text-foreground">{t(l.labelKey)}</span>
-                    <span className="text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-accent">›</span>
-                  </button>
+                    <span className="hidden w-[130px] shrink-0 text-muted-foreground lg:block">{fmtDate(r.createdAt)}</span>
+                    <span className="flex shrink-0 flex-col items-end gap-1 lg:contents">
+                      <span className={cn("font-heading text-[15px] font-semibold tabular-nums lg:w-[110px] lg:text-right", r.status === "rejected" ? "text-muted-foreground" : "text-[var(--heading)]")}>{fmtNum(r.totalSom)}</span>
+                      <span className="lg:flex lg:w-[120px] lg:justify-end"><StatusTag status={r.status} /></span>
+                    </span>
+                  </div>
                 );
               })}
             </div>
-          </div>
+          )}
+        </div>
 
+        {/* Menyu */}
+        <div className="order-1 space-y-3.5 lg:order-2">
+          {menu}
           {!initData && (
-            <button
-              type="button"
-              onClick={logout}
-              className="flex w-full items-center justify-center gap-2 border border-border bg-secondary py-2.5 font-heading text-sm font-bold uppercase tracking-wide text-muted-foreground transition-colors hover:text-destructive"
-            >
+            <button type="button" onClick={logout} className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-border py-3 text-[13px] font-medium text-muted-foreground transition-colors hover:text-destructive">
               <LogOut className="size-4" />
               {t("profile.logout")}
             </button>
           )}
-        </div>
-
-        {/* Right column */}
-        <div className="space-y-6">
-          {/* Trade link faqat skin YUBORADIGAN bo'limlarga kerak (Skin sotishda biz skin olamiz). */}
-          {(FEATURES.auctions || FEATURES.market || FEATURES.trade) && (
-          <div className="border border-border bg-card p-5 shadow-panel">
-            <h2 className="flex items-center gap-2 font-heading text-sm font-bold uppercase tracking-wide text-foreground">
-              <Link2 className="size-4 text-accent" />
-              {t("profile.tradeLink")}
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">{t("profile.tradeLinkDesc")}</p>
-            <textarea
-              value={tradeLink}
-              onChange={(e) => setTradeLink(e.target.value)}
-              rows={3}
-              className="mt-3 w-full resize-none border border-border bg-secondary px-3 py-2 text-sm text-foreground outline-none focus:border-accent"
-              placeholder="https://steamcommunity.com/tradeoffer/new/?partner=..."
-            />
-            <div className="mt-2 flex items-center justify-between">
-              <span className={"inline-flex items-center gap-1 text-xs font-semibold " + (user.tradeLink ? "text-success" : "text-muted-foreground")}>
-                <CheckCircle2 className="size-4" />
-                {user.tradeLink ? t("profile.confirmed") : t("profile.notSet")}
-              </span>
-              <button
-                type="button"
-                onClick={saveTradeLink}
-                disabled={saving}
-                className="inline-flex items-center gap-1.5 bg-accent px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-accent-foreground transition-colors hover:opacity-90 disabled:opacity-50"
-              >
-                <Save className="size-3.5" />
-                {saving ? "..." : t("common.save")}
-              </button>
-            </div>
-          </div>
-          )}
-
-          <div className="border border-border bg-card p-5 shadow-panel">
-            <h2 className="flex items-center gap-2 font-heading text-sm font-bold uppercase tracking-wide text-foreground">
-              <SteamLogo className="size-4 text-accent" />
-              {t("profile.steamAccount")}
-            </h2>
-            <div className="mt-3 flex items-center justify-between">
-              <span className={"inline-flex items-center gap-1.5 text-xs font-semibold " + (user.steamId64 ? "text-success" : "text-muted-foreground")}>
-                {user.steamId64 && <CheckCircle2 className="size-3.5" />}
-                {user.steamId64 ? t("profile.connected") : t("profile.notConnected")}
-              </span>
-              {!user.steamId64 && (
-                <button
-                  type="button"
-                  onClick={connectSteam}
-                  className="inline-flex items-center gap-1.5 border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-accent"
-                >
-                  {t("profile.connect")}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {FEATURES.auctions && (<>
-          <div className="border border-border bg-card shadow-panel">
-            <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-              <Gavel className="size-4 text-primary" />
-              <h2 className="font-heading text-sm font-bold uppercase tracking-wide text-foreground">{t("profile.activeBids")}</h2>
-            </div>
-            {activeBids === null ? (
-              <div className="p-4 text-xs text-muted-foreground">{t("common.loading")}</div>
-            ) : activeBids.length === 0 ? (
-              <div className="p-4 text-xs text-muted-foreground">{t("profile.noActiveBids")}</div>
-            ) : (
-              <ul className="divide-y divide-border">
-                {activeBids.map((a) => (
-                  <li key={a.id}>
-                    <button
-                      type="button"
-                      onClick={() => navigate("auction-detail", a.id)}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-secondary/40"
-                    >
-                      <div className="relative size-12 shrink-0 overflow-hidden bg-secondary">
-                        {a.image && <img src={imgSrc(a.image)} alt={a.name} className="size-full object-contain p-1" />}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-foreground">{a.name}</p>
-                        <p className="font-heading text-sm font-bold text-primary">{fmtMoney(a.price)}</p>
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div className="border border-border bg-card shadow-panel">
-            <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-              <Trophy className="size-4 text-warning" />
-              <h2 className="font-heading text-sm font-bold uppercase tracking-wide text-foreground">{t("profile.wonSkins")}</h2>
-            </div>
-            {wins === null ? (
-              <div className="p-4 text-xs text-muted-foreground">{t("common.loading")}</div>
-            ) : wonAuctions.length === 0 ? (
-              <div className="p-4 text-xs text-muted-foreground">{t("profile.noWinsYet")}</div>
-            ) : (
-              <ul className="divide-y divide-border">
-                {wonAuctions.map((w, i) => (
-                  <li key={i} className="flex items-center gap-3 px-4 py-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground">{w.lotName}</p>
-                      <p className="text-xs text-muted-foreground">{fmtMoney(w.price)}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          </>)}
         </div>
       </div>
     </div>
