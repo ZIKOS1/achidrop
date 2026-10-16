@@ -15,8 +15,10 @@ import { SELL_CATEGORIES, sellCategory, TrustBadges, TrustStats, RecentSales, Ho
 // ko'rsatiladi → user skinni Steam orqali O'ZI yuboradi → admin "Oldim"ni bosgach
 // pul balansga tushadi (server: POST /api/instant-sell).
 
-const WEAR_FULL = { FN: "Factory New", MW: "Minimal Wear", FT: "Field-Tested", WW: "Well-Worn", BS: "Battle-Scarred" };
 // Steam nodirlik nomi qisqa ko'rinishda ("Mil-Spec Grade" → "Mil-Spec", case'lar → "Container")
+// Bir martada nechta skin ko'rsatiladi ("Yana ko'rsatish" har bosilganda +20).
+const PAGE = 20;
+
 function rarityLabel(item) {
   if (sellCategory(item.marketHashName || item.name) === "case") return "Container";
   return (item.rarity || "").replace(/ Grade$/, "") || "—";
@@ -52,9 +54,9 @@ function Tick({ on }) {
   );
 }
 
-// Skin qatori: telefonda nom + "Nodirlik · Sifat", kompyuterda alohida ustunlar.
+// Skin kartochkasi: rasm (nodirlik nuri bilan), nom, "Nodirlik · Sifat", narx.
 // Nodirlik nuqtasi va matn orasida 8px (gap-2).
-function SkinRow({ item, selected, disabled, priced, onToggle, index = 0 }) {
+function SkinCard({ item, selected, disabled, priced, onToggle, index = 0 }) {
   const rColor = rarityColor(item.rarity, item.name);
   const tag = !item.tradable ? t("sell.locked") : !priced ? t("sell.noPrice") : null;
   return (
@@ -62,41 +64,36 @@ function SkinRow({ item, selected, disabled, priced, onToggle, index = 0 }) {
       type="button"
       disabled={disabled}
       onClick={onToggle}
-      style={{ "--fade-delay": `${Math.min(index * 30, 450)}ms` }}
+      style={{ "--fade-delay": `${Math.min((index % PAGE) * 30, 450)}ms` }}
       className={cn(
-        "animate-fade-up flex w-full items-center gap-3.5 rounded-none border-b border-border px-4 py-2.5 text-left transition-[background-color,transform] duration-200 last:border-b-0 lg:px-5",
-        selected ? "bg-[var(--row-sel)]" : "hover:bg-[var(--row-hov)]",
-        disabled ? "cursor-not-allowed opacity-50" : "active:scale-[0.985]"
+        "animate-fade-up group relative flex flex-col overflow-hidden rounded-2xl border bg-card text-left transition-[border-color,background-color,transform,box-shadow] duration-200",
+        selected ? "border-primary/60 bg-[var(--row-sel)] shadow-[0_14px_30px_-20px_var(--primary)]" : "border-border hover:-translate-y-0.5 hover:border-ring/60",
+        disabled ? "cursor-not-allowed opacity-50 hover:translate-y-0" : "active:scale-[0.98]"
       )}
     >
+      <span className="absolute right-2.5 top-2.5 z-10"><Tick on={selected} /></span>
       <span
-        className="flex h-[42px] w-14 shrink-0 items-center justify-center rounded-xl lg:h-11 lg:w-[60px]"
-        style={{ background: `radial-gradient(ellipse at center, ${rColor}33, transparent 72%)` }}
+        className="flex h-24 items-center justify-center px-4 pt-3 sm:h-28"
+        style={{ background: `radial-gradient(ellipse at center, ${rColor}33, transparent 70%)` }}
       >
-        {item.imageUrl ? <img src={imgSrc(item.imageUrl)} alt="" loading="lazy" className="max-h-full max-w-full rounded-none object-contain" /> : <Package className="size-5 text-muted-foreground" />}
+        {item.imageUrl ? <img src={imgSrc(item.imageUrl)} alt="" loading="lazy" className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105" /> : <Package className="size-7 text-muted-foreground" />}
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[12.5px] font-medium text-foreground lg:text-[13px]">{item.name}</span>
-        <span className="mt-1 flex items-center gap-2 lg:hidden">
+      <span className="flex flex-1 flex-col px-3 pb-3 pt-2">
+        <span className="line-clamp-2 min-h-[2.5em] text-[12px] font-medium leading-[1.25] text-foreground">{item.name}</span>
+        <span className="mt-1.5 flex items-center gap-2">
           <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: rColor, boxShadow: `0 0 8px ${rColor}` }} />
-          <span className="truncate text-[11px] text-muted-foreground">{rarityLabel(item)}{item.wear ? ` · ${item.wear}` : ""}</span>
+          <span className="truncate text-[10.5px] text-muted-foreground">{rarityLabel(item)}{item.wear ? ` · ${item.wear}` : ""}</span>
+        </span>
+        <span className="mt-2 flex items-end justify-between gap-2">
+          <span className="whitespace-nowrap font-heading text-[15px] font-semibold tabular-nums text-foreground">{priced ? fmtMoney(item.priceSom) : "—"}</span>
+          {tag && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--row-sel)] px-2 py-0.5 text-[10px] font-semibold text-primary">
+              {!item.tradable && <Lock className="size-2.5" />}
+              {tag}
+            </span>
+          )}
         </span>
       </span>
-      <span className="hidden w-[120px] shrink-0 items-center gap-2 lg:flex">
-        <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: rColor, boxShadow: `0 0 8px ${rColor}` }} />
-        <span className="truncate text-[11px] text-muted-foreground">{rarityLabel(item)}</span>
-      </span>
-      <span className="hidden w-[110px] shrink-0 truncate text-[11px] text-muted-foreground lg:block">{WEAR_FULL[item.wear] || "—"}</span>
-      <span className="shrink-0 text-right lg:w-[110px]">
-        <span className="block whitespace-nowrap font-heading text-[15px] font-semibold tabular-nums text-foreground lg:text-base">{priced ? fmtMoney(item.priceSom) : "—"}</span>
-        {tag && (
-          <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-[var(--row-sel)] px-2 py-0.5 text-[10px] font-semibold text-primary">
-            {!item.tradable && <Lock className="size-2.5" />}
-            {tag}
-          </span>
-        )}
-      </span>
-      <Tick on={selected} />
     </button>
   );
 }
@@ -273,6 +270,7 @@ export default function Sell() {
   const [mine, setMine] = useState([]);
   const [category, setCategory] = useState("all");
   const [sort, setSort] = useState("desc");
+  const [shown, setShown] = useState(PAGE);
   const [stats, setStats] = useState(null);
   const [botUsername, setBotUsername] = useState(null);
   const [confetti, setConfetti] = useState(false);
@@ -350,6 +348,9 @@ export default function Sell() {
     // Sotiladiganlari doim oldinda.
     return [...list].sort((a, b) => (sellable(b) - sellable(a)) || cmp(a, b));
   }, [items, query, category, sort, quote?.lisConfigured]);
+
+  // Filtr/qidiruv/saralash o'zgarsa yana birinchi 20 tadan boshlanadi.
+  useEffect(() => { setShown(PAGE); }, [query, category, sort]);
 
   const selectedItems = items.filter((i) => selected.has(i.assetId));
   const total = selectedItems.reduce((s, i) => s + (i.priceSom || 0), 0);
@@ -562,18 +563,21 @@ export default function Sell() {
 
             {/* Ro'yxat / jadval */}
             {loading && !quote ? (
-              <div className="overflow-hidden rounded-3xl border border-border bg-card">
-                <div className="flex items-center gap-2.5 border-b border-border px-4 py-3 text-xs text-muted-foreground">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2.5 px-1 text-xs text-muted-foreground">
                   <span className="size-4 rounded-full border-2 border-primary/30 border-t-primary spin" />
                   {t("sellx.loadingInv")}
                 </div>
-                {Array.from({ length: 7 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3.5 border-b border-border px-4 py-2.5 last:border-b-0">
-                    <div className="skeleton h-[42px] w-14 rounded-xl" />
-                    <div className="flex-1 space-y-2"><div className="skeleton h-2.5 w-3/4 rounded-md" /><div className="skeleton h-2 w-2/5 rounded-md" /></div>
-                    <div className="skeleton h-3.5 w-16 rounded-md" />
-                  </div>
-                ))}
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="overflow-hidden rounded-2xl border border-border bg-card p-3">
+                      <div className="skeleton h-20 w-full rounded-xl" />
+                      <div className="skeleton mt-3 h-2.5 w-4/5 rounded-md" />
+                      <div className="skeleton mt-2 h-2 w-1/2 rounded-md" />
+                      <div className="skeleton mt-3 h-3.5 w-2/5 rounded-md" />
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : error ? (
               <EmptyState icon={Lock} tone="err" title={error}>
@@ -585,29 +589,36 @@ export default function Sell() {
             ) : !items.length ? (
               <EmptyState icon={Package} title={t("sell.empty")} desc={t("sell.emptyDesc")} />
             ) : (
-              <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-panel">
-                <div className="hidden items-center gap-3.5 border-b border-border bg-secondary/60 px-5 py-3 text-[10px] uppercase tracking-[0.16em] text-muted-foreground lg:flex">
-                  <span className="w-[60px] shrink-0" />
-                  <span className="flex-1">{t("sellx.col.skin")}</span>
-                  <span className="w-[120px] shrink-0">{t("sellx.col.rarity")}</span>
-                  <span className="w-[110px] shrink-0">{t("sellx.col.wear")}</span>
-                  <span className="w-[110px] shrink-0 text-right">{t("sell.youGet")}</span>
-                  <span className="w-[22px] shrink-0" />
+              visible.length === 0 ? (
+                <p className="rounded-3xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">{t("sellx.notFound")}</p>
+              ) : (
+                <div>
+                  {/* Hammasi bir marta yuklangan — "Yana ko'rsatish" faqat ekranda ochadi, serverga so'rov yubormaydi. */}
+                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4">
+                    {visible.slice(0, shown).map((it, i) => (
+                      <SkinCard
+                        key={it.assetId}
+                        index={i}
+                        item={it}
+                        priced={Number.isFinite(it.priceSom)}
+                        selected={selected.has(it.assetId)}
+                        disabled={!sellable(it)}
+                        onToggle={() => toggle(it)}
+                      />
+                    ))}
+                  </div>
+                  {visible.length > shown && (
+                    <button
+                      type="button"
+                      onClick={() => { setShown((n) => n + PAGE); hap("selection"); }}
+                      className="mx-auto mt-4 flex items-center gap-2 rounded-2xl border border-border bg-card px-5 py-3 text-sm font-medium text-foreground transition-all duration-200 hover:-translate-y-0.5 hover:border-ring/60 active:scale-95"
+                    >
+                      <ChevronDown className="size-4 text-primary" />
+                      {t("sellx.more", { n: visible.length - shown })}
+                    </button>
+                  )}
                 </div>
-                {visible.length === 0 ? (
-                  <p className="p-6 text-center text-sm text-muted-foreground">{t("sellx.notFound")}</p>
-                ) : visible.map((it, i) => (
-                  <SkinRow
-                    key={it.assetId}
-                    index={i}
-                    item={it}
-                    priced={Number.isFinite(it.priceSom)}
-                    selected={selected.has(it.assetId)}
-                    disabled={!sellable(it)}
-                    onToggle={() => toggle(it)}
-                  />
-                ))}
-              </div>
+              )
             )}
           </section>
 
