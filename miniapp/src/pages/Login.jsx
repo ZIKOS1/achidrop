@@ -1,69 +1,12 @@
-import { useEffect, useState } from "react";
-import { KeyRound, Gavel, ShieldCheck, Wallet } from "lucide-react";
+import { useState } from "react";
+import { Gavel, ShieldCheck, Wallet } from "lucide-react";
 import { api } from "../api";
-import { useApp } from "../context";
 import { t } from "../i18n";
-import { TelegramLogo, SteamLogo } from "../components/BrandIcons";
-
-function remaining(expiresAt) {
-  const total = Math.max(0, Math.round((expiresAt - Date.now()) / 1000));
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
+import { SteamLogo } from "../components/BrandIcons";
 
 export default function Login() {
-  const { navigate, refreshMe } = useApp();
   const [steamLoading, setSteamLoading] = useState(false);
-  const [tgLoading, setTgLoading] = useState(false);
-  const [botUrl, setBotUrl] = useState(null);
-  const [nonce, setNonce] = useState(null);
-  const [expiresAt, setExpiresAt] = useState(null);
-  const [timeLeft, setTimeLeft] = useState("");
-  const [code, setCode] = useState("");
-  const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!expiresAt) return;
-    setTimeLeft(remaining(expiresAt));
-    const i = setInterval(() => setTimeLeft(remaining(expiresAt)), 1000);
-    return () => clearInterval(i);
-  }, [expiresAt]);
-
-  const expired = expiresAt != null && Date.now() >= expiresAt;
-
-  async function startTelegramLogin() {
-    setTgLoading(true);
-    setError("");
-    setCode("");
-    try {
-      const r = await api("/api/auth/telegram-login/start", { method: "POST" });
-      setNonce(r.nonce);
-      setBotUrl(r.botUrl);
-      setExpiresAt(r.expiresAt);
-      window.open(r.botUrl, "_blank");
-    } catch (e) {
-      setError(e.error || t("login.error"));
-    } finally {
-      setTgLoading(false);
-    }
-  }
-
-  async function verifyCode() {
-    if (!code.trim()) return;
-    setVerifying(true);
-    setError("");
-    try {
-      await api("/api/auth/telegram-login/verify", { method: "POST", body: JSON.stringify({ nonce, code: code.trim() }) });
-      await refreshMe();
-      navigate("auctions");
-    } catch (e) {
-      setError(e.error || t("login.codeError"));
-    } finally {
-      setVerifying(false);
-    }
-  }
 
   async function loginWithSteam() {
     setSteamLoading(true);
@@ -117,78 +60,6 @@ export default function Login() {
         <p className="mb-6 text-sm text-muted-foreground">{t("login.subtitle")}</p>
 
         <div className="w-full space-y-4">
-        {!botUrl ? (
-          <button
-            type="button"
-            disabled={tgLoading}
-            onClick={startTelegramLogin}
-            className="flex w-full items-center justify-center gap-2 bg-[#2AABEE] py-3 font-heading text-sm font-bold uppercase tracking-wide text-white shadow-[0_10px_24px_-10px_#2AABEEaa] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#2AABEE]/90 disabled:translate-y-0 disabled:opacity-50"
-          >
-            <TelegramLogo className="size-4" />
-            {tgLoading ? "..." : t("login.telegram")}
-          </button>
-        ) : (
-          <div className="animate-fade-up space-y-3 border border-border bg-card p-4 text-left shadow-panel">
-            <p className="text-sm text-foreground">
-              <span className="font-heading font-bold text-primary">1.</span> {t("login.step1")}
-            </p>
-            <a
-              href={botUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="flex w-full items-center justify-center gap-2 border border-accent/40 bg-accent/10 py-2 font-heading text-xs font-bold uppercase tracking-wide text-accent transition-colors hover:bg-accent/20"
-            >
-              <TelegramLogo className="size-3.5" />
-              {t("login.reopenBot")}
-            </a>
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-foreground">
-                <span className="font-heading font-bold text-primary">2.</span> {t("login.step2")}
-              </p>
-              <span className={"font-heading text-sm font-bold tabular-nums " + (expired ? "text-destructive" : "text-accent")}>
-                {expired ? t("login.expiredShort") : timeLeft}
-              </span>
-            </div>
-            <div className="flex items-stretch gap-2">
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                value={code}
-                disabled={expired}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                placeholder="123456"
-                className="w-full border border-border bg-secondary px-3 py-2.5 text-center font-heading text-lg font-bold tracking-[0.3em] text-foreground outline-none focus:border-primary disabled:opacity-40"
-              />
-              <button
-                type="button"
-                disabled={verifying || expired || code.length < 6}
-                onClick={verifyCode}
-                aria-label={t("login.step2")}
-                className="flex w-14 shrink-0 items-center justify-center bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
-              >
-                <KeyRound className="size-5" />
-              </button>
-            </div>
-            {expired && (
-              <p className="text-xs text-destructive">{t("login.codeExpired")}</p>
-            )}
-            <button
-              type="button"
-              onClick={startTelegramLogin}
-              className="w-full text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
-            >
-              {t("login.resend")}
-            </button>
-          </div>
-        )}
-
-        <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
-          <span className="h-px flex-1 bg-border" />
-          {t("login.or")}
-          <span className="h-px flex-1 bg-border" />
-        </div>
-
         <button
           type="button"
           disabled={steamLoading}
