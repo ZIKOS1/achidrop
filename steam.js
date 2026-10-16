@@ -72,14 +72,42 @@ const communityInvCache = new Map(); // steamId64 -> { data, ts }
 
 // Sof funksiya (testlanadi). marketable:0 itemlar (medal, coin va h.k.)
 // umuman sotib bo'lmagani uchun tashlab yuboriladi.
+// Trade hold'dagi skin ham sotiladigan tur bo'lsa ko'rsatamiz (medal, coin,
+// storage unit va h.k. — yo'q).
+const SELLABLE_TYPES = new Set([
+    "CSGO_Type_Pistol", "CSGO_Type_SMG", "CSGO_Type_Rifle", "CSGO_Type_SniperRifle",
+    "CSGO_Type_Shotgun", "CSGO_Type_Machinegun", "CSGO_Type_Knife", "Type_Hands",
+    "Type_CustomPlayer", "CSGO_Tool_Sticker", "CSGO_Type_WeaponCase", "CSGO_Type_MusicKit",
+    "CSGO_Tool_Patch", "CSGO_Type_Spray", "CSGO_Tool_Keychain", "CSGO_Tool_WeaponCase_KeyTag",
+]);
+
+// Qulf qachon ochilishi: cache_expiration (ISO) yoki egasiga ko'rinadigan
+// "Tradable/Marketable After Oct 23, 2026 (8:00:00) GMT" matni.
+function holdEndsAt(d) {
+    if (d.cache_expiration && !isNaN(Date.parse(d.cache_expiration))) return new Date(d.cache_expiration).toISOString();
+    for (const o of d.owner_descriptions || []) {
+        const m = String(o.value || "").match(/After\s+([A-Za-z]{3,9}\s+\d{1,2},\s+\d{4})(?:\s*\((\d{1,2}:\d{2}:\d{2})\))?/);
+        if (m) {
+            const t = Date.parse(`${m[1]} ${m[2] || "00:00:00"} GMT`);
+            if (!isNaN(t)) return new Date(t).toISOString();
+        }
+    }
+    return null;
+}
+
 function parseCommunityInventory(body) {
     const descs = new Map();
     for (const d of body?.descriptions || []) descs.set(`${d.classid}_${d.instanceid}`, d);
     const items = [];
     for (const a of body?.assets || []) {
         const d = descs.get(`${a.classid}_${a.instanceid}`);
-        if (!d || !d.marketable) continue;
+        if (!d || !d.market_hash_name) continue;
         const tags = d.tags || [];
+        // marketable:0 — yo medal/coin kabi umuman sotilmaydigan narsa, yo yangi
+        // olingan skin (Steam trade hold / trade protection, 7–8 kun). Ikkinchisi
+        // ko'rsatiladi (qulf bilan), birinchisi tashlab yuboriladi.
+        const lockedUntil = d.marketable ? null : holdEndsAt(d);
+        if (!d.marketable && !lockedUntil && !SELLABLE_TYPES.has(tags.find(t => t.category === "Type")?.internal_name)) continue;
         const exterior = tags.find(t => t.category === "Exterior");
         const rarity = tags.find(t => t.category === "Rarity");
         items.push({
@@ -90,7 +118,8 @@ function parseCommunityInventory(body) {
             float: null,
             image: d.icon_url ? `${COMMUNITY_IMG}${d.icon_url}/256fx256f` : null,
             rarity: rarity ? rarity.localized_tag_name : null,
-            tradable: !!d.tradable,
+            tradable: !!d.tradable && !!d.marketable,
+            lockedUntil,
             stickers: [],
         });
     }

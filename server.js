@@ -1336,6 +1336,7 @@ function sellItemView(it, prices) {
         wear: it.wear ?? skinUtils.wearCode(it.float),
         rarity: it.rarity ?? null,
         tradable: it.tradable !== false,
+        lockedUntil: it.lockedUntil || null,
         priceSom,
     };
 }
@@ -1360,7 +1361,8 @@ app.get("/api/instant-sell/quote", auth, async (req, res) => {
 
     let prices = null;
     if (base.lisConfigured) {
-        const names = items.filter(it => it.tradable !== false).map(it => sellItemView(it, null).marketHashName);
+        // Qulfdagi skinlarning ham narxi ko'rsatiladi (tanlab bo'lmaydi, lekin qiymati ko'rinadi).
+        const names = [...new Set(items.map(it => sellItemView(it, null).marketHashName))];
         try { prices = await lisSkinsPrice.getInstantSellPricesSom(names); }
         catch (err) { console.log("LIS PRICE ERROR:", err.message); }
     }

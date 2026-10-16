@@ -58,7 +58,8 @@ function Tick({ on }) {
 // Nodirlik nuqtasi va matn orasida 8px (gap-2).
 function SkinCard({ item, selected, disabled, priced, onToggle, index = 0 }) {
   const rColor = rarityColor(item.rarity, item.name);
-  const tag = !item.tradable ? t("sell.locked") : !priced ? t("sell.noPrice") : null;
+  const lockDays = item.lockedUntil ? Math.max(1, Math.ceil((Date.parse(item.lockedUntil) - Date.now()) / 86400000)) : 0;
+  const tag = !item.tradable ? (lockDays ? t("sellx.lockDays", { n: lockDays }) : t("sell.locked")) : !priced ? t("sell.noPrice") : null;
   return (
     <button
       type="button"

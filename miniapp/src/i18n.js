@@ -133,6 +133,7 @@ const DICT = {
   "sellx.holdPill": { uz: "Kartaga 8 kun 12 soatda", ru: "На карту через 8 дн 12 ч", en: "To card in 8d 12h" },
   "sellx.deskSubtitle": { uz: "Skinlarni belgilang — admin qabul qilgach pul balansingizga tushadi", ru: "Отметьте скины — после приёма админом деньги поступят на баланс", en: "Pick skins — money hits your balance once the admin accepts" },
   "sellx.steamMissing": { uz: "Steam ulanmagan", ru: "Steam не подключён", en: "Steam not connected" },
+  "sellx.lockDays": { uz: "Qulf · {n} kun", ru: "Замок · {n} дн.", en: "Locked · {n}d" },
   "sellx.more": { uz: "Yana ko'rsatish · {n} ta qoldi", ru: "Показать ещё · осталось {n}", en: "Show more · {n} left" },
   "sellx.found": { uz: "{n} ta skin topildi", ru: "Найдено скинов: {n}", en: "{n} skins found" },
   "sellx.loadingInv": { uz: "Inventar yuklanmoqda…", ru: "Загрузка инвентаря…", en: "Loading inventory…" },

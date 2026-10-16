@@ -11,6 +11,8 @@ const body = {
         { appid: 730, contextid: "2", assetid: "222", classid: "c2", instanceid: "0", amount: "1" },
         { appid: 730, contextid: "2", assetid: "333", classid: "c1", instanceid: "0", amount: "1" },
         { appid: 730, contextid: "2", assetid: "444", classid: "c3", instanceid: "9", amount: "1" },
+        { appid: 730, contextid: "2", assetid: "555", classid: "c4", instanceid: "0", amount: "1" },
+        { appid: 730, contextid: "2", assetid: "666", classid: "c5", instanceid: "0", amount: "1" },
     ],
     descriptions: [
         {
@@ -28,10 +30,24 @@ const body = {
         },
         {
             classid: "c3", instanceid: "9", tradable: 1, marketable: 0,
-            name: "Service Medal", market_hash_name: "Service Medal", icon_url: "ICON3", tags: [],
+            name: "Service Medal", market_hash_name: "Service Medal", icon_url: "ICON3",
+            tags: [{ category: "Type", internal_name: "CSGO_Type_Collectible", localized_tag_name: "Collectible" }],
+        },
+        {
+            // Yangi sotib olingan skin — trade hold (egasi ko'radigan sana bilan)
+            classid: "c4", instanceid: "0", tradable: 0, marketable: 0,
+            name: "AWP | Atheris", market_hash_name: "AWP | Atheris (Field-Tested)", icon_url: "ICON4",
+            owner_descriptions: [{ type: "html", value: "Tradable/Marketable After Oct 23, 2026 (8:00:00) GMT" }],
+            tags: [{ category: "Type", internal_name: "CSGO_Type_SniperRifle", localized_tag_name: "Sniper Rifle" }],
+        },
+        {
+            // Trade hold, lekin sana ko'rinmaydi (ochiq inventar) — turi bo'yicha qoladi
+            classid: "c5", instanceid: "0", tradable: 0, marketable: 0,
+            name: "Glock-18 | Vogue", market_hash_name: "Glock-18 | Vogue (Minimal Wear)", icon_url: "ICON5",
+            tags: [{ category: "Type", internal_name: "CSGO_Type_Pistol", localized_tag_name: "Pistol" }],
         },
     ],
-    total_inventory_count: 4,
+    total_inventory_count: 6,
     success: 1,
 };
 
@@ -49,10 +65,21 @@ test("parseCommunityInventory: Steam nomi Lis narxi uchun to'g'ridan-to'g'ri oli
 
 test("parseCommunityInventory: bir xil classid'li ikki skin ikkita alohida item, lock va sotib bo'lmaydiganlar belgilanadi", () => {
     const items = steam.parseCommunityInventory(body);
-    assert.deepEqual(items.map(i => i.assetId), ["111", "222", "333"]);
+    assert.deepEqual(items.map(i => i.assetId), ["111", "222", "333", "555", "666"]);
     assert.equal(items.find(i => i.assetId === "222").tradable, false);
     // marketable:0 (medal va h.k.) — umuman sotib bo'lmaydi, ro'yxatga kirmaydi
     assert.equal(items.some(i => i.assetId === "444"), false);
+});
+
+test("parseCommunityInventory: trade hold'dagi skin qulf bilan ko'rsatiladi, ochilish sanasi o'qiladi", () => {
+    const items = steam.parseCommunityInventory(body);
+    const awp = items.find(i => i.assetId === "555");
+    assert.equal(awp.tradable, false);
+    assert.equal(awp.lockedUntil, "2026-10-23T08:00:00.000Z");
+    const glock = items.find(i => i.assetId === "666");
+    assert.equal(glock.tradable, false);
+    assert.equal(glock.lockedUntil, null);
+    assert.equal(items.find(i => i.assetId === "111").lockedUntil, null);
 });
 
 test("parseCommunityInventory: bo'sh yoki buzilgan javob bo'sh ro'yxat", () => {
