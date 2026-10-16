@@ -32,13 +32,10 @@ async function requestInventory(steamId64, { force = false } = {}, deps) {
         await deps.sleep(POLL_MS);
         const res = await deps.readDoc(resId(steamId64));
         if (res && res.fetchedAt >= started) {
-            // Steam xato bersa, bot oxirgi yaxshi inventarni shu hujjatda saqlab qoladi.
-            if (res.error && !res.items?.length) throw new Error(res.error);
+            if (res.error) throw new Error(res.error);
             return res.items;
         }
     }
-    // Bot javob bermadi (o'chiq/band) — avval olingan inventar bo'lsa, xato o'rniga o'shani ko'rsatamiz.
-    if (cached && (!cached.error || cached.items?.length)) return cached.items;
     throw new Error("Inventarni hozir yuklab bo'lmadi, keyinroq qayta urinib ko'ring");
 }
 
@@ -56,9 +53,7 @@ async function processPendingRequests(deps) {
             doc = { items, fetchedAt: deps.now(), error: null };
         } catch (err) {
             console.log(`INVENTAR ${steamId64}: ${err.message}`);
-            // Oxirgi yaxshi inventarni bosib yubormaymiz — sayt xato o'rniga shuni ko'rsatadi.
-            const prev = await deps.readDoc(resId(steamId64));
-            doc = { items: prev?.items || [], fetchedAt: deps.now(), error: err.message };
+            doc = { items: [], fetchedAt: deps.now(), error: err.message };
         }
         await deps.writeDoc(resId(steamId64), doc);
     }

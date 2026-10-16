@@ -204,7 +204,7 @@ export default function Sell() {
 
   useEffect(() => {
     if (!user) return;
-    load();
+    load(true); // har kirganda inventar Steam'dan yangidan olinadi (keshsiz)
     loadMine();
   }, [user?.id, user?.steamId64, load, loadMine]);
 
