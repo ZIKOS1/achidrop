@@ -37,7 +37,7 @@ export default function Notifications() {
           <ul className="divide-y divide-border">
             {list.map((n) => (
               <li key={n.id} className={"px-4 py-3 transition-colors hover:bg-secondary/30" + (!n.read ? " border-l-2 border-primary bg-primary/[0.03]" : "")}>
-                <p className="whitespace-pre-line text-sm text-foreground">{n.text.replace(/\*/g, "")}</p>
+                <p className="whitespace-pre-line text-sm text-foreground">{String(n.text || "").replace(/\*/g, "")}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{n.date ? new Date(n.date).toLocaleString("uz-UZ") : "-"}</p>
               </li>
             ))}

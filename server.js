@@ -1307,17 +1307,21 @@ function mdEscape(text) {
 // SteamApis orqali to'g'ridan-to'g'ri (steam.js steamApisGet), aks holda VPS'dagi
 // inventory-worker orqali (inventoryBridge.js).
 // Har safar Steam'dan YANGI inventar olinadi — eski nusxa yoki zaxira
-// ko'rsatilmaydi. SteamApis vaqtincha xato bersa (5xx / tarmoq), 1 marta qayta
-// uriniladi; baribir bo'lmasa — xato userga ko'rsatiladi.
+// ko'rsatilmaydi. SteamApis vaqtincha xato bersa (code 305 / 5xx / tarmoq),
+// 2 marta qayta uriniladi; baribir bo'lmasa — xato userga ko'rsatiladi.
 async function getSellInventory(steamId64, force) {
     if (!process.env.STEAMAPIS_KEY) return inventoryBridge.requestInventory(steamId64, { force }, inventoryBridge.mongoDeps());
     try {
         return await fetchCommunityInventory(steamId64, force, steamApisGet);
     } catch (err) {
         console.log("SELL INVENTORY (SteamApis) ERROR:", steamId64, err.message);
-        if (!/HTTP 5\d\d|fetch failed|abort|timeout/i.test(err.message)) throw err;
-        await new Promise((r) => setTimeout(r, 1500));
-        return fetchCommunityInventory(steamId64, true, steamApisGet);
+        // Vaqtinchalik xato (Steam/SteamApis javob bermadi, tarmoq) — 2 marta qayta urinamiz.
+        if (!/javob bermayapti|fetch failed|abort|timeout/i.test(err.message)) throw err;
+        for (const wait of [1500, 3500]) {
+            await new Promise((r) => setTimeout(r, wait));
+            try { return await fetchCommunityInventory(steamId64, true, steamApisGet); }
+            catch (e2) { console.log("SELL INVENTORY retry ERROR:", steamId64, e2.message); if (wait === 3500) throw e2; }
+        }
     }
 }
 
@@ -2462,6 +2466,9 @@ app.get(["/admin", "/admin/"], (req, res) => {
 });
 
 // SPA fallback
+// Noma'lum /api manzil — sahifa HTML'i emas, JSON 404.
+app.use("/api", (req, res) => res.status(404).json({ error: "Not found" }));
+
 app.get("*", (req, res) => {
     res.sendFile(path.join(__dirname, "miniapp", "dist", "index.html"));
 });

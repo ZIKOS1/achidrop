@@ -273,7 +273,12 @@ export default function AppShell({ page, children }) {
     if (item.external) return openTg();
     navigate(item.page || item.key);
     if (item.section) {
-      setTimeout(() => document.getElementById(item.section)?.scrollIntoView({ behavior: "smooth", block: "start" }), 350);
+      // Sahifa yuklanayotganda (inventar, so'rovlar) balandligi o'zgaradi va
+      // birinchi aylantirish "uchib ketadi" — shu sabab bir necha marta tekshiramiz.
+      [350, 1000, 2000].forEach((ms, i) => setTimeout(() => {
+        const el = document.getElementById(item.section);
+        if (el && Math.abs(el.getBoundingClientRect().top - 72) > 40) el.scrollIntoView({ behavior: i ? "auto" : "smooth", block: "start" });
+      }, ms));
     } else {
       window.scrollTo({ top: 0 });
     }

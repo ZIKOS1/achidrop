@@ -73,12 +73,12 @@ const communityInvCache = new Map(); // steamId64 -> { data, ts }
 // Sof funksiya (testlanadi). marketable:0 itemlar (medal, coin va h.k.)
 // umuman sotib bo'lmagani uchun tashlab yuboriladi.
 // Trade hold'dagi skin ham sotiladigan tur bo'lsa ko'rsatamiz (medal, coin,
-// storage unit va h.k. — yo'q).
+// storage unit, ishlatilgan graffiti va h.k. — yo'q).
 const SELLABLE_TYPES = new Set([
     "CSGO_Type_Pistol", "CSGO_Type_SMG", "CSGO_Type_Rifle", "CSGO_Type_SniperRifle",
     "CSGO_Type_Shotgun", "CSGO_Type_Machinegun", "CSGO_Type_Knife", "Type_Hands",
     "Type_CustomPlayer", "CSGO_Tool_Sticker", "CSGO_Type_WeaponCase", "CSGO_Type_MusicKit",
-    "CSGO_Tool_Patch", "CSGO_Type_Spray", "CSGO_Tool_Keychain", "CSGO_Tool_WeaponCase_KeyTag",
+    "CSGO_Tool_Patch", "CSGO_Tool_Keychain", "CSGO_Tool_WeaponCase_KeyTag",
 ]);
 
 // Qulf qachon ochilishi: cache_expiration (ISO) yoki egasiga ko'rinadigan
@@ -180,6 +180,10 @@ async function fetchCommunityInventory(steamId64, force = false, get = fetchGet)
         if (resp.status === 429) steamBusyUntil = Date.now() + 60_000;
         if (resp.status === 403) throw new Error("Steam inventaringiz yopiq (private). Uni Steam sozlamalarida ochiq (public) qiling");
         if (resp.status === 429) throw new Error("Steam hozir band, 1-2 daqiqadan keyin urinib ko'ring");
+        // SteamApis Steam'dan ololmasa 400 + code 305 qaytaradi (odatda 1 daqiqa ichida o'tib ketadi).
+        if (resp.status >= 500 || (resp.status === 400 && /"code"\s*:\s*305|try again later/i.test(resp.text || ""))) {
+            throw new Error("Steam hozir javob bermayapti. Bir necha soniyadan keyin «Yangilash»ni bosing");
+        }
         if (resp.status < 200 || resp.status >= 300) throw new Error(`Steam xato qaytardi (HTTP ${resp.status})`);
         let body = null;
         try { body = JSON.parse(resp.text); } catch {}

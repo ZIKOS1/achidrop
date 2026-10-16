@@ -13,6 +13,7 @@ const body = {
         { appid: 730, contextid: "2", assetid: "444", classid: "c3", instanceid: "9", amount: "1" },
         { appid: 730, contextid: "2", assetid: "555", classid: "c4", instanceid: "0", amount: "1" },
         { appid: 730, contextid: "2", assetid: "666", classid: "c5", instanceid: "0", amount: "1" },
+        { appid: 730, contextid: "2", assetid: "777", classid: "c6", instanceid: "0", amount: "1" },
     ],
     descriptions: [
         {
@@ -46,8 +47,14 @@ const body = {
             name: "Glock-18 | Vogue", market_hash_name: "Glock-18 | Vogue (Minimal Wear)", icon_url: "ICON5",
             tags: [{ category: "Type", internal_name: "CSGO_Type_Pistol", localized_tag_name: "Pistol" }],
         },
+        {
+            // Ishlatilgan (sealed emas) graffiti — hech qachon sotilmaydi
+            classid: "c6", instanceid: "0", tradable: 0, marketable: 0,
+            name: "Graffiti | Karambit (Dust Brown)", market_hash_name: "Graffiti | Karambit (Dust Brown)", icon_url: "ICON6",
+            tags: [{ category: "Type", internal_name: "CSGO_Type_Spray", localized_tag_name: "Graffiti" }],
+        },
     ],
-    total_inventory_count: 6,
+    total_inventory_count: 7,
     success: 1,
 };
 

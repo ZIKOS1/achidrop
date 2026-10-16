@@ -74,6 +74,7 @@ export function Ring({ progress, size = 46, done, children }) {
 
 export function HistoryRow({ h, dense }) {
   const positive = (h.amount || 0) > 0;
+  const zero = !h.amount;
   const Icon = positive ? Plus : Minus;
   return (
     <div className={cn("flex items-center gap-3 border-b border-border last:border-b-0", dense ? "px-4 py-2.5" : "px-5 py-3")}>
@@ -85,7 +86,7 @@ export function HistoryRow({ h, dense }) {
         <p className="mt-0.5 text-[11px] text-muted-foreground">{fmtDate(h.date)}</p>
       </div>
       <span className={cn("shrink-0 font-heading text-[15px] font-semibold tabular-nums", positive ? "text-success" : "text-[var(--heading)]")}>
-        {positive ? "+" : "−"}{fmtNum(Math.abs(h.amount || 0))}
+        {positive ? "+" : zero ? "" : "−"}{fmtNum(Math.abs(h.amount || 0))}
       </span>
     </div>
   );

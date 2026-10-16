@@ -190,7 +190,7 @@ function ProfileView() {
           ) : (
             <div className="border-t border-border">
               <div className="hidden gap-4 border-b border-border px-5 py-3 text-[10px] uppercase tracking-[0.16em] text-muted-foreground lg:flex">
-                <span className="w-[70px]">{t("pb.col.req")}</span><span className="flex-1">{t("pb.col.skins")}</span><span className="w-[130px]">{t("pb.col.date")}</span>
+                <span className="w-[120px]">{t("pb.col.req")}</span><span className="flex-1">{t("pb.col.skins")}</span><span className="w-[130px]">{t("pb.col.date")}</span>
                 <span className="w-[110px] text-right">{t("pb.col.sum")}</span><span className="w-[120px] text-right">{t("pb.col.status")}</span>
               </div>
               {mine.slice(0, 6).map((r) => {
@@ -198,7 +198,7 @@ function ProfileView() {
                 const more = (r.items?.length || 1) - 1;
                 return (
                   <div key={r.id} className="flex items-center gap-3 border-b border-border px-5 py-3 text-[13px] last:border-b-0 lg:gap-4">
-                    <span className="w-12 shrink-0 tabular-nums text-muted-foreground lg:w-[70px]">#{r.id}</span>
+                    <span className="w-[60px] shrink-0 truncate tabular-nums text-muted-foreground lg:w-[120px]" title={`#${r.id}`}>#{r.id}</span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-foreground">{first}{more > 0 ? `, +${more}` : ""}</span>
                       <span className="block text-[11px] text-muted-foreground lg:hidden">{fmtDate(r.createdAt)}</span>

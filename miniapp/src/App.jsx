@@ -4,6 +4,7 @@ import { AppContext } from "./context";
 import { applyTheme, getInitialTheme } from "./theme";
 import { getCurrentLang, setCurrentLang } from "./i18n";
 import AppShell from "./components/AppShell";
+import ErrorBoundary from "./components/ErrorBoundary";
 import Modal from "./components/Modal";
 import Toast from "./components/Toast";
 import Login from "./pages/Login";
@@ -193,7 +194,7 @@ export default function App() {
 
   return (
     <AppContext.Provider value={ctx}>
-      <AppShell page={page.name}>{render(page.data)}</AppShell>
+      <AppShell page={page.name}><ErrorBoundary resetKey={page.name}>{render(page.data)}</ErrorBoundary></AppShell>
       <Modal modal={modal} onClose={closeModal} />
       <Toast toast={toast} />
     </AppContext.Provider>
