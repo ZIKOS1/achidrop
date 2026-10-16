@@ -124,7 +124,7 @@ module.exports = (bot) => {
                 return ctx.editMessageText("⚠️ Steam ulash hozircha sozlanmagan. Admin bilan bog'laning.",
                     Markup.inlineKeyboard([[Markup.button.callback("⬅️ Orqaga", "back_to_market")]])).catch(() => {});
             }
-            const nonce = createPendingAuth(user.id, "bidder");
+            const nonce = await createPendingAuth(user.id, "bidder");
             const url = `${process.env.WEBAPP_URL}/api/auth/steam/start?state=${nonce}`;
             return ctx.editMessageText(
                 "🔗 *Market'ga qo'yish uchun avval Steam hisobingizni ulang:*",
@@ -143,7 +143,7 @@ module.exports = (bot) => {
         const user = getUser(ctx.from.id);
         if (!user) return;
         if (!user.steamId64) {
-            const nonce = createPendingAuth(user.id, "bidder");
+            const nonce = await createPendingAuth(user.id, "bidder");
             const url = `${process.env.WEBAPP_URL}/api/auth/steam/start?state=${nonce}`;
             return ctx.editMessageText(
                 "🔗 *Tezkor sotish uchun avval Steam hisobingizni ulang:*",

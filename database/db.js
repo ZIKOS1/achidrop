@@ -22,8 +22,8 @@ async function connect() {
     console.log("✅ MongoDB ulandi");
 
     const docs = await Store.find({}).lean();
-    // inv_/invReq_ — inventoryBridge'ning vaqtinchalik hujjatlari, keshga kerak emas.
-    for (const doc of docs) if (!/^inv(Req)?_/.test(doc._id)) cache[doc._id] = doc.data;
+    // inv_/invReq_ (inventoryBridge) va steamAuth_ (auth-steam) — vaqtinchalik hujjatlar, keshga kerak emas.
+    for (const doc of docs) if (!/^(inv(Req)?|steamAuth)_/.test(doc._id)) cache[doc._id] = doc.data;
     console.log("✅ Ma'lumotlar keshga yuklandi:", Object.keys(cache).join(", ") || "(bo'sh)");
 
     // Websaytdan Steam orqali (Telegramsiz) kiruvchi foydalanuvchilar qo'shilishi
@@ -133,10 +133,15 @@ async function writeDoc(id, data) {
 async function removeDoc(id) {
   await Store.deleteOne({ _id: id });
 }
+// O'qish va o'chirish bitta atomik amal — bir martalik kodlar uchun (auth-steam.js).
+async function takeDoc(id) {
+  const doc = await Store.findOneAndDelete({ _id: id }).lean();
+  return doc ? doc.data : null;
+}
 async function listIds(prefix) {
   const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const docs = await Store.find({ _id: { $regex: `^${escaped}` } }, { _id: 1 }).lean();
   return docs.map(d => d._id);
 }
 
-module.exports = { read, write, connect, refresh, withTransaction, readTx, writeTx, readDoc, writeDoc, removeDoc, listIds };
+module.exports = { read, write, connect, refresh, withTransaction, readTx, writeTx, readDoc, writeDoc, removeDoc, takeDoc, listIds };

@@ -119,7 +119,7 @@ module.exports = (bot) => {
                 return ctx.editMessageText("⚠️ Steam ulash hozircha sozlanmagan. Admin bilan bog'laning.",
                     Markup.inlineKeyboard([[Markup.button.callback("⬅️ Orqaga", "back_to_trades")]])).catch(() => {});
             }
-            const nonce = createPendingAuth(user.id, "bidder");
+            const nonce = await createPendingAuth(user.id, "bidder");
             const url = `${process.env.WEBAPP_URL}/api/auth/steam/start?state=${nonce}`;
             return ctx.editMessageText(
                 "🔗 *Obmen ochish uchun avval Steam hisobingizni ulang:*",

@@ -2290,22 +2290,22 @@ app.post("/api/admin/settings", requireAdminPanel, (req, res) => {
 
 // Mini-app'dan (autentifikatsiya bilan) chaqiriladi — faqat tashqi brauzerda
 // ochiladigan URL qaytaradi (frontend tg.openLink() bilan ochadi).
-app.get("/api/admin/steam-login-url", requireAdminPanel, (req, res) => {
+app.get("/api/admin/steam-login-url", requireAdminPanel, async (req, res) => {
     if (!process.env.STEAM_API_KEY || !process.env.WEBAPP_URL) {
         return res.status(400).json({ error: "STEAM_API_KEY yoki WEBAPP_URL .env da sozlanmagan" });
     }
     // "admin" purpose uchun tgId keyinchalik hech qayerda o'qilmaydi (faqat
     // do'kon sozlamalariga steamId64 yozish uchun ishlatiladi) — Admin Panel
     // endi Telegram foydalanuvchisi bilan bog'liq emas, shu sabab shunchaki 0.
-    const nonce = createPendingAuth(0, "admin");
+    const nonce = await createPendingAuth(0, "admin");
     res.json({ url: `${process.env.WEBAPP_URL}/api/auth/steam/start?state=${nonce}` });
 });
 
-app.get("/api/steam-login-url", auth, (req, res) => {
+app.get("/api/steam-login-url", auth, async (req, res) => {
     if (!process.env.STEAM_API_KEY || !process.env.WEBAPP_URL) {
         return res.status(400).json({ error: "STEAM_API_KEY yoki WEBAPP_URL .env da sozlanmagan" });
     }
-    const nonce = createPendingAuth(req.tgUser.id, "bidder");
+    const nonce = await createPendingAuth(req.tgUser.id, "bidder");
     res.json({ url: `${process.env.WEBAPP_URL}/api/auth/steam/start?state=${nonce}` });
 });
 
@@ -2404,11 +2404,11 @@ app.post("/api/auth/telegram-login/verify", telegramLoginLimiter, async (req, re
 });
 
 // GET /api/auth/steam-login-url — websaytdan mustaqil (Telegramsiz) Steam bilan kirish
-app.get("/api/auth/steam-login-url", (req, res) => {
+app.get("/api/auth/steam-login-url", async (req, res) => {
     if (!process.env.STEAM_API_KEY || !process.env.WEBAPP_URL) {
         return res.status(400).json({ error: "STEAM_API_KEY yoki WEBAPP_URL .env da sozlanmagan" });
     }
-    const nonce = createPendingAuth(null, "website");
+    const nonce = await createPendingAuth(null, "website");
     res.json({ url: `${process.env.WEBAPP_URL}/api/auth/steam/start?state=${nonce}` });
 });
 

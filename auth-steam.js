@@ -1,61 +1,50 @@
 const crypto     = require("crypto");
 const SteamAuth   = require("node-steam-openid");
-const { read, write, refresh } = require("./database/db");
 
 const PENDING_TTL_MS = 10 * 60_000; // 10 daqiqa
 
-// /start va /callback so'rovlari Vercel serverless'da turli instance'larga tushishi
-// mumkin — shu instance hali ko'rmagan nonce'ni topish uchun Mongo'dan qayta o'qiladi.
-async function getPendingFresh() {
-    const raw = await refresh("steamAuthPending");
-    return Array.isArray(raw) ? {} : raw;
+// Har kod (nonce) Mongo'da ALOHIDA hujjat: `steamAuth_<nonce>`. Avval hammasi bitta
+// `steamAuthPending` hujjatida edi va har yaratishda butunligicha qayta yozilardi —
+// Vercel'ning turli nusxalari va VPS'dagi bot eski nusxasi bilan yozib, boshqa
+// birovning hozirgina yaratgan kodini o'chirib yuborardi ("Sessiya muddati o'tgan
+// yoki allaqachon ishlatilgan"). Ishlatish atomik (takeDoc = findOneAndDelete).
+const PREFIX = "steamAuth_";
+const docId = (nonce) => PREFIX + nonce;
+const validNonce = (nonce) => typeof nonce === "string" && /^[a-f0-9]{32}$/.test(nonce);
+
+function mongoDeps() {
+    const db = require("./database/db");
+    return { now: () => Date.now(), readDoc: db.readDoc, writeDoc: db.writeDoc, takeDoc: db.takeDoc, removeDoc: db.removeDoc, listIds: db.listIds };
 }
 
-function getPending() {
-    const raw = read("steamAuthPending");
-    return Array.isArray(raw) ? {} : raw;
-}
-
-function cleanupExpired(pending) {
-    const now = Date.now();
-    for (const nonce of Object.keys(pending)) {
-        if (pending[nonce].expiresAt <= now) delete pending[nonce];
+// Tashlab ketilgan (Steam'dan qaytilmagan) kodlarni tozalash.
+async function removeExpired(deps) {
+    for (const id of await deps.listIds(PREFIX)) {
+        const entry = await deps.readDoc(id);
+        if (!entry || entry.expiresAt <= deps.now()) await deps.removeDoc(id);
     }
 }
 
-// Mini-app'dan (auth bilan) chaqirilganda — kim so'raganini (tgId) va nima uchun
-// (admin o'ziga SteamID64 yozadimi, yoki bidchi o'z akkauntini bog'laydimi) eslab
-// qolish uchun. Vercel serverless'da /start va /callback so'rovlari turli
-// instance'larga tushishi mumkin, shu sabab in-memory Map emas, mavjud
-// Mongo-backed keshda saqlanadi (settings/auctions bilan bir xil naqsh).
-function createPendingAuth(tgId, purpose) {
-    const pending = getPending();
-    cleanupExpired(pending);
+// Kim so'raganini (tgId) va nima uchun (admin / bidchi / websayt) eslab qoladi.
+async function createPendingAuth(tgId, purpose, deps = mongoDeps()) {
+    await removeExpired(deps);
     const nonce = crypto.randomBytes(16).toString("hex");
-    pending[nonce] = { tgId, purpose, expiresAt: Date.now() + PENDING_TTL_MS };
-    write("steamAuthPending", pending);
+    await deps.writeDoc(docId(nonce), { tgId, purpose, expiresAt: deps.now() + PENDING_TTL_MS });
     return nonce;
 }
 
-// /start bosqichida — hali o'chirilmaydi, chunki keyin /callback ham shu nonce'ni
-// so'raydi (Steam login jarayoni davomida bir necha redirect bo'lishi mumkin).
-async function peekPendingAuth(nonce) {
-    if (!nonce) return null;
-    const pending = await getPendingFresh();
-    cleanupExpired(pending);
-    return pending[nonce] || null;
+// /start bosqichida — hali o'chirilmaydi, keyin /callback ham shu kodni so'raydi.
+async function peekPendingAuth(nonce, deps = mongoDeps()) {
+    if (!validNonce(nonce)) return null;
+    const entry = await deps.readDoc(docId(nonce));
+    return entry && entry.expiresAt > deps.now() ? entry : null;
 }
 
-// /callback bosqichida — bir martalik ishlatiladi, keyin o'chiriladi.
-async function consumePendingAuth(nonce) {
-    if (!nonce) return null;
-    const pending = await getPendingFresh();
-    cleanupExpired(pending);
-    const entry = pending[nonce];
-    if (!entry) return null;
-    delete pending[nonce];
-    write("steamAuthPending", pending);
-    return entry;
+// /callback bosqichida — bir martalik: o'qish va o'chirish bitta amal.
+async function consumePendingAuth(nonce, deps = mongoDeps()) {
+    if (!validNonce(nonce)) return null;
+    const entry = await deps.takeDoc(docId(nonce));
+    return entry && entry.expiresAt > deps.now() ? entry : null;
 }
 
 function getSteamAuth(returnUrl) {
