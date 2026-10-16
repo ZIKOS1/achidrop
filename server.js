@@ -47,7 +47,10 @@ app.use(helmet({
     frameguard: false,
 }));
 
-app.use(express.json({ limit: "12mb" }));
+// Katta limit faqat rasm yuklash uchun — boshqa yo'llarga 12 MB'lik so'rovlar yuborib
+// serverni band qilib bo'lmasin.
+app.use("/api/admin/upload-image", express.json({ limit: "12mb" }));
+app.use(express.json({ limit: "200kb" }));
 app.use(express.static(path.join(__dirname, "miniapp", "dist")));
 
 // ── Kirish/parol tekshiruvchi yo'llar uchun umumiy rate-limit ────────────────
@@ -77,7 +80,6 @@ const promoCheckLimiter = rateLimit({
     message: { error: "Juda ko'p urinish. Birozdan keyin qayta urinib ko'ring." },
 });
 
-// Galereyadan tanlangan rasmlar base64 holda keladi, shuning uchun JSON limiti oshirilgan.
 
 async function tgSendMessage(chatId, text, replyMarkup) {
     try {
@@ -187,6 +189,7 @@ app.use("/api", (req, res, next) => {
 });
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
+const INIT_DATA_MAX_AGE_S = 24 * 60 * 60;
 function validateInitData(initData) {
     if (!initData) return null;
     try {
@@ -208,7 +211,11 @@ function validateInitData(initData) {
             .update(dataCheckString)
             .digest("hex");
 
-        if (computed !== hash) return null;
+        if (computed.length !== hash.length || !crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(hash))) return null;
+
+        // Eski initData qayta ishlatilmasin (oshkor bo'lgan bo'lsa abadiy kirish bo'lardi).
+        const authDate = Number(params.get("auth_date"));
+        if (!authDate || Date.now() / 1000 - authDate > INIT_DATA_MAX_AGE_S) return null;
 
         const userStr = params.get("user");
         return userStr ? JSON.parse(userStr) : null;
@@ -713,7 +720,7 @@ app.post("/api/support/withdraw-issue", auth, (req, res) => {
     const ticket = supportManager.openOrGet(u.id, u.name, lotId, lotName, reason);
     if (process.env.ADMIN_ID) {
         tgSendMessage(Number(process.env.ADMIN_ID),
-            `🆘 *YORDAM SO'ROVI!*\n\n👤 ${u.name}\n🪪 \`${u.id}\`\n🏷 ${lotName}\n🆔 Ticket #${ticket.id}`,
+            `🆘 *YORDAM SO'ROVI!*\n\n👤 ${mdEscape(u.name ?? String(u.id))}\n🪪 \`${u.id}\`\n🏷 ${lotName}\n🆔 Ticket #${ticket.id}`,
             { inline_keyboard: [
                 [{ text: "💬 Javob berish", callback_data: `support_reply_${ticket.id}` }],
                 [{ text: "✅ Yopish", callback_data: `support_close_${ticket.id}` }],
@@ -750,7 +757,7 @@ app.post("/api/support/:id/message", auth, (req, res) => {
     const result = supportManager.addMessage(ticket.id, "user", u.name, text);
     if (result.error) return res.status(400).json({ error: result.error });
     if (process.env.ADMIN_ID) {
-        tgSendMessage(Number(process.env.ADMIN_ID), `🆘 *Ticket #${ticket.id}* (${u.name}):*\n${text}`,
+        tgSendMessage(Number(process.env.ADMIN_ID), `🆘 *Ticket #${ticket.id}* (${mdEscape(u.name ?? String(u.id))}):\n${mdEscape(text)}`,
             { inline_keyboard: [
                 [{ text: "💬 Javob berish", callback_data: `support_reply_${ticket.id}` }],
                 [{ text: "✅ Yopish", callback_data: `support_close_${ticket.id}` }],
@@ -1431,8 +1438,8 @@ app.get("/api/trade-hold-summary", auth, (req, res) => {
 app.post("/api/trade-withdraw", auth, (req, res) => {
     const u = req.user;
     if (!u) return res.status(404).json({ error: "User not found" });
-    const cardNumber = String(req.body.cardNumber || "").trim();
-    if (!cardNumber) return res.status(400).json({ error: "Karta raqami kerak" });
+    const cardNumber = String(req.body.cardNumber || "").replace(/[\s-]/g, "");
+    if (!/^\d{16}$/.test(cardNumber)) return res.status(400).json({ error: "Karta raqami 16 ta raqamdan iborat bo'lishi kerak" });
 
     const result = balanceManager.requestWithdrawal(u.id, cardNumber);
     if (result.error) return res.status(400).json({ error: "Hozircha yechib olish mumkin bo'lgan mablag' yo'q" });
@@ -1441,7 +1448,7 @@ app.post("/api/trade-withdraw", auth, (req, res) => {
     if (process.env.ADMIN_ID) {
         tgSendMessage(
             Number(process.env.ADMIN_ID),
-            `💸 *Pul chiqarish so'rovi!*\n\n👤 ${u.name ?? u.id}\n🪪 \`${u.id}\`\n💰 *${request.amount.toLocaleString()} so'm*\n💳 \`${request.cardNumber}\``,
+            `💸 *Pul chiqarish so'rovi!*\n\n👤 ${mdEscape(u.name ?? String(u.id))}\n🪪 \`${u.id}\`\n💰 *${request.amount.toLocaleString()} so'm*\n💳 \`${request.cardNumber}\``,
             { inline_keyboard: [[
                 { text: "✅ Tasdiqlash", callback_data: `wd_approve_${request.id}` },
                 { text: "❌ Rad etish",  callback_data: `wd_reject_${request.id}` },
@@ -1502,10 +1509,17 @@ app.get("/api/image/:fileId", async (req, res) => {
     try {
         const token   = process.env.BOT_TOKEN;
         const fileId  = req.params.fileId;
+        if (!/^[A-Za-z0-9_-]{10,200}$/.test(fileId)) return res.status(404).send("Not found");
         const apiResp = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
         const data    = await apiResp.json();
         if (!data.ok) return res.status(404).send("Not found");
-        res.redirect(`https://api.telegram.org/file/bot${token}/${data.result.file_path}`);
+        // Redirect EMAS: Telegram fayl manzili bot tokenini o'z ichiga oladi —
+        // brauzerga yo'naltirilsa token oshkor bo'lardi. Server o'zi olib uzatadi.
+        const file = await fetch(`https://api.telegram.org/file/bot${token}/${data.result.file_path}`);
+        if (!file.ok) return res.status(404).send("Not found");
+        res.setHeader("Content-Type", file.headers.get("content-type") || "application/octet-stream");
+        res.setHeader("Cache-Control", "public, max-age=86400");
+        res.send(Buffer.from(await file.arrayBuffer()));
     } catch {
         res.status(500).send("Error");
     }
@@ -1522,14 +1536,14 @@ app.post("/api/admin/login", adminLoginLimiter, async (req, res) => {
         return res.status(429).json({ error: `Ko'p noto'g'ri urinish — akkaunt vaqtincha qulflandi. ${mins} daqiqadan keyin qayta urinib ko'ring.` });
     }
     if (!account) return res.status(401).json({ error: "Login yoki parol xato" });
-    const token = createAdminSession(account.id, account.role);
+    const token = await createAdminSession(account.id);
     setAdminSessionCookie(res, token);
     res.json({ success: true, role: account.role });
 });
 
 // POST /api/admin/logout
-app.post("/api/admin/logout", (req, res) => {
-    destroyAdminSession(getAdminSessionToken(req));
+app.post("/api/admin/logout", async (req, res) => {
+    await destroyAdminSession(getAdminSessionToken(req));
     clearAdminSessionCookie(res);
     res.json({ success: true });
 });
@@ -2351,7 +2365,7 @@ app.get("/api/auth/steam/callback", async (req, res) => {
                 saveUsers(arr);
             }
             if (u.blocked) return res.status(403).send("Siz bloklangansiz.");
-            const token = createSession(u.id);
+            const token = await createSession(u.id);
             setSessionCookie(res, token);
             return res.redirect(process.env.WEBAPP_URL || "/");
         } else {
@@ -2398,7 +2412,7 @@ app.post("/api/auth/telegram-login/verify", telegramLoginLimiter, async (req, re
     }
     if (u.blocked) return res.status(403).json({ error: "Bloklangansiz" });
 
-    const token = createSession(u.id);
+    const token = await createSession(u.id);
     setSessionCookie(res, token);
     res.json({ success: true });
 });
@@ -2413,8 +2427,8 @@ app.get("/api/auth/steam-login-url", async (req, res) => {
 });
 
 // POST /api/auth/logout
-app.post("/api/auth/logout", (req, res) => {
-    destroySession(getSessionToken(req));
+app.post("/api/auth/logout", async (req, res) => {
+    await destroySession(getSessionToken(req));
     clearSessionCookie(res);
     res.json({ success: true });
 });

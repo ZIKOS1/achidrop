@@ -1,52 +1,35 @@
-const crypto = require("crypto");
 const { read, write, refresh } = require("./database/db");
 const { findUserById } = require("./userLifecycle");
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 kun
 const COOKIE_NAME = "sid";
 
-function getSessions() {
-    const raw = read("sessions");
-    return Array.isArray(raw) ? {} : raw;
+const { createTokenStore } = require("./tokenStore");
+const store = createTokenStore("sess_", SESSION_TTL_MS);
+
+// Websaytda (Steam orqali) muvaffaqiyatli autentifikatsiyadan keyin chaqiriladi —
+// tasodifiy token yaratib, cookie orqali brauzerga beriladi (30 kunga).
+async function createSession(userId) {
+    return store.create({ userId });
 }
 
-function cleanupExpired(sessions) {
-    const now = Date.now();
-    for (const token of Object.keys(sessions)) {
-        if (sessions[token].expiresAt <= now) delete sessions[token];
-    }
-}
-
-// Websaytda (Telegram Login Widget yoki Steam orqali) muvaffaqiyatli
-// autentifikatsiyadan keyin chaqiriladi — tasodifiy token yaratib, cookie
-// orqali brauzerga beriladi (30 kunga).
-function createSession(userId) {
-    const sessions = getSessions();
-    cleanupExpired(sessions);
-    const token = crypto.randomBytes(32).toString("hex");
-    sessions[token] = { userId, expiresAt: Date.now() + SESSION_TTL_MS };
-    write("sessions", sessions);
-    return token;
-}
-
-// Vercel serverless'da har so'rov turli instance'ga tushishi mumkin — shu
-// sabab Mongo'dan qayta o'qiladi (auth-steam.js'dagi steamAuthPending bilan
-// bir xil naqsh).
+// Yangi sessiyalar alohida hujjatlarda (tokenStore.js). Eski bitta `sessions`
+// hujjatidagilar muddati tugaguncha o'qiladi — deploydan keyin hech kim chiqib ketmasin.
 async function getSessionUser(token) {
     if (!token) return null;
-    const raw = await refresh("sessions");
-    const sessions = Array.isArray(raw) ? {} : raw;
-    cleanupExpired(sessions);
-    const entry = sessions[token];
-    if (!entry) return null;
-    return findUserById(entry.userId);
+    let entry = await store.get(token);
+    if (!entry) {
+        const raw = await refresh("sessions");
+        const legacy = raw && !Array.isArray(raw) ? raw[token] : null;
+        if (legacy && legacy.expiresAt > Date.now()) entry = legacy;
+    }
+    return entry ? findUserById(entry.userId) : null;
 }
 
-function destroySession(token) {
-    if (!token) return;
-    const sessions = getSessions();
-    delete sessions[token];
-    write("sessions", sessions);
+async function destroySession(token) {
+    await store.destroy(token);
+    const raw = read("sessions");
+    if (token && raw && !Array.isArray(raw) && raw[token]) { delete raw[token]; write("sessions", raw); }
 }
 
 function parseCookie(req) {

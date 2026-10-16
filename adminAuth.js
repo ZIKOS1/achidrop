@@ -18,45 +18,27 @@ const { parseCookie, cookieFlags } = require("./session");
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 soat — user sessiyasidan (30 kun) qisqaroq
 const COOKIE_NAME = "admin_sid";
 
-function getSessions() {
-    const raw = read("adminSessions");
-    return Array.isArray(raw) ? {} : raw;
+const { createTokenStore } = require("./tokenStore");
+const sessionStore = createTokenStore("admsess_", SESSION_TTL_MS);
+
+async function createAdminSession(accountId) {
+    return sessionStore.create({ accountId });
 }
 
-function cleanupExpiredSessions(sessions) {
-    const now = Date.now();
-    for (const token of Object.keys(sessions)) {
-        if (sessions[token].expiresAt <= now) delete sessions[token];
-    }
-}
-
-function createAdminSession(accountId, role) {
-    const sessions = getSessions();
-    cleanupExpiredSessions(sessions);
-    const token = crypto.randomBytes(32).toString("hex");
-    sessions[token] = { accountId, role, expiresAt: Date.now() + SESSION_TTL_MS };
-    write("adminSessions", sessions);
-    return token;
-}
-
-// Vercel serverless'da har so'rov turli instance'ga tushishi mumkin — session.js
-// bilan bir xil sabab uchun Mongo'dan qayta o'qiladi. To'liq sessiya obyektini
-// ({accountId, role}) qaytaradi — requireAdminPanel shundan req.adminSession'ni
-// to'ldiradi, requireCeo esa role'ni tekshiradi.
+// Akkaunt har so'rovda qayta tekshiriladi: o'chirilgan/bloklangan admin sessiyasi
+// darhol ishlamay qoladi, rol ham akkauntning hozirgi rolidan olinadi.
 async function getAdminSession(token) {
-    if (!token) return null;
-    const raw = await refresh("adminSessions");
-    const sessions = Array.isArray(raw) ? {} : raw;
-    cleanupExpiredSessions(sessions);
-    return sessions[token] || null;
+    const session = await sessionStore.get(token);
+    if (!session) return null;
+    const account = (await getAccountsFresh()).find(a => a.id === session.accountId);
+    if (!account || account.active === false) { await sessionStore.destroy(token); return null; }
+    return { accountId: account.id, role: account.role, expiresAt: session.expiresAt };
 }
 
-function destroyAdminSession(token) {
-    if (!token) return;
-    const sessions = getSessions();
-    delete sessions[token];
-    write("adminSessions", sessions);
+async function destroyAdminSession(token) {
+    await sessionStore.destroy(token);
 }
+
 
 function getAdminSessionToken(req) {
     return parseCookie(req)[COOKIE_NAME] || null;
