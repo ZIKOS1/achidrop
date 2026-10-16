@@ -106,15 +106,20 @@ async function fetchCommunityInventory(steamId64, force = false) {
     let start = null;
     for (let page = 0; page < 5; page++) {
         const url = `https://steamcommunity.com/inventory/${steamId64}/730/2?l=english&count=2000${start ? `&start_assetid=${start}` : ""}`;
-        const ac = new AbortController();
-        const timer = setTimeout(() => ac.abort(), 20000);
         let resp;
-        try {
-            resp = await fetch(url, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0" }, signal: ac.signal });
-        } catch (err) {
-            throw new Error(err.name === "AbortError" ? "Steam javob bermadi, keyinroq urinib ko'ring" : "Steam bilan bog'lanishda xato");
-        } finally {
-            clearTimeout(timer);
+        // 429 ko'pincha bir lahzalik — sayt 22s kutadi, shu ichida 2 marta qayta urinamiz.
+        for (let attempt = 0; attempt < 3; attempt++) {
+            if (attempt) await new Promise(r => setTimeout(r, 3000));
+            const ac = new AbortController();
+            const timer = setTimeout(() => ac.abort(), 8000);
+            try {
+                resp = await fetch(url, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0" }, signal: ac.signal });
+            } catch (err) {
+                throw new Error(err.name === "AbortError" ? "Steam javob bermadi, keyinroq urinib ko'ring" : "Steam bilan bog'lanishda xato");
+            } finally {
+                clearTimeout(timer);
+            }
+            if (resp.status !== 429) break;
         }
         if (resp.status === 403) throw new Error("Steam inventaringiz yopiq (private). Uni Steam sozlamalarida ochiq (public) qiling");
         if (resp.status === 429) throw new Error("Steam hozir band, 1-2 daqiqadan keyin urinib ko'ring");

@@ -79,6 +79,23 @@ test("bridge: bot ishlamasa, lekin avval olingan inventar bo'lsa — xato o'rnig
     assert.deepEqual(await bridge.requestInventory("765", { force: true }, deps), ITEMS);
 });
 
+test("bridge: Steam xato bersa ham oxirgi yaxshi inventar yo'qolmaydi va ko'rsatiladi", async () => {
+    const store = fakeStore();
+    let now = 9_000_000;
+    await store.writeDoc("inv_765", { items: ITEMS, fetchedAt: now - 2 * 3600_000, error: null });
+    const deps = {
+        ...store,
+        now: () => now,
+        sleep: async (ms) => {
+            now += ms;
+            await bridge.processPendingRequests({ ...store, now: () => now, fetchInventory: async () => { throw new Error("Steam hozir band, 1-2 daqiqadan keyin urinib ko'ring"); } });
+        },
+    };
+    assert.deepEqual(await bridge.requestInventory("765", { force: true }, deps), ITEMS);
+    // Ikkinchi marta ham (xato hujjati eski inventarni bosib ketmagan bo'lishi kerak)
+    assert.deepEqual(await bridge.requestInventory("765", { force: true }, deps), ITEMS);
+});
+
 test("bridge: eski natija (so'rovdan oldingi) yangi so'rovga javob deb olinmaydi", async () => {
     const store = fakeStore();
     let now = 9_000_000;
