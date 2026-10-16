@@ -2426,7 +2426,8 @@ app.get("*", (req, res) => {
 });
 
 if (!process.env.VERCEL) {
-    app.listen(PORT, () => {
+    // VPS'da WEBAPP_HOST=127.0.0.1 — sayt Vercel'da, bu server tashqariga ochilmasin.
+    app.listen(PORT, process.env.WEBAPP_HOST, () => {
         console.log(`🌐 Mini App: http://localhost:${PORT}`);
         if (!process.env.WEBAPP_URL) {
             console.log("⚠️  WEBAPP_URL .env ga qo'shing va HTTPS (ngrok/hosting) ishlatishni unutmang!");

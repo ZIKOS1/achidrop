@@ -4,7 +4,7 @@ const { read, connect, refresh } = require("./database/db");
 const { notifyUser } = require("./notify");
 const { finishAuction } = require("./auctionLifecycle");
 const inventoryBridge = require("./inventoryBridge");
-const { fetchCommunityInventory } = require("./steam");
+const { fetchCommunityInventory, curlGet } = require("./steam");
 
 // Vaqtni chiroyli ko'rsatish
 function timeLeft(endTime) {
@@ -74,7 +74,7 @@ async function main() {
         try {
             await inventoryBridge.processPendingRequests({
                 ...inventoryBridge.mongoDeps(),
-                fetchInventory: (sid, force) => fetchCommunityInventory(sid, force),
+                fetchInventory: (sid, force) => fetchCommunityInventory(sid, force, curlGet),
             });
         } catch (err) {
             console.log("INVENTAR SO'ROV XATO:", err.message);
