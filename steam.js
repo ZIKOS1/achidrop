@@ -173,4 +173,10 @@ async function fetchInventory(force = false) {
     return body;
 }
 
-module.exports = { fetchInventory, fetchUserInventory, fetchCommunityInventory, parseCommunityInventory, curlGet, steamApisGet };
+// Oxirgi muvaffaqiyatli yuklangan inventar (necha daqiqa oldin bo'lishidan qat'i nazar) —
+// Steam/SteamApis vaqtincha xato bersa, sahifa bo'sh qolmasligi uchun.
+function getCachedCommunityInventory(steamId64) {
+    return communityInvCache.get(steamId64)?.data || null;
+}
+
+module.exports = { fetchInventory, fetchUserInventory, fetchCommunityInventory, getCachedCommunityInventory, parseCommunityInventory, curlGet, steamApisGet };

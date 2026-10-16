@@ -276,11 +276,13 @@ export default function Sell() {
   const [confetti, setConfetti] = useState(false);
   const prevStatus = useRef(null);
 
+  const hasQuote = useRef(false);
   const load = useCallback((refresh = false) => {
     setLoading(true);
     setError("");
     api(`/api/instant-sell/quote${refresh ? "?refresh=1" : ""}`)
       .then((q) => {
+        hasQuote.current = true;
         setQuote(q);
         // Inventar yangilanganda yo'qolgan/narxsiz skinlar tanlovdan chiqadi.
         setSelected((prev) => {
@@ -288,9 +290,14 @@ export default function Sell() {
           return new Set([...prev].filter((id) => ok.has(id)));
         });
       })
-      .catch((e) => setError(e?.error || t("common.genericError")))
+      .catch((e) => {
+        const msg = e?.error || t("common.genericError");
+        // Yangilashda xato bo'lsa — eski ro'yxat qoladi, faqat ogohlantiramiz.
+        if (refresh && hasQuote.current) showToast(msg, "err");
+        else setError(msg);
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [showToast]);
 
   const loadMine = useCallback(() => {
     api("/api/instant-sell-mine").then((list) => {
