@@ -97,7 +97,36 @@ function parseCommunityInventory(body) {
     return items;
 }
 
-async function fetchCommunityInventory(steamId64, force = false) {
+// Inventar sahifasini olish usullari: { status, text } qaytaradi.
+// Odatda Node fetch. VPS'da (inventory-worker.js) esa curl: Steam'ni himoya
+// qiladigan Akamai datacenter IP'dan kelgan Node so'rovini "barmoq izi"
+// bo'yicha 429 bilan rad etadi (sarlavha/IPv4 farqi yo'q), curl'ni esa o'tkazadi.
+async function fetchGet(url) {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 8000);
+    try {
+        const resp = await fetch(url, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0" }, signal: ac.signal });
+        return { status: resp.status, text: await resp.text() };
+    } catch (err) {
+        throw new Error(err.name === "AbortError" ? "Steam javob bermadi, keyinroq urinib ko'ring" : "Steam bilan bog'lanishda xato");
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+function curlGet(url) {
+    const { execFile } = require("child_process");
+    return new Promise((resolve, reject) => {
+        execFile("curl", ["-s", "-m", "8", "-H", "User-Agent: Mozilla/5.0", "-w", "\n%{http_code}", url],
+            { maxBuffer: 64 * 1024 * 1024 }, (err, stdout) => {
+                if (err) return reject(new Error(err.code === 28 ? "Steam javob bermadi, keyinroq urinib ko'ring" : "Steam bilan bog'lanishda xato"));
+                const cut = stdout.lastIndexOf("\n");
+                resolve({ status: Number(stdout.slice(cut + 1)), text: stdout.slice(0, cut) });
+            });
+    });
+}
+
+async function fetchCommunityInventory(steamId64, force = false, get = fetchGet) {
     if (!steamId64) throw new Error("Steam hisobingiz ulanmagan");
     const cached = communityInvCache.get(steamId64);
     if (!force && cached && Date.now() - cached.ts < CACHE_MS) return cached.data;
@@ -110,21 +139,14 @@ async function fetchCommunityInventory(steamId64, force = false) {
         // 429 ko'pincha bir lahzalik — sayt 22s kutadi, shu ichida 2 marta qayta urinamiz.
         for (let attempt = 0; attempt < 3; attempt++) {
             if (attempt) await new Promise(r => setTimeout(r, 3000));
-            const ac = new AbortController();
-            const timer = setTimeout(() => ac.abort(), 8000);
-            try {
-                resp = await fetch(url, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0" }, signal: ac.signal });
-            } catch (err) {
-                throw new Error(err.name === "AbortError" ? "Steam javob bermadi, keyinroq urinib ko'ring" : "Steam bilan bog'lanishda xato");
-            } finally {
-                clearTimeout(timer);
-            }
+            resp = await get(url);
             if (resp.status !== 429) break;
         }
         if (resp.status === 403) throw new Error("Steam inventaringiz yopiq (private). Uni Steam sozlamalarida ochiq (public) qiling");
         if (resp.status === 429) throw new Error("Steam hozir band, 1-2 daqiqadan keyin urinib ko'ring");
-        if (!resp.ok) throw new Error(`Steam xato qaytardi (HTTP ${resp.status})`);
-        const body = await resp.json().catch(() => null);
+        if (resp.status < 200 || resp.status >= 300) throw new Error(`Steam xato qaytardi (HTTP ${resp.status})`);
+        let body = null;
+        try { body = JSON.parse(resp.text); } catch {}
         if (!body) break; // bo'sh inventar Steam'da bo'sh javob qaytaradi
         items.push(...parseCommunityInventory(body));
         if (!body.more_items || !body.last_assetid) break;
@@ -144,4 +166,4 @@ async function fetchInventory(force = false) {
     return body;
 }
 
-module.exports = { fetchInventory, fetchUserInventory, fetchCommunityInventory, parseCommunityInventory };
+module.exports = { fetchInventory, fetchUserInventory, fetchCommunityInventory, parseCommunityInventory, curlGet };

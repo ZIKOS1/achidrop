@@ -2,15 +2,16 @@
 // pm2 ostida 24/7). index.js ham xuddi shu ishni qiladi, lekin bot
 // foydalanuvchining kompyuterida — kompyuter o'chsa inventar ochilmay qolardi.
 // VPS IP'sini Steam bloklamaydi (Vercel'nikini bloklaydi), shu sabab so'rovlar
-// shu yerda bajariladi. Ikkalasi bir vaqtda ishlasa ham zarari yo'q: kim birinchi
-// olsa o'sha javob yozadi (inventoryBridge.js).
+// shu yerda bajariladi — faqat curl orqali (steam.js curlGet izohiga qarang).
+// Ikkalasi bir vaqtda ishlasa ham zarari yo'q: kim birinchi olsa o'sha javob
+// yozadi (inventoryBridge.js).
 //
 // Faqat mongoose.connect — db.connect() butun bazani keshga yuklaydi va
 // backfill yozadi, bu yerga kerak emas (readDoc/writeDoc keshsiz ishlaydi).
 require("dotenv").config();
 const mongoose = require("mongoose");
 const inventoryBridge = require("./inventoryBridge");
-const { fetchCommunityInventory } = require("./steam");
+const { fetchCommunityInventory, curlGet } = require("./steam");
 
 async function main() {
     if (!process.env.MONGODB_URI) throw new Error("MONGODB_URI .env faylda topilmadi!");
@@ -24,7 +25,7 @@ async function main() {
         try {
             await inventoryBridge.processPendingRequests({
                 ...inventoryBridge.mongoDeps(),
-                fetchInventory: (sid, force) => fetchCommunityInventory(sid, force),
+                fetchInventory: (sid, force) => fetchCommunityInventory(sid, force, curlGet),
             });
         } catch (err) {
             console.log("INVENTAR SO'ROV XATO:", err.message);
