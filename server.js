@@ -5,7 +5,7 @@ const rateLimit   = require("express-rate-limit");
 const crypto  = require("crypto");
 const path    = require("path");
 const { read, write, refresh } = require("./database/db");
-const { fetchInventory, fetchUserInventory, fetchCommunityInventory, getCachedCommunityInventory, steamApisGet } = require("./steam");
+const { fetchInventory, fetchUserInventory, fetchCommunityInventory, steamApisGet } = require("./steam");
 const inventoryBridge = require("./inventoryBridge");
 const { createPendingAuth, peekPendingAuth, consumePendingAuth, getSteamAuth, steamConnectedHtml } = require("./auth-steam");
 const { createPendingLogin, consumePendingLogin } = require("./auth-telegram-login");
@@ -1306,21 +1306,18 @@ function mdEscape(text) {
 // Skin sotish inventari. Vercel IP'si Steam'da bloklangan: STEAMAPIS_KEY bo'lsa
 // SteamApis orqali to'g'ridan-to'g'ri (steam.js steamApisGet), aks holda VPS'dagi
 // inventory-worker orqali (inventoryBridge.js).
-// SteamApis xato bersa (Steam band / vaqtincha uzilish): avval shu server
-// nusxasidagi oxirgi inventar, u ham bo'lmasa — VPS'dagi inventory-worker.
-// Yopiq (private) inventar xatosi esa to'g'ridan-to'g'ri userga ko'rsatiladi.
+// Har safar Steam'dan YANGI inventar olinadi — eski nusxa yoki zaxira
+// ko'rsatilmaydi. SteamApis vaqtincha xato bersa (5xx / tarmoq), 1 marta qayta
+// uriniladi; baribir bo'lmasa — xato userga ko'rsatiladi.
 async function getSellInventory(steamId64, force) {
-    const viaBridge = () => inventoryBridge.requestInventory(steamId64, { force }, inventoryBridge.mongoDeps());
-    if (!process.env.STEAMAPIS_KEY) return viaBridge();
+    if (!process.env.STEAMAPIS_KEY) return inventoryBridge.requestInventory(steamId64, { force }, inventoryBridge.mongoDeps());
     try {
         return await fetchCommunityInventory(steamId64, force, steamApisGet);
     } catch (err) {
         console.log("SELL INVENTORY (SteamApis) ERROR:", steamId64, err.message);
-        if (/private|yopiq/i.test(err.message)) throw err;
-        const stale = getCachedCommunityInventory(steamId64);
-        if (stale) return stale;
-        try { return await viaBridge(); }
-        catch (e2) { console.log("SELL INVENTORY (bridge) ERROR:", steamId64, e2.message); throw err; }
+        if (!/HTTP 5\d\d|fetch failed|abort|timeout/i.test(err.message)) throw err;
+        await new Promise((r) => setTimeout(r, 1500));
+        return fetchCommunityInventory(steamId64, true, steamApisGet);
     }
 }
 
