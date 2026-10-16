@@ -194,3 +194,22 @@ test("instantSellPriceSomTiered: Lis narxi × 0.89 × kurs, keyin pog'onali marj
     assert.equal(lis.instantSellPriceSomTiered(100, 12700, tiers), Math.floor(100 * 0.89 * 12700 * 0.9));
     assert.equal(lis.instantSellPriceSomTiered(null, 12700, tiers), null);
 });
+
+test("publicStats: faqat tasdiqlangan (credited) so'rovlar; so'nggi sotuvlarda user ma'lumoti yo'q", () => {
+    const reqs = [
+        { id: 1, userId: 7, status: "credited", resolvedAt: "2026-10-15T10:00:00Z", totalSom: 30000,
+          items: [{ marketHashName: "AK-47 | Redline (Field-Tested)", name: "AK-47 | Redline", imageUrl: "a.png", priceSom: 20000, assetId: "x1", float: 0.2 },
+                  { marketHashName: "Revolution Case", name: "Revolution Case", imageUrl: "b.png", priceSom: 10000, assetId: "x2" }] },
+        { id: 2, userId: 8, status: "awaiting_admin", totalSom: 99999, items: [{ marketHashName: "X", priceSom: 99999 }] },
+        { id: 3, userId: 9, status: "rejected", totalSom: 5, items: [{ marketHashName: "Y", priceSom: 5 }] },
+        { id: 4, userId: 7, status: "credited", resolvedAt: "2026-10-16T10:00:00Z", totalSom: 5000,
+          items: [{ marketHashName: "Glock-18 | Wraiths (Field-Tested)", name: "Glock-18 | Wraiths", imageUrl: "c.png", priceSom: 5000, assetId: "x3" }] },
+    ];
+    const s = ism.publicStats(reqs);
+    assert.equal(s.deals, 2);
+    assert.equal(s.skins, 3);
+    assert.equal(s.paidSom, 35000);
+    assert.equal(s.recent[0].name, "Glock-18 | Wraiths"); // eng yangisi birinchi
+    assert.deepEqual(Object.keys(s.recent[0]).sort(), ["at", "imageUrl", "name", "priceSom"]);
+    assert.equal(s.recent.length, 3);
+});

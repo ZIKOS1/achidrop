@@ -1419,6 +1419,14 @@ app.post("/api/instant-sell", auth, async (req, res) => {
     res.json({ request, botTradeUrl: getBotTradeUrl() });
 });
 
+// GET /api/public-stats — ochiq: tasdiqlangan sotuvlar soni/summasi va so'nggi
+// sotuvlar (ismlarsiz). Bosh sahifadagi ishonch bloki va lenta uchun.
+app.get("/api/public-stats", async (req, res) => {
+    await instantSellManager.refreshRequests();
+    res.setHeader("Cache-Control", "public, max-age=60");
+    res.json(instantSellManager.publicStats(instantSellManager.getAllRequests()));
+});
+
 // GET /api/instant-sell-mine — mening sotish so'rovlarim
 app.get("/api/instant-sell-mine", auth, async (req, res) => {
     const u = req.user;

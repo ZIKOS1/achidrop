@@ -174,6 +174,26 @@ function rejectedText(request) {
         `\n\nSavol bo'lsa, qo'llab-quvvatlash bo'limiga yozing.`;
 }
 
+// Ochiq statistika (bosh sahifadagi ishonch bloki va "So'nggi sotuvlar" lentasi) —
+// faqat tasdiqlangan sotuvlar, foydalanuvchi haqida hech qanday ma'lumot chiqmaydi.
+function publicStats(requests, recentLimit = 12) {
+    const done = requests.filter(r => r.status === "credited");
+    const recent = done
+        .slice()
+        .sort((a, b) => String(b.resolvedAt || b.createdAt).localeCompare(String(a.resolvedAt || a.createdAt)))
+        .flatMap(r => (r.items || []).map(it => ({
+            name: it.name || it.marketHashName, imageUrl: it.imageUrl || null,
+            priceSom: it.priceSom, at: r.resolvedAt || r.createdAt,
+        })))
+        .slice(0, recentLimit);
+    return {
+        deals: done.length,
+        skins: done.reduce((n, r) => n + (r.items || []).length, 0),
+        paidSom: done.reduce((n, r) => n + (r.totalSom || 0), 0),
+        recent,
+    };
+}
+
 async function refreshRequests() {
     await refresh("instantSellRequests").catch(() => {});
 }
@@ -182,5 +202,6 @@ module.exports = {
     SELL_HOLD_MS, MAX_ITEMS_PER_REQUEST, MAX_OPEN_REQUESTS_PER_USER,
     createSellRequest, approveSellRequest, rejectSellRequest,
     getInstantSellRequest, getMyInstantSellRequests, getRequestsForAdmin, refreshRequests,
-    validateNewRequest, creditRequestInTx, approvedText, rejectedText,
+    validateNewRequest, creditRequestInTx, approvedText, rejectedText, publicStats,
+    getAllRequests,
 };

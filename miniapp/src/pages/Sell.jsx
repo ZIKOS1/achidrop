@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Banknote, Check, CheckCircle2, Clock, Copy, ExternalLink, Layers, Lock, Package, RefreshCw, Search, Wallet, XCircle } from "lucide-react";
+import { ArrowDownWideNarrow, Banknote, Check, CheckCircle2, Clock, Copy, Crown, ExternalLink, Layers, Lock, Package, RefreshCw, Search, Wallet, XCircle } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
 import { imgSrc, wearClasses, fmtMoney, hap, rarityColor } from "../utils";
@@ -8,6 +8,7 @@ import { t } from "../i18n";
 import { cn } from "../lib/cn";
 import Empty from "../components/Empty";
 import { SteamLogo } from "../components/BrandIcons";
+import { SELL_CATEGORIES, sellCategory, HeroDecor, TrustBadges, TrustStats, RecentSales, HowItWorks, Faq, TelegramBanner, Confetti } from "../components/SellExtras";
 
 // Skin sotish (Lis-Skins uslubida): user Steam inventaridan skinlarni
 // belgilaydi → "Sotish" → so'rov yaratiladi va bizning trade link
@@ -33,15 +34,17 @@ function StatusBadge({ status }) {
 
 // Kartochka: rasm ortida nodirlik rangidagi yumshoq nur va pastda rangli
 // chiziq (pichoq ★ — oltin), tanlanganda brend rangidagi halqa.
-function SkinCard({ item, selected, disabled, priced, onToggle }) {
+function SkinCard({ item, selected, disabled, priced, onToggle, index = 0 }) {
   const rColor = rarityColor(item.rarity, item.name);
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onToggle}
+      style={{ "--fade-delay": `${Math.min(index * 25, 450)}ms` }}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-xl border bg-card text-left transition-all duration-200 ease-out",
+        "animate-fade-up group relative flex flex-col overflow-hidden rounded-xl border bg-card text-left transition-all duration-200 ease-out",
+        selected && "select-pulse",
         selected
           ? "border-primary shadow-[0_0_0_1px_var(--primary),0_14px_32px_-14px_color-mix(in_oklch,var(--primary)_70%,transparent)]"
           : "border-border",
@@ -172,7 +175,7 @@ function TradeLinkPanel({ request, botTradeUrl, onDone }) {
 }
 
 export default function Sell() {
-  const { user, navigate, showToast, openModal, closeModal, tg } = useApp();
+  const { user, navigate, showToast, openModal, closeModal, tg, refreshMe } = useApp();
   const [quote, setQuote] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -181,6 +184,12 @@ export default function Sell() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null); // { request, botTradeUrl }
   const [mine, setMine] = useState([]);
+  const [category, setCategory] = useState("all");
+  const [sort, setSort] = useState("desc");
+  const [stats, setStats] = useState(null);
+  const [botUsername, setBotUsername] = useState(null);
+  const [confetti, setConfetti] = useState(false);
+  const prevStatus = useRef(null);
 
   const load = useCallback((refresh = false) => {
     setLoading(true);
@@ -199,8 +208,36 @@ export default function Sell() {
   }, []);
 
   const loadMine = useCallback(() => {
-    api("/api/instant-sell-mine").then(setMine).catch(() => {});
+    api("/api/instant-sell-mine").then((list) => {
+      const prev = prevStatus.current;
+      if (prev) {
+        const credited = list.filter((r) => r.status === "credited" && prev[r.id] === "awaiting_admin");
+        if (credited.length) {
+          const sum = credited.reduce((n, r) => n + (r.totalSom || 0), 0);
+          showToast(t("sellx.credited", { id: credited.map((r) => r.id).join(", #"), sum: fmtMoney(sum) }), "ok");
+          hap("notif", "success");
+          setConfetti(true);
+          setTimeout(() => setConfetti(false), 3500);
+          refreshMe?.();
+        }
+      }
+      prevStatus.current = Object.fromEntries(list.map((r) => [r.id, r.status]));
+      setMine(list);
+    }).catch(() => {});
+  }, [showToast, refreshMe]);
+
+  // Ochiq statistika va bot nomi (ishonch bloki, lenta, Telegram banner)
+  useEffect(() => {
+    api("/api/public-stats").then(setStats).catch(() => {});
+    api("/api/bot-info").then((r) => setBotUsername(r.username)).catch(() => {});
   }, []);
+
+  // Admin "Oldim"ni bosganini sahifa ochiq turganda ham sezish uchun
+  useEffect(() => {
+    if (!user || !mine.some((r) => r.status === "awaiting_admin")) return;
+    const id = setInterval(loadMine, 30000);
+    return () => clearInterval(id);
+  }, [user?.id, mine, loadMine]);
 
   useEffect(() => {
     if (!user) return;
@@ -210,12 +247,21 @@ export default function Sell() {
 
   const items = quote?.items || [];
   const sellable = (it) => quote?.lisConfigured && it.tradable && Number.isFinite(it.priceSom);
+  const catCounts = useMemo(() => {
+    const c = { all: items.length };
+    for (const it of items) { const k = sellCategory(it.marketHashName || it.name); c[k] = (c[k] || 0) + 1; }
+    return c;
+  }, [items]);
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = q ? items.filter((i) => i.name.toLowerCase().includes(q)) : items;
-    // Sotiladiganlari oldinda, qimmatlari birinchi.
-    return [...list].sort((a, b) => (sellable(b) - sellable(a)) || ((b.priceSom || 0) - (a.priceSom || 0)));
-  }, [items, query, quote?.lisConfigured]);
+    let list = q ? items.filter((i) => i.name.toLowerCase().includes(q)) : items;
+    if (category !== "all") list = list.filter((i) => sellCategory(i.marketHashName || i.name) === category);
+    const byPrice = sort === "asc" ? (a, b) => (a.priceSom || 0) - (b.priceSom || 0) : (a, b) => (b.priceSom || 0) - (a.priceSom || 0);
+    const cmp = sort === "name" ? (a, b) => a.name.localeCompare(b.name) : byPrice;
+    // Sotiladiganlari doim oldinda.
+    return [...list].sort((a, b) => (sellable(b) - sellable(a)) || cmp(a, b));
+  }, [items, query, category, sort, quote?.lisConfigured]);
 
   const selectedItems = items.filter((i) => selected.has(i.assetId));
   const total = selectedItems.reduce((s, i) => s + (i.priceSom || 0), 0);
@@ -236,6 +282,12 @@ export default function Sell() {
       }
       return next;
     });
+  }
+
+  function selectTop5() {
+    hap("impact", "medium");
+    const top = items.filter(sellable).sort((a, b) => b.priceSom - a.priceSom).slice(0, Math.min(5, maxItems));
+    setSelected(new Set(top.map((i) => i.assetId)));
   }
 
   function selectAll() {
@@ -280,13 +332,21 @@ export default function Sell() {
     });
   }
 
+  const openLink = (url) => (tg?.openLink ? tg.openLink(url) : window.open(url, "_blank", "noopener"));
+
   if (!user) {
     return (
-      <Empty icon={Banknote} title={t("common.loginRequired")}>
-        <button type="button" onClick={() => navigate("login")} className="bg-primary px-5 py-2.5 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-primary/90">
-          {t("common.login")}
-        </button>
-      </Empty>
+      <div className="space-y-5">
+        <Empty icon={Banknote} title={t("common.loginRequired")}>
+          <button type="button" onClick={() => navigate("login")} className="bg-primary px-5 py-2.5 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-primary/90">
+            {t("common.login")}
+          </button>
+        </Empty>
+        <TrustBadges />
+        <RecentSales recent={stats?.recent} />
+        <HowItWorks />
+        <Faq />
+      </div>
     );
   }
 
@@ -301,18 +361,20 @@ export default function Sell() {
   const steps = [t("sell.step1"), t("sell.step2"), t("sell.step3")];
   const sellableItems = items.filter(sellable);
   const inventoryValue = sellableItems.reduce((sum, i) => sum + i.priceSom, 0);
+  const topImages = [...sellableItems].sort((a, b) => b.priceSom - a.priceSom).map((i) => i.imageUrl).filter(Boolean).slice(0, 3);
 
   return (
     <div className="space-y-5 pb-28">
+      <Confetti show={confetti} />
       <div className="relative overflow-hidden rounded-2xl border border-border bg-[linear-gradient(135deg,var(--hero-a),var(--hero-b))] p-5 shadow-panel sm:p-6">
-        <div className="pointer-events-none absolute -right-16 -top-20 size-64 rounded-full bg-primary/15 blur-3xl" />
+        <HeroDecor images={topImages} />
         <div className="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground sm:text-3xl">{t("sell.title")}</h1>
+            <h1 className="text-shine font-heading text-2xl font-bold uppercase tracking-wide sm:text-3xl">{t("sell.title")}</h1>
             <p className="mt-1 max-w-md text-sm text-muted-foreground">{t("sell.subtitle")}</p>
           </div>
           {quote?.lisConfigured && sellableItems.length > 0 && (
-            <div className="flex gap-3">
+            <div className="relative z-10 flex gap-3 lg:mr-[19rem] xl:mr-[25rem]">
               <div className="rounded-xl border border-border bg-background/60 px-4 py-2.5">
                 <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground"><Wallet className="size-3.5" />{t("sell.inventoryValue")}</p>
                 <p className="font-heading text-lg font-bold text-foreground">{fmtMoney(inventoryValue)}</p>
@@ -324,7 +386,7 @@ export default function Sell() {
             </div>
           )}
         </div>
-        <ol className="relative mt-5 grid gap-2 sm:grid-cols-3 sm:gap-0">
+        <ol className="relative z-10 mt-5 grid gap-2 sm:grid-cols-3 sm:gap-0 lg:mr-[19rem] xl:mr-[25rem]">
           {steps.map((s, i) => (
             <li key={i} className="relative flex items-center gap-2.5 text-xs text-foreground sm:pr-4">
               <span className="relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full bg-primary font-heading text-xs font-bold text-primary-foreground shadow-[0_0_16px_-4px_var(--primary)]">{i + 1}</span>
@@ -334,6 +396,8 @@ export default function Sell() {
           ))}
         </ol>
       </div>
+
+      <RecentSales recent={stats?.recent} />
 
       {quote && !quote.lisConfigured && (
         <div className="flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4">
@@ -356,7 +420,7 @@ export default function Sell() {
       ) : (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex min-w-[180px] flex-1 items-center gap-2 rounded-lg border border-border bg-card px-3 transition-colors focus-within:border-primary/60">
+            <div className="flex min-w-[130px] flex-1 items-center gap-2 rounded-lg border border-border bg-card px-3 transition-colors focus-within:border-primary/60">
               <Search className="size-4 text-muted-foreground" />
               <input
                 value={query}
@@ -377,6 +441,43 @@ export default function Sell() {
             </button>
           </div>
 
+          {items.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="-mx-1 flex w-full gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:w-auto sm:flex-1">
+                {SELL_CATEGORIES.filter((c) => c === "all" || catCounts[c]).map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => { setCategory(c); hap("selection"); }}
+                    className={cn(
+                      "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200",
+                      category === c
+                        ? "border-primary bg-primary text-primary-foreground shadow-[0_6px_16px_-8px_var(--primary)]"
+                        : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                    )}
+                  >
+                    {t(`sellx.cat.${c}`)}
+                    <span className={cn("rounded-full px-1.5 text-[10px]", category === c ? "bg-primary-foreground/20" : "bg-secondary")}>{catCounts[c] || 0}</span>
+                  </button>
+                ))}
+              </div>
+              <label className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs text-muted-foreground">
+                <ArrowDownWideNarrow className="size-3.5" />
+                <select value={sort} onChange={(e) => setSort(e.target.value)} className="bg-transparent font-medium text-foreground outline-none">
+                  <option value="desc">{t("sellx.sort.desc")}</option>
+                  <option value="asc">{t("sellx.sort.asc")}</option>
+                  <option value="name">{t("sellx.sort.name")}</option>
+                </select>
+              </label>
+              {quote?.lisConfigured && sellableItems.length > 0 && (
+                <button type="button" onClick={selectTop5} className="flex items-center gap-1.5 rounded-lg border border-warning/40 bg-warning/10 px-3 py-1.5 text-xs font-semibold text-warning transition-all duration-200 hover:-translate-y-0.5 hover:bg-warning/20">
+                  <Crown className="size-3.5" />
+                  {t("sellx.top5")}
+                </button>
+              )}
+            </div>
+          )}
+
           {loading && !quote ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {Array.from({ length: 12 }).map((_, i) => (
@@ -393,9 +494,13 @@ export default function Sell() {
             <Empty icon={Package} title={t("sell.empty")} desc={t("sell.emptyDesc")} />
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-              {visible.map((it) => (
+              {visible.length === 0 && (
+                <p className="col-span-full rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">{t("sellx.notFound")}</p>
+              )}
+              {visible.map((it, i) => (
                 <SkinCard
                   key={it.assetId}
+                  index={i}
                   item={it}
                   priced={Number.isFinite(it.priceSom)}
                   selected={selected.has(it.assetId)}
@@ -441,6 +546,12 @@ export default function Sell() {
           </ul>
         </div>
       )}
+
+      <TrustStats stats={stats} />
+      <TrustBadges />
+      <HowItWorks />
+      <Faq />
+      <TelegramBanner botUsername={botUsername} onOpen={openLink} />
 
       <AnimatePresence>
         {selected.size > 0 && (
