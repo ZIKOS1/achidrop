@@ -1312,8 +1312,20 @@ function mdEscape(text) {
 // 2 marta qayta uriniladi; baribir bo'lmasa — xato userga ko'rsatiladi.
 async function getSellInventory(steamId64, force, token) {
     // steamwebapi — trade-himoyadagi (yaqinda olingan/qimmat) skinlarni ham
-    // beradi; kaliti bo'lsa birinchi shu ishlatiladi.
-    if (process.env.STEAMWEBAPI_KEY) return steamWebApiInventory(steamId64, force);
+    // beradi; kaliti bo'lsa birinchi shu ishlatiladi. Lekin u sotilmaydigan
+    // collectible'larni (medal, graffiti, coin) BERMAYDI — ularni ko'rsatish
+    // uchun community (SteamApis) inventaridan qo'shib qo'yamiz (best-effort).
+    if (process.env.STEAMWEBAPI_KEY) {
+        const items = await steamWebApiInventory(steamId64, force);
+        if (process.env.STEAMAPIS_KEY) {
+            try {
+                const comm = await fetchCommunityInventory(steamId64, force, steamApisGet);
+                const have = new Set(items.map(i => String(i.assetId)));
+                for (const it of comm) if (it.sellable === false && !have.has(String(it.assetId))) items.push(it);
+            } catch (err) { console.log("SELL INVENTORY merge (community) ERROR:", err.message); }
+        }
+        return items;
+    }
     if (!process.env.STEAMAPIS_KEY) return inventoryBridge.requestInventory(steamId64, { force }, inventoryBridge.mongoDeps());
     try {
         return await fetchCommunityInventory(steamId64, force, steamApisGet, { token });
