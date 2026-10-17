@@ -214,9 +214,12 @@ async function fetchCommunityInventory(steamId64, force = false, get = fetchGet,
     const cached = communityInvCache.get(steamId64);
     if (!force && cached && Date.now() - cached.ts < CACHE_MS) return cached.data;
 
+    // "2" bo'limi egasiga yopiq bo'lsa ({blocked}) — bo'sh deb qaraymiz (eski
+    // xatti-harakat), ishlamay qolmaymiz.
     const main = await fetchInventoryContext(steamId64, 2, get, null);
-    const byId = new Map(main.items.map(i => [i.assetId, i]));
-    let totalCount = main.totalCount || main.items.length;
+    const mainItems = main.items || [];
+    const byId = new Map(mainItems.map(i => [i.assetId, i]));
+    let totalCount = main.totalCount || mainItems.length;
 
     if (token) {
         try {

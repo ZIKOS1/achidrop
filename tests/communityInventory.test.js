@@ -132,3 +132,9 @@ test("fetchCommunityInventory: '16' egasiga yopiq (rwgrsn) — jim o'tadi", asyn
     assert.equal(items.length, 1);
     assert.equal(steam.communityInventoryMeta("sidC").hiddenCount, 1);
 });
+
+test("fetchCommunityInventory: '2' egasiga yopiq bo'lsa ham ishlaydi (bo'sh)", async () => {
+    const items = await steam.fetchCommunityInventory("sidD", true, fakeGet({ "2": { success: 1, rwgrsn: -2 } }));
+    assert.deepEqual(items, []);
+    assert.equal(steam.communityInventoryMeta("sidD").hiddenCount, 0);
+});
