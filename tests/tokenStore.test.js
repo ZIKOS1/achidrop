@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { createTokenStore } = require("../tokenStore");
+const { createTokenStore } = require("../backend/tokenStore");
 
 function fakeDeps(clock) {
     const docs = new Map();

@@ -1,7 +1,7 @@
 {
     "framework": null,
-    "buildCommand": "npm run build:miniapp",
-    "outputDirectory": "miniapp/dist",
+    "buildCommand": "npm run build:frontend",
+    "outputDirectory": "frontend/dist",
     "rewrites": [
         { "source": "/api/:path*", "destination": "/api" },
         { "source": "/admin", "destination": "/admin.html" }

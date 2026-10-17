@@ -6,16 +6,16 @@
 // nizo/bekor qilish) tradeHandler.js'ning UMUMIY `showTradeRoom`'idan
 // (kind'ga qaramaydi) qayta ishlatiladi — market va obmen bir xil davomni bosib o'tadi.
 const { Markup } = require("telegraf");
-const { read, write, refresh } = require("../database/db");
-const { notifyUser } = require("../notify");
-const { fetchUserInventory } = require("../steam");
-const { createPendingAuth } = require("../auth-steam");
-const tradeManager = require("../tradeManager");
-const balanceManager = require("../balanceManager");
-const skinUtils    = require("../skinUtils");
+const { read, write, refresh } = require("../../backend/database/db");
+const { notifyUser } = require("../../backend/notify");
+const { fetchUserInventory } = require("../../backend/steam");
+const { createPendingAuth } = require("../../backend/auth-steam");
+const tradeManager = require("../../backend/tradeManager");
+const balanceManager = require("../../backend/balanceManager");
+const skinUtils    = require("../../backend/skinUtils");
 const tradeHandler = require("./tradeHandler"); // showTradeRoom — faqat tradeHandler(bot) chaqirilgandan keyin mavjud bo'ladi (index.js shunday tartibda ulaydi)
-const instantSellManager = require("../instantSellManager");
-const { getInstantSellPriceSom } = require("../lisSkinsPrice");
+const instantSellManager = require("../../backend/instantSellManager");
+const { getInstantSellPriceSom } = require("../../backend/lisSkinsPrice");
 
 const LISTINGS_PAGE_SIZE  = 5;
 const INVENTORY_PAGE_SIZE = 6;

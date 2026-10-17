@@ -1,8 +1,8 @@
 require("dotenv").config();
 const { Telegraf, Markup } = require("telegraf");
-const { read, connect, refresh } = require("./database/db");
-const { notifyUser } = require("./notify");
-const { finishAuction } = require("./auctionLifecycle");
+const { read, connect, refresh } = require("../backend/database/db");
+const { notifyUser } = require("../backend/notify");
+const { finishAuction } = require("../backend/auctionLifecycle");
 
 // Vaqtni chiroyli ko'rsatish
 function timeLeft(endTime) {
@@ -23,7 +23,7 @@ async function main() {
     await connect();
 
     // Mini App API server
-    require("./server");
+    require("../backend/server");
 
     const bot = new Telegraf(process.env.BOT_TOKEN);
 

@@ -1,8 +1,8 @@
 const { Markup } = require("telegraf");
-const { read, write, refresh } = require("../database/db");
-const { notifyUser } = require("../notify");
-const bidManager = require("../bidManager");
-const skinUtils = require("../skinUtils");
+const { read, write, refresh } = require("../../backend/database/db");
+const { notifyUser } = require("../../backend/notify");
+const bidManager = require("../../backend/bidManager");
+const skinUtils = require("../../backend/skinUtils");
 
 const pendingBid         = {};
 const pendingTopup       = {};

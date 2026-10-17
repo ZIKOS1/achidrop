@@ -1,9 +1,9 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const lis = require("../lisSkinsPrice");
-const bm = require("../balanceManager");
-const ism = require("../instantSellManager");
+const lis = require("../backend/lisSkinsPrice");
+const bm = require("../backend/balanceManager");
+const ism = require("../backend/instantSellManager");
 
 test("instantSellPriceSom: Lis × kurs × (1 − marja), pastga yaxlitlanadi", () => {
     assert.equal(lis.instantSellPriceSom(10, 12700, 12), 111760);

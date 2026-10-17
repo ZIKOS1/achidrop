@@ -1,6 +1,6 @@
 require("dotenv").config();
-const { connect } = require("../database/db");
-const app = require("../server");
+const { connect } = require("../backend/database/db");
+const app = require("../backend/server");
 
 module.exports = async (req, res) => {
     await connect();

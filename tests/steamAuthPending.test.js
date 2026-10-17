@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const auth = require("../auth-steam");
+const auth = require("../backend/auth-steam");
 
 // Mongo o'rnidagi soxta ombor — Vercel'ning turli nusxalari va VPS'dagi bot
 // hammasi shu bitta omborni ko'radi.

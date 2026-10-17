@@ -1,8 +1,8 @@
 const { Markup } = require("telegraf");
-const { read, write } = require("../database/db");
-const { createTelegramUser } = require("../userLifecycle");
-const { attachCodeToPending } = require("../auth-telegram-login");
-const { FEATURES } = require("../features");
+const { read, write } = require("../../backend/database/db");
+const { createTelegramUser } = require("../../backend/userLifecycle");
+const { attachCodeToPending } = require("../../backend/auth-telegram-login");
+const { FEATURES } = require("../../backend/features");
 
 function readUsers() {
     const data = read("users");

@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert");
-const { parseCookie, envValue, summarize, lisGet, ownerPricesSom } = require("../lisAutosell");
+const { parseCookie, envValue, summarize, lisGet, ownerPricesSom } = require("../backend/lisAutosell");
 
 test("parseCookie: qiymat ichidagi = saqlanadi", () => {
     const c = parseCookie("a=1; XSRF-TOKEN=ab%3D%3D; b=x=y");

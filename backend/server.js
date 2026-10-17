@@ -52,7 +52,7 @@ app.use(helmet({
 // serverni band qilib bo'lmasin.
 app.use("/api/admin/upload-image", express.json({ limit: "12mb" }));
 app.use(express.json({ limit: "200kb" }));
-app.use(express.static(path.join(__dirname, "miniapp", "dist")));
+app.use(express.static(path.join(__dirname, "..", "frontend", "dist")));
 
 // ── Kirish/parol tekshiruvchi yo'llar uchun umumiy rate-limit ────────────────
 // IP bo'yicha — brute-force (admin login, telegram-login kod, promo kod)
@@ -2521,7 +2521,7 @@ app.post("/api/auth/logout", async (req, res) => {
 // pastdagi umumiy SPA fallback'dan OLDIN turishi kerak, aks holda "*" uni
 // ham ushlab, noto'g'ri (mijoz) bundle'ni yuborib yuboradi).
 app.get(["/admin", "/admin/"], (req, res) => {
-    res.sendFile(path.join(__dirname, "miniapp", "dist", "admin.html"));
+    res.sendFile(path.join(__dirname, "..", "frontend", "dist", "admin.html"));
 });
 
 // SPA fallback
@@ -2529,7 +2529,7 @@ app.get(["/admin", "/admin/"], (req, res) => {
 app.use("/api", (req, res) => res.status(404).json({ error: "Not found" }));
 
 app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "miniapp", "dist", "index.html"));
+    res.sendFile(path.join(__dirname, "..", "frontend", "dist", "index.html"));
 });
 
 if (!process.env.VERCEL) {

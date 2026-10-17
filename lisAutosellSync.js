@@ -7,8 +7,8 @@
 require("dotenv").config({ path: require("path").join(__dirname, ".env") });
 const fs = require("fs");
 const path = require("path");
-const db = require("./database/db");
-const { STATE_ID, REQ_ID, envValue, fetchState } = require("./lisAutosell");
+const db = require("./backend/database/db");
+const { STATE_ID, REQ_ID, envValue, fetchState } = require("./backend/lisAutosell");
 
 const COOKIE_ENV = path.join(__dirname, "lis_autosell", ".env");
 const INTERVAL_MS = 3 * 60 * 1000;

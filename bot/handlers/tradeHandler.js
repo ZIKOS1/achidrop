@@ -1,13 +1,13 @@
 const { Markup } = require("telegraf");
-const { read, refresh } = require("../database/db");
-const { notifyUser } = require("../notify");
-const { fetchUserInventory } = require("../steam");
-const { createPendingAuth } = require("../auth-steam");
-const tradeManager   = require("../tradeManager");
-const tradeDelivery  = require("../tradeDelivery");
-const balanceManager = require("../balanceManager");
-const chatManager    = require("../chatManager");
-const skinUtils      = require("../skinUtils");
+const { read, refresh } = require("../../backend/database/db");
+const { notifyUser } = require("../../backend/notify");
+const { fetchUserInventory } = require("../../backend/steam");
+const { createPendingAuth } = require("../../backend/auth-steam");
+const tradeManager   = require("../../backend/tradeManager");
+const tradeDelivery  = require("../../backend/tradeDelivery");
+const balanceManager = require("../../backend/balanceManager");
+const chatManager    = require("../../backend/chatManager");
+const skinUtils      = require("../../backend/skinUtils");
 
 const TRADES_PAGE_SIZE    = 5;
 const INVENTORY_PAGE_SIZE = 6;

@@ -22,7 +22,7 @@ Thumbs.db
 # (database/db.js), bu fayllar db.js tomonidan umuman o'qilmaydi, lekin
 # ba'zilarida eski real foydalanuvchi ma'lumotlari (ism/username) bor —
 # git tarixiga keraksiz shaxsiy ma'lumot yozilmasligi uchun chiqarib tashlandi.
-database/*.json
+backend/database/*.json
 
 # optional lock (agar xohlasang)
 package-lock.json

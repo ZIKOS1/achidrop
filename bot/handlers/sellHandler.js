@@ -7,10 +7,10 @@
 // bu yerda faqat (1) "💸 Skin sotish" tugmasi mini-appni ochadi, (2) admin
 // "✅ Oldim" / "❌ Rad etish" tugmalarini bosadi (server.js yuborgan xabarda).
 const { Markup } = require("telegraf");
-const { refresh } = require("../database/db");
-const { notifyUser } = require("../notify");
-const { FEATURES } = require("../features");
-const instantSellManager = require("../instantSellManager");
+const { refresh } = require("../../backend/database/db");
+const { notifyUser } = require("../../backend/notify");
+const { FEATURES } = require("../../backend/features");
+const instantSellManager = require("../../backend/instantSellManager");
 
 const SELL_TEXTS = ["💸 Skin sotish", "💸 Продать скин"];
 

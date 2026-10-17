@@ -1,5 +1,5 @@
 const { Markup } = require("telegraf");
-const { read, write } = require("../database/db");
+const { read, write } = require("../../backend/database/db");
 
 // Global state — adminHandler ham ko'rishi uchun export qilamiz
 const pendingPromo = {};

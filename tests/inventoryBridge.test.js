@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const bridge = require("../inventoryBridge");
+const bridge = require("../backend/inventoryBridge");
 
 // Mongo o'rnidagi soxta ombor — sayt va bot alohida jarayonlar, lekin
 // ikkalasi ham shu bitta "ombor" orqali gaplashadi.

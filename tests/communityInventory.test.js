@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const steam = require("../steam");
+const steam = require("../backend/steam");
 
 // steamcommunity.com/inventory/<id>/730/2 javobining qisqartirilgan nusxasi
 // (haqiqiy javob shakli, 2026-10-15 kuni tekshirilgan).

@@ -2,11 +2,11 @@
   "name": "auksion-bot",
   "version": "1.0.0",
   "description": "Telegram Auction Bot",
-  "main": "index.js",
+  "main": "bot/index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
-    "build:miniapp": "cd miniapp && npm install && npm run build",
+    "start": "node bot/index.js",
+    "dev": "nodemon bot/index.js",
+    "build:frontend": "cd frontend && npm install && npm run build",
     "test": "node --test tests/*.test.js"
   },
   "dependencies": {

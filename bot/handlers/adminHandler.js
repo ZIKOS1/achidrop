@@ -1,9 +1,9 @@
 const { Markup } = require("telegraf");
-const { read, write } = require("../database/db");
-const { finishAuction, cancelAuction } = require("../auctionLifecycle");
-const { notifyUser, pushNotification } = require("../notify");
-const balanceManager = require("../balanceManager");
-const supportManager = require("../supportManager");
+const { read, write } = require("../../backend/database/db");
+const { finishAuction, cancelAuction } = require("../../backend/auctionLifecycle");
+const { notifyUser, pushNotification } = require("../../backend/notify");
+const balanceManager = require("../../backend/balanceManager");
+const supportManager = require("../../backend/supportManager");
 
 function readUsers() {
     const data = read("users");
