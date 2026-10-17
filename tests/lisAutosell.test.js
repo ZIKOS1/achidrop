@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert");
-const { parseCookie, envValue, summarize, lisGet } = require("../lisAutosell");
+const { parseCookie, envValue, summarize, lisGet, ownerPricesSom } = require("../lisAutosell");
 
 test("parseCookie: qiymat ichidagi = saqlanadi", () => {
     const c = parseCookie("a=1; XSRF-TOKEN=ab%3D%3D; b=x=y");
@@ -43,6 +43,20 @@ test("lisGet: 419 → cookie_expired, XSRF header dekodlanadi", async () => {
     await assert.rejects(lisGet("/x", { cookie: "XSRF-TOKEN=ab%3D", sessionId: "s1" }, fake), e => e.code === "cookie_expired");
     assert.strictEqual(seen["X-XSRF-TOKEN"], "ab=");
     assert.strictEqual(seen["x-session-id"], "s1");
+});
+
+test("ownerPricesSom: faqat Lis egasi va yangi ma'lumot uchun", () => {
+    const now = 1_000_000_000;
+    const state = { steamId: "765", fetchedAt: now - 60_000, items: [
+        { assetId: "1", priceUsd: 2.15 }, { assetId: "2", priceUsd: 0 },
+    ] };
+    const m = ownerPricesSom(state, "765", 12700, now);
+    assert.strictEqual(m.get("1"), 27305);
+    assert.strictEqual(m.has("2"), false);
+    assert.strictEqual(ownerPricesSom(state, "999", 12700, now), null);
+    assert.strictEqual(ownerPricesSom(state, null, 12700, now), null);
+    assert.strictEqual(ownerPricesSom({ ...state, fetchedAt: now - 25 * 3600_000 }, "765", 12700, now), null);
+    assert.strictEqual(ownerPricesSom(null, "765", 12700, now), null);
 });
 
 test("lisGet: Cloudflare sahifasi tushunarli xato beradi", async () => {

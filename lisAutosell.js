@@ -92,11 +92,37 @@ async function lisGet(path, { cookie, sessionId }, fetchImpl = fetch) {
 
 async function fetchState(creds, fetchImpl) {
     const inv = await lisGet("/sell-skins/inventory?game_id=1", creds, fetchImpl);
+    const user = (await lisGet("/users", creds, fetchImpl))?.data;
     let payout = null;
     try { payout = (await lisGet("/offers/instant-payout", creds, fetchImpl))?.data ?? null; } catch (e) {
         if (e.code === "cookie_expired") throw e;
     }
-    return summarize(inv?.data, payout);
+    return { ...summarize(inv?.data, payout), steamId: user?.steam_id ? String(user.steam_id) : null };
 }
 
-module.exports = { STATE_ID, REQ_ID, parseCookie, envValue, summarize, lisGet, fetchState };
+// ── Skin sotish (client) ─────────────────────────────────────────────────────
+// Lis cookie egasining Steam akkaunti saytda ham ulangan bo'lsa, unga Skin
+// sotishda Lis avtosell narxining o'zi (× kurs, marjasiz) ko'rsatiladi va
+// so'rov ham shu narxda yoziladi. Boshqa userlarga — oddiy formula.
+const OWNER_PRICE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+// (sof funksiya) state + steamId64 → Map(assetId -> so'm) yoki null (egasi emas / eski).
+function ownerPricesSom(state, steamId64, rate, now = Date.now()) {
+    if (!state?.steamId || !steamId64 || String(state.steamId) !== String(steamId64)) return null;
+    if (!state.fetchedAt || now - state.fetchedAt > OWNER_PRICE_MAX_AGE_MS) return null;
+    if (!(rate > 0)) return null;
+    const out = new Map();
+    for (const it of state.items || []) {
+        const som = Math.floor(it.priceUsd * rate);
+        if (som > 0) out.set(String(it.assetId), som);
+    }
+    return out;
+}
+
+async function getOwnerPricesSom(steamId64, rate) {
+    const { readDoc } = require("./database/db");
+    const state = await readDoc(STATE_ID).catch(() => null);
+    return ownerPricesSom(state, steamId64, rate);
+}
+
+module.exports = { STATE_ID, REQ_ID, parseCookie, envValue, summarize, lisGet, fetchState, ownerPricesSom, getOwnerPricesSom };

@@ -1369,7 +1369,16 @@ app.get("/api/instant-sell/quote", auth, async (req, res) => {
         try { prices = await lisSkinsPrice.getInstantSellPricesSom(names); }
         catch (err) { console.log("LIS PRICE ERROR:", err.message); }
     }
-    res.json({ ...base, steamConnected: true, items: items.map(it => sellItemView(it, prices)) });
+    // Lis cookie egasi — Lis avtosell narxining o'zi (lisAutosell.ownerPricesSom).
+    const ownerPrices = await lisAutosell.getOwnerPricesSom(u.steamId64, lisSkinsPrice.getUsdToSomRate());
+    res.json({
+        ...base, steamConnected: true, lisAutosellPrices: !!ownerPrices,
+        items: items.map(it => {
+            const v = sellItemView(it, prices);
+            const own = ownerPrices?.get(v.assetId);
+            return own ? { ...v, priceSom: own } : v;
+        }),
+    });
 });
 
 // POST /api/instant-sell — { assetIds: [...] } — tanlangan skinlarni sotish
@@ -1411,7 +1420,8 @@ app.post("/api/instant-sell", auth, async (req, res) => {
     });
 
     let result;
-    try { result = await instantSellManager.createSellRequest(u.id, items); }
+    const priceByAsset = await lisAutosell.getOwnerPricesSom(u.steamId64, lisSkinsPrice.getUsdToSomRate());
+    try { result = await instantSellManager.createSellRequest(u.id, items, { priceByAsset }); }
     catch (err) { return res.status(500).json({ error: err.message }); }
     if (result.error) {
         return res.status(400).json({ error: INSTANT_SELL_ERRORS[result.error] || result.error, code: result.error, assetIds: result.assetIds });

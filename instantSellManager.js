@@ -60,14 +60,18 @@ function nextId(existing) {
 }
 
 // items: [{ assetId, marketHashName, name, imageUrl?, float? }]
-async function createSellRequest(userId, items) {
+// priceByAsset: Map(assetId -> so'm) — Lis avtosell narxi (faqat Lis cookie
+// egasi uchun, lisAutosell.ownerPricesSom); bor bo'lsa formula o'rniga shu.
+async function createSellRequest(userId, items, { priceByAsset = null } = {}) {
     if (!isLisConfigured()) return { error: "no_key" };
     if (!Array.isArray(items) || !items.length) return { error: "empty" };
     if (items.length > MAX_ITEMS_PER_REQUEST) return { error: "too_many" };
 
     // Tashqi I/O (Lis) — tranzaksiyadan TASHQARIDA (fn qayta ishga tushishi mumkin).
-    const prices = await getInstantSellPricesSom(items.map(i => i.marketHashName));
-    const missing = items.filter(i => !Number.isFinite(prices.get(i.marketHashName)));
+    const fixed = (i) => priceByAsset?.get(String(i.assetId));
+    const byName = await getInstantSellPricesSom(items.filter(i => !Number.isFinite(fixed(i))).map(i => i.marketHashName));
+    const priceOf = (i) => Number.isFinite(fixed(i)) ? fixed(i) : byName.get(i.marketHashName);
+    const missing = items.filter(i => !Number.isFinite(priceOf(i)));
     if (missing.length) return { error: "price_not_found", assetIds: missing.map(i => String(i.assetId)) };
 
     const priced = items.map(i => ({
@@ -76,7 +80,7 @@ async function createSellRequest(userId, items) {
         name: i.name ?? i.marketHashName,
         imageUrl: i.imageUrl ?? null,
         float: Number.isFinite(i.float) ? i.float : null,
-        priceSom: prices.get(i.marketHashName),
+        priceSom: priceOf(i),
     }));
     const totalSom = priced.reduce((s, i) => s + i.priceSom, 0);
 
