@@ -4,7 +4,7 @@ const helmet      = require("helmet");
 const rateLimit   = require("express-rate-limit");
 const crypto  = require("crypto");
 const path    = require("path");
-const { read, write, refresh } = require("./database/db");
+const { read, write, refresh, readDoc, writeDoc } = require("./database/db");
 const { fetchInventory, fetchUserInventory, fetchCommunityInventory, steamApisGet } = require("./steam");
 const inventoryBridge = require("./inventoryBridge");
 const { createPendingAuth, peekPendingAuth, consumePendingAuth, getSteamAuth, steamConnectedHtml } = require("./auth-steam");
@@ -30,6 +30,7 @@ const { trySendAutoOffer, maybeCheckPendingWithdrawals } = require("./withdrawDe
 const supportManager = require("./supportManager");
 const instantSellManager = require("./instantSellManager");
 const lisSkinsPrice = require("./lisSkinsPrice");
+const lisAutosell = require("./lisAutosell");
 
 const app  = express();
 const PORT = process.env.WEBAPP_PORT || 3000;
@@ -2246,6 +2247,19 @@ app.post("/api/admin/instant-sell/:id/reject", requireAdminPanel, async (req, re
     if (result.error) return res.status(400).json({ error: result.error });
     notifyUser(result.request.userId, instantSellManager.rejectedText(result.request), tgSendMessage);
     res.json({ request: result.request });
+});
+
+// ── ADMIN: Lis avtosell (narxlarni egasining kompyuteridagi lisAutosellSync.js yozadi) ──
+
+app.get("/api/admin/lis-autosell", requireAdminPanel, async (req, res) => {
+    const state = await readDoc(lisAutosell.STATE_ID).catch(() => null);
+    const pending = !!(await readDoc(lisAutosell.REQ_ID).catch(() => null));
+    res.json({ state, pending, rate: lisSkinsPrice.getUsdToSomRate(), now: Date.now() });
+});
+
+app.post("/api/admin/lis-autosell/refresh", requireAdminPanel, async (req, res) => {
+    await writeDoc(lisAutosell.REQ_ID, { at: Date.now() });
+    res.json({ ok: true });
 });
 
 // ── ADMIN: Sozlamalar ─────────────────────────────────────────────────────────

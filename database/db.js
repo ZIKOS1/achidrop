@@ -22,8 +22,8 @@ async function connect() {
     console.log("✅ MongoDB ulandi");
 
     const docs = await Store.find({}).lean();
-    // inv_/invReq_ (inventoryBridge), steamAuth_ (auth-steam), sess_/admsess_ (tokenStore) — keshga kerak emas.
-    for (const doc of docs) if (!/^(inv(Req)?|steamAuth|sess|admsess)_/.test(doc._id)) cache[doc._id] = doc.data;
+    // inv_/invReq_ (inventoryBridge), steamAuth_ (auth-steam), sess_/admsess_ (tokenStore), lisAuto_ (lisAutosell) — keshga kerak emas.
+    for (const doc of docs) if (!/^(inv(Req)?|steamAuth|sess|admsess|lisAuto)_/.test(doc._id)) cache[doc._id] = doc.data;
     console.log("✅ Ma'lumotlar keshga yuklandi:", Object.keys(cache).join(", ") || "(bo'sh)");
 
     // Websaytdan Steam orqali (Telegramsiz) kiruvchi foydalanuvchilar qo'shilishi
