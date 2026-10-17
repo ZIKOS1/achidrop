@@ -59,7 +59,7 @@ function Tick({ on }) {
 function SkinCard({ item, selected, disabled, priced, onToggle, index = 0 }) {
   const rColor = rarityColor(item.rarity, item.name);
   const lockDays = item.lockedUntil ? Math.max(1, Math.ceil((Date.parse(item.lockedUntil) - Date.now()) / 86400000)) : 0;
-  const tag = !item.tradable ? (lockDays ? t("sellx.lockDays", { n: lockDays }) : t("sell.locked")) : !priced ? t("sell.noPrice") : null;
+  const tag = item.sellable === false ? t("sell.notSellable") : !item.tradable ? (lockDays ? t("sellx.lockDays", { n: lockDays }) : t("sell.locked")) : !priced ? t("sell.noPrice") : null;
   return (
     <button
       type="button"
@@ -89,7 +89,7 @@ function SkinCard({ item, selected, disabled, priced, onToggle, index = 0 }) {
           <span className="whitespace-nowrap font-heading text-[15px] font-semibold tabular-nums text-foreground">{priced ? fmtMoney(item.priceSom) : "—"}</span>
           {tag && (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--row-sel)] px-2 py-0.5 text-[10px] font-semibold text-primary">
-              {!item.tradable && <Lock className="size-2.5" />}
+              {!item.tradable && item.sellable !== false && <Lock className="size-2.5" />}
               {tag}
             </span>
           )}
@@ -347,8 +347,9 @@ export default function Sell() {
     if (category !== "all") list = list.filter((i) => sellCategory(i.marketHashName || i.name) === category);
     const byPrice = sort === "asc" ? (a, b) => (a.priceSom || 0) - (b.priceSom || 0) : (a, b) => (b.priceSom || 0) - (a.priceSom || 0);
     const cmp = sort === "name" ? (a, b) => a.name.localeCompare(b.name) : byPrice;
-    // Sotiladiganlari doim oldinda.
-    return [...list].sort((a, b) => (sellable(b) - sellable(a)) || cmp(a, b));
+    // Sotiladiganlari doim oldinda, umuman sotilmaydiganlar (medal, coin...) eng oxirida.
+    const rank = (it) => (sellable(it) ? 2 : it.sellable === false ? 0 : 1);
+    return [...list].sort((a, b) => (rank(b) - rank(a)) || cmp(a, b));
   }, [items, query, category, sort, quote?.lisConfigured]);
 
   // Filtr/qidiruv/saralash o'zgarsa yana birinchi 20 tadan boshlanadi.

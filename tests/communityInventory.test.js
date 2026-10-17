@@ -72,10 +72,15 @@ test("parseCommunityInventory: Steam nomi Lis narxi uchun to'g'ridan-to'g'ri oli
 
 test("parseCommunityInventory: bir xil classid'li ikki skin ikkita alohida item, lock va sotib bo'lmaydiganlar belgilanadi", () => {
     const items = steam.parseCommunityInventory(body);
-    assert.deepEqual(items.map(i => i.assetId), ["111", "222", "333", "555", "666"]);
+    assert.deepEqual(items.map(i => i.assetId), ["111", "222", "333", "444", "555", "666", "777"]);
     assert.equal(items.find(i => i.assetId === "222").tradable, false);
-    // marketable:0 (medal va h.k.) — umuman sotib bo'lmaydi, ro'yxatga kirmaydi
-    assert.equal(items.some(i => i.assetId === "444"), false);
+    // medal va ishlatilgan graffiti — ko'rsatiladi, lekin sotib bo'lmaydi
+    for (const id of ["444", "777"]) {
+        const it = items.find(i => i.assetId === id);
+        assert.equal(it.sellable, false);
+        assert.equal(it.tradable, false);
+    }
+    for (const id of ["111", "555", "666"]) assert.equal(items.find(i => i.assetId === id).sellable, true);
 });
 
 test("parseCommunityInventory: trade hold'dagi skin qulf bilan ko'rsatiladi, ochilish sanasi o'qiladi", () => {

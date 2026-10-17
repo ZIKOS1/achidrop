@@ -70,10 +70,9 @@ const COMMUNITY_IMG = "https://community.akamai.steamstatic.com/economy/image/";
 const WEAR_BY_TAG = { WearCategory0: "FN", WearCategory1: "MW", WearCategory2: "FT", WearCategory3: "WW", WearCategory4: "BS" };
 const communityInvCache = new Map(); // steamId64 -> { data, ts }
 
-// Sof funksiya (testlanadi). marketable:0 itemlar (medal, coin va h.k.)
-// umuman sotib bo'lmagani uchun tashlab yuboriladi.
-// Trade hold'dagi skin ham sotiladigan tur bo'lsa ko'rsatamiz (medal, coin,
-// storage unit, ishlatilgan graffiti va h.k. — yo'q).
+// Sof funksiya (testlanadi). Inventardagi hamma narsa qaytariladi.
+// `sellable`: sotiladigan tur yoki trade hold'dagi skin — true; medal, coin,
+// storage unit, ishlatilgan graffiti va h.k. — false (faqat ko'rsatiladi).
 const SELLABLE_TYPES = new Set([
     "CSGO_Type_Pistol", "CSGO_Type_SMG", "CSGO_Type_Rifle", "CSGO_Type_SniperRifle",
     "CSGO_Type_Shotgun", "CSGO_Type_Machinegun", "CSGO_Type_Knife", "Type_Hands",
@@ -107,7 +106,9 @@ function parseCommunityInventory(body) {
         // olingan skin (Steam trade hold / trade protection, 7–8 kun). Ikkinchisi
         // ko'rsatiladi (qulf bilan), birinchisi tashlab yuboriladi.
         const lockedUntil = d.marketable ? null : holdEndsAt(d);
-        if (!d.marketable && !lockedUntil && !SELLABLE_TYPES.has(tags.find(t => t.category === "Type")?.internal_name)) continue;
+        // Sotilmaydiganlar (medal, coin, graffiti...) ham ko'rsatiladi — user
+        // inventari to'liq ko'rinsin — lekin `sellable:false` bilan, tanlab bo'lmaydi.
+        const sellable = !!d.marketable || !!lockedUntil || SELLABLE_TYPES.has(tags.find(t => t.category === "Type")?.internal_name);
         const exterior = tags.find(t => t.category === "Exterior");
         const rarity = tags.find(t => t.category === "Rarity");
         items.push({
@@ -119,6 +120,7 @@ function parseCommunityInventory(body) {
             image: d.icon_url ? `${COMMUNITY_IMG}${d.icon_url}/256fx256f` : null,
             rarity: rarity ? rarity.localized_tag_name : null,
             tradable: !!d.tradable && !!d.marketable,
+            sellable,
             lockedUntil,
             stickers: [],
         });
