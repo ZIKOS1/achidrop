@@ -5,7 +5,7 @@ const rateLimit   = require("express-rate-limit");
 const crypto  = require("crypto");
 const path    = require("path");
 const { read, write, refresh, readDoc, writeDoc } = require("./database/db");
-const { fetchInventory, fetchUserInventory, fetchCommunityInventory, steamApisGet } = require("./steam");
+const { fetchInventory, fetchUserInventory, fetchCommunityInventory, communityInventoryMeta, steamApisGet } = require("./steam");
 const inventoryBridge = require("./inventoryBridge");
 const { createPendingAuth, peekPendingAuth, consumePendingAuth, getSteamAuth, steamConnectedHtml } = require("./auth-steam");
 const { createPendingLogin, consumePendingLogin } = require("./auth-telegram-login");
@@ -1310,17 +1310,17 @@ function mdEscape(text) {
 // Har safar Steam'dan YANGI inventar olinadi — eski nusxa yoki zaxira
 // ko'rsatilmaydi. SteamApis vaqtincha xato bersa (code 305 / 5xx / tarmoq),
 // 2 marta qayta uriniladi; baribir bo'lmasa — xato userga ko'rsatiladi.
-async function getSellInventory(steamId64, force) {
+async function getSellInventory(steamId64, force, token) {
     if (!process.env.STEAMAPIS_KEY) return inventoryBridge.requestInventory(steamId64, { force }, inventoryBridge.mongoDeps());
     try {
-        return await fetchCommunityInventory(steamId64, force, steamApisGet);
+        return await fetchCommunityInventory(steamId64, force, steamApisGet, { token });
     } catch (err) {
         console.log("SELL INVENTORY (SteamApis) ERROR:", steamId64, err.message);
         // Vaqtinchalik xato (Steam/SteamApis javob bermadi, tarmoq) — 2 marta qayta urinamiz.
         if (!/javob bermayapti|fetch failed|abort|timeout/i.test(err.message)) throw err;
         for (const wait of [1500, 3500]) {
             await new Promise((r) => setTimeout(r, wait));
-            try { return await fetchCommunityInventory(steamId64, true, steamApisGet); }
+            try { return await fetchCommunityInventory(steamId64, true, steamApisGet, { token }); }
             catch (e2) { console.log("SELL INVENTORY retry ERROR:", steamId64, e2.message); if (wait === 3500) throw e2; }
         }
     }
@@ -1359,7 +1359,7 @@ app.get("/api/instant-sell/quote", auth, async (req, res) => {
     if (!u.steamId64) return res.json({ ...base, steamConnected: false, items: [] });
 
     let items;
-    try { items = await getSellInventory(u.steamId64, req.query.refresh === "1"); }
+    try { items = await getSellInventory(u.steamId64, req.query.refresh === "1", u.steamInvToken || null); }
     catch (err) { return res.status(500).json({ error: err.message }); }
 
     let prices = null;
@@ -1378,7 +1378,26 @@ app.get("/api/instant-sell/quote", auth, async (req, res) => {
             const own = ownerPrices?.get(v.assetId);
             return own ? { ...v, priceSom: own } : v;
         }),
+        // Steam yashirgan (trade-himoyasidagi) skinlar soni + token holati.
+        hiddenCount: communityInventoryMeta(u.steamId64).hiddenCount,
+        hasInvToken: !!u.steamInvToken,
     });
+});
+
+// POST /api/steam-inv-token — { token } — Steam inventar access-token'i.
+// Berilsa trade-himoyasidagi skinlar ham ko'rinadi (getSellInventory).
+// bo'sh "" — tokenni o'chiradi. Token oddiy API kalit kabi saqlanadi.
+app.post("/api/steam-inv-token", auth, (req, res) => {
+    const u = req.user;
+    if (!u) return res.status(404).json({ error: "User not found" });
+    const raw = String(req.body.token ?? "").trim();
+    if (raw && !/^[A-Za-z0-9_-]{6,64}$/.test(raw)) return res.status(400).json({ error: "Token formati noto'g'ri" });
+    const arr = getUsers();
+    const user = arr.find(x => x.id === u.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    user.steamInvToken = raw || null;
+    saveUsers(arr);
+    res.json({ success: true, hasInvToken: !!raw });
 });
 
 // POST /api/instant-sell — { assetIds: [...] } — tanlangan skinlarni sotish
@@ -1406,7 +1425,7 @@ app.post("/api/instant-sell", auth, async (req, res) => {
     if (assetIds.length > instantSellManager.MAX_ITEMS_PER_REQUEST) return res.status(400).json({ error: INSTANT_SELL_ERRORS.too_many, code: "too_many" });
 
     let inv;
-    try { inv = await getSellInventory(u.steamId64, false); }
+    try { inv = await getSellInventory(u.steamId64, false, u.steamInvToken || null); }
     catch (err) { return res.status(500).json({ error: err.message }); }
     const byId = new Map(inv.map(it => [String(it.assetId), it]));
     const notFound = assetIds.filter(a => !byId.has(a));

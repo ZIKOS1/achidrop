@@ -98,3 +98,37 @@ test("parseCommunityInventory: bo'sh yoki buzilgan javob bo'sh ro'yxat", () => {
     assert.deepEqual(steam.parseCommunityInventory(null), []);
     assert.deepEqual(steam.parseCommunityInventory({ success: 1 }), []);
 });
+
+// ── fetchCommunityInventory: yashirin son + token bilan "16" bo'limi ──────────
+function fakeGet(pages) {
+    // pages: { "2": body, "16": body|blocked }
+    return async (url) => {
+        const ctx = url.match(/\/730\/(\d+)/)[1];
+        const p = pages[ctx];
+        if (p === undefined) return { status: 200, text: "" };
+        return { status: 200, text: JSON.stringify(p) };
+    };
+}
+const oneAsset = (id, total) => ({
+    total_inventory_count: total,
+    assets: [{ appid: 730, contextid: "2", assetid: id, classid: "k" + id, instanceid: "0", amount: "1" }],
+    descriptions: [{ classid: "k" + id, instanceid: "0", tradable: 1, marketable: 1, name: "Case " + id, market_hash_name: "Case " + id, icon_url: "IC", tags: [] }],
+});
+
+test("fetchCommunityInventory: token yo'q — yashirin son hisoblanadi", async () => {
+    const items = await steam.fetchCommunityInventory("sidA", true, fakeGet({ "2": oneAsset("1", 3) }));
+    assert.equal(items.length, 1);
+    assert.deepEqual(steam.communityInventoryMeta("sidA"), { totalCount: 3, hiddenCount: 2 });
+});
+
+test("fetchCommunityInventory: token bilan '16' qo'shiladi, yashirin kamayadi", async () => {
+    const items = await steam.fetchCommunityInventory("sidB", true, fakeGet({ "2": oneAsset("1", 3), "16": oneAsset("2", 1) }), { token: "tok123" });
+    assert.deepEqual(items.map(i => i.assetId).sort(), ["1", "2"]);
+    assert.equal(steam.communityInventoryMeta("sidB").hiddenCount, 2); // total 3+1=4, shown 2
+});
+
+test("fetchCommunityInventory: '16' egasiga yopiq (rwgrsn) — jim o'tadi", async () => {
+    const items = await steam.fetchCommunityInventory("sidC", true, fakeGet({ "2": oneAsset("1", 2), "16": { success: 1, rwgrsn: -2 } }), { token: "bad" });
+    assert.equal(items.length, 1);
+    assert.equal(steam.communityInventoryMeta("sidC").hiddenCount, 1);
+});

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Banknote, Check, CheckCircle2, ChevronDown, Clock, Copy, Crown, ExternalLink, Lock, Package, RefreshCw, Search, X, XCircle } from "lucide-react";
+import { Banknote, Check, CheckCircle2, ChevronDown, Clock, Copy, Crown, ExternalLink, EyeOff, Lock, Package, RefreshCw, Search, X, XCircle } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
 import { imgSrc, fmtMoney, hap, rarityColor } from "../utils";
@@ -255,6 +255,84 @@ function EmptyState({ icon: Icon, title, desc, children, tone = "gold" }) {
       <p className="text-sm font-semibold text-foreground">{title}</p>
       {desc && <p className="max-w-xs text-xs leading-relaxed text-muted-foreground">{desc}</p>}
       {children && <div className="mt-2">{children}</div>}
+    </div>
+  );
+}
+
+// Steam yaqinda olingan skinlarni (trade-himoya) ommaviy inventardan yashiradi
+// — ular faqat egasining "inventar tokeni" bilan ko'rinadi. Shu bannerda son
+// ko'rsatiladi va token kiritish taklif qilinadi.
+function HiddenItemsBanner({ count, hasToken, steamId, onSaved, showToast }) {
+  const [open, setOpen] = useState(false);
+  const [token, setToken] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function save(value) {
+    setSaving(true);
+    try {
+      await api("/api/steam-inv-token", { method: "POST", body: JSON.stringify({ token: value }) });
+      showToast(value ? "Token saqlandi, inventar yangilanmoqda…" : "Token o'chirildi", "ok");
+      setOpen(false);
+      onSaved();
+    } catch (e) {
+      showToast(e?.error || "Xato", "err");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-3">
+      <div className="flex items-start gap-2.5">
+        <EyeOff className="mt-0.5 size-4 shrink-0 text-amber-500" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-medium text-foreground">
+            {count} ta skin Steam himoyasida — ko'rinmayapti
+          </p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+            Yaqinda savdo orqali olingan skinlarni Steam vaqtincha yashiradi. Ularni ko'rsatish uchun Steam "inventar tokeni"ni kiriting (bir marta).
+          </p>
+          {!open ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button type="button" onClick={() => setOpen(true)} className="rounded-lg bg-amber-500/90 px-3 py-1.5 text-[12px] font-semibold text-black hover:bg-amber-500">
+                {hasToken ? "Tokenni yangilash" : "Token kiritish"}
+              </button>
+              {hasToken && (
+                <button type="button" disabled={saving} onClick={() => save("")} className="rounded-lg border border-border px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-50">
+                  O'chirish
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="mt-2 space-y-2">
+              <ol className="list-decimal space-y-0.5 pl-4 text-[11px] text-muted-foreground">
+                <li>Steam ilovasida profilingiz → <b>Inventory</b> → o'ng yuqoridagi <b>⚙︎</b> (sozlama).</li>
+                <li><b>Share inventory link</b> / <b>Copy link</b> ni bosing.</li>
+                <li>Havoladagi <code>access_token=</code> dan keyingi qismni shu yerga joylang.</li>
+              </ol>
+              <input
+                value={token}
+                onChange={(e) => setToken(e.target.value.trim())}
+                placeholder="access_token qiymati"
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-[12px] text-foreground outline-none focus:border-primary"
+              />
+              <div className="flex gap-2">
+                <button type="button" disabled={saving || !token} onClick={() => save(token)} className="rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-primary-foreground disabled:opacity-50">
+                  {saving ? "…" : "Saqlash"}
+                </button>
+                <button type="button" onClick={() => setOpen(false)} className="rounded-lg border border-border px-3 py-1.5 text-[12px] text-muted-foreground">
+                  Bekor
+                </button>
+                {steamId && (
+                  <a href={`https://steamcommunity.com/profiles/${steamId}/inventory/`} target="_blank" rel="noreferrer" className="ml-auto flex items-center gap-1 text-[12px] text-primary hover:underline">
+                    Steam inventar <ExternalLink className="size-3" />
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -537,6 +615,10 @@ export default function Sell() {
               </button>
             </div>
             {query && !loading && <p className="-mt-1 px-1 text-[11px] text-muted-foreground">{visible.length ? t("sellx.found", { n: visible.length }) : <span className="text-destructive">{t("sellx.notFound")}</span>}</p>}
+
+            {quote?.steamConnected && quote?.hiddenCount > 0 && (
+              <HiddenItemsBanner count={quote.hiddenCount} hasToken={quote.hasInvToken} steamId={user.steamId64} onSaved={() => load(true)} showToast={showToast} />
+            )}
 
             {/* Filtr chiplari (03) */}
             {items.length > 0 && (

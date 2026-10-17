@@ -167,34 +167,70 @@ function steamApisGet(url) {
 
 let steamBusyUntil = 0;
 
-async function fetchCommunityInventory(steamId64, force = false, get = fetchGet) {
-    if (!steamId64) throw new Error("Steam hisobingiz ulanmagan");
-    const cached = communityInvCache.get(steamId64);
-    if (!force && cached && Date.now() - cached.ts < CACHE_MS) return cached.data;
+// Steam "jami" (total_inventory_count) qancha skin borligini aytadi, lekin
+// trade-himoyasidagi (yaqinda olingan) skinlarni OMMAGA bermaydi — ular
+// alohida "16" bo'limida, faqat egasiga (yoki egasining access_token'i bilan)
+// ko'rinadi. Shu sabab ochiq "2" bo'limidan kelgan skinlar soni Steam aytgan
+// "jami"dan kam bo'lishi mumkin. Farqni (`hiddenCount`) UI'da ko'rsatamiz;
+// token berilsa "16" ham olinib qo'shiladi.
+function communityInventoryMeta(steamId64) {
+    const c = communityInvCache.get(steamId64);
+    return c ? { totalCount: c.totalCount ?? c.data.length, hiddenCount: c.hiddenCount ?? 0 } : { totalCount: 0, hiddenCount: 0 };
+}
 
+// Bitta bo'limni (2 yoki 16) to'liq o'qiydi. { items, totalCount } yoki
+// protected bo'limi egasiga yopiq bo'lsa (token yo'q/xato) { blocked:true }.
+async function fetchInventoryContext(steamId64, contextId, get, token) {
     const items = [];
-    let start = null;
+    let start = null, totalCount = 0;
     for (let page = 0; page < 5; page++) {
-        const url = `https://steamcommunity.com/inventory/${steamId64}/730/2?l=english&count=2000${start ? `&start_assetid=${start}` : ""}`;
-        // 429 dan keyin qayta urinish IP cheklovini uzaytiradi — 1 daqiqa umuman so'ramaymiz.
+        const q = `l=english&count=2000${token ? `&access_token=${encodeURIComponent(token)}` : ""}${start ? `&start_assetid=${start}` : ""}`;
+        const url = `https://steamcommunity.com/inventory/${steamId64}/730/${contextId}?${q}`;
         if (Date.now() < steamBusyUntil) throw new Error("Steam hozir band, 1-2 daqiqadan keyin urinib ko'ring");
         const resp = await get(url);
-        if (resp.status === 429) steamBusyUntil = Date.now() + 60_000;
+        if (resp.status === 429) { steamBusyUntil = Date.now() + 60_000; throw new Error("Steam hozir band, 1-2 daqiqadan keyin urinib ko'ring"); }
         if (resp.status === 403) throw new Error("Steam inventaringiz yopiq (private). Uni Steam sozlamalarida ochiq (public) qiling");
-        if (resp.status === 429) throw new Error("Steam hozir band, 1-2 daqiqadan keyin urinib ko'ring");
-        // SteamApis Steam'dan ololmasa 400 + code 305 qaytaradi (odatda 1 daqiqa ichida o'tib ketadi).
         if (resp.status >= 500 || (resp.status === 400 && /"code"\s*:\s*305|try again later/i.test(resp.text || ""))) {
             throw new Error("Steam hozir javob bermayapti. Bir necha soniyadan keyin «Yangilash»ni bosing");
         }
         if (resp.status < 200 || resp.status >= 300) throw new Error(`Steam xato qaytardi (HTTP ${resp.status})`);
         let body = null;
         try { body = JSON.parse(resp.text); } catch {}
-        if (!body) break; // bo'sh inventar Steam'da bo'sh javob qaytaradi
+        if (!body) break;                                   // bo'sh inventar
+        if (body.success && body.rwgrsn === -2) return { blocked: true };  // protected, egasiga yopiq
+        totalCount = body.total_inventory_count || totalCount;
         items.push(...parseCommunityInventory(body));
         if (!body.more_items || !body.last_assetid) break;
         start = body.last_assetid;
     }
-    communityInvCache.set(steamId64, { data: items, ts: Date.now() });
+    return { items, totalCount };
+}
+
+// token berilsa trade-himoyasidagi "16" bo'limi ham qo'shiladi (xato bo'lsa
+// jim o'tkaziladi — ochiq skinlar baribir ko'rsatiladi). hiddenCount keshga
+// yoziladi: Steam aytgan jami − biz ko'rsatayotgan son.
+async function fetchCommunityInventory(steamId64, force = false, get = fetchGet, { token } = {}) {
+    if (!steamId64) throw new Error("Steam hisobingiz ulanmagan");
+    const cached = communityInvCache.get(steamId64);
+    if (!force && cached && Date.now() - cached.ts < CACHE_MS) return cached.data;
+
+    const main = await fetchInventoryContext(steamId64, 2, get, null);
+    const byId = new Map(main.items.map(i => [i.assetId, i]));
+    let totalCount = main.totalCount || main.items.length;
+
+    if (token) {
+        try {
+            const prot = await fetchInventoryContext(steamId64, 16, get, token);
+            if (!prot.blocked && prot.items) {
+                for (const it of prot.items) if (!byId.has(it.assetId)) byId.set(it.assetId, it);
+                totalCount += prot.totalCount || prot.items.length;
+            }
+        } catch (err) { console.log("PROTECTED INV (16) ERROR:", steamId64, err.message); }
+    }
+
+    const items = [...byId.values()];
+    const hiddenCount = Math.max(0, totalCount - items.length);
+    communityInvCache.set(steamId64, { data: items, ts: Date.now(), totalCount, hiddenCount });
     return items;
 }
 
@@ -208,4 +244,4 @@ async function fetchInventory(force = false) {
     return body;
 }
 
-module.exports = { fetchInventory, fetchUserInventory, fetchCommunityInventory, parseCommunityInventory, curlGet, steamApisGet };
+module.exports = { fetchInventory, fetchUserInventory, fetchCommunityInventory, communityInventoryMeta, parseCommunityInventory, curlGet, steamApisGet };
