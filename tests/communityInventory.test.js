@@ -138,3 +138,28 @@ test("fetchCommunityInventory: '2' egasiga yopiq bo'lsa ham ishlaydi (bo'sh)", a
     assert.deepEqual(items, []);
     assert.equal(steam.communityInventoryMeta("sidD").hiddenCount, 0);
 });
+
+// ── steamwebapi parser (trade-himoyadagi skinlar bilan) ──────────────────────
+test("parseWebApiInventory: maydonlar to'g'ri, medal sotilmaydi deб belgilanadi", () => {
+    const out = steam.parseWebApiInventory([
+        { assetid: "1", markethashname: "AK-47 | Redline (Field-Tested)", marketname: "AK-47 | Redline", wear: "ft", float: { floatvalue: 0.25 }, image: "https://img/x", rarity: "Classified", tradable: true, marketable: true, owneronly: true },
+        { assetid: "2", markethashname: "5 Year Veteran Coin", marketname: "5 Year Veteran Coin", tradable: false, marketable: false, image: "https://img/y" },
+        { markethashname: "NoAsset" }, // assetid yo'q — tashlanadi
+    ]);
+    assert.equal(out.length, 2);
+    const ak = out[0];
+    assert.equal(ak.assetId, "1");
+    assert.equal(ak.marketHashName, "AK-47 | Redline (Field-Tested)");
+    assert.equal(ak.wear, "FT");
+    assert.equal(ak.float, 0.25);
+    assert.equal(ak.tradable, true);
+    assert.equal(ak.sellable, true);
+    const coin = out[1];
+    assert.equal(coin.sellable, false);   // marketable:false → sotilmaydi
+    assert.equal(coin.tradable, false);
+});
+
+test("parseWebApiInventory: massiv bo'lmasa bo'sh", () => {
+    assert.deepEqual(steam.parseWebApiInventory({ error: "limit" }), []);
+    assert.deepEqual(steam.parseWebApiInventory(null), []);
+});

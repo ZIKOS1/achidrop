@@ -5,7 +5,7 @@ const rateLimit   = require("express-rate-limit");
 const crypto  = require("crypto");
 const path    = require("path");
 const { read, write, refresh, readDoc, writeDoc } = require("./database/db");
-const { fetchInventory, fetchUserInventory, fetchCommunityInventory, communityInventoryMeta, steamApisGet } = require("./steam");
+const { fetchInventory, fetchUserInventory, fetchCommunityInventory, communityInventoryMeta, steamWebApiInventory, steamApisGet } = require("./steam");
 const inventoryBridge = require("./inventoryBridge");
 const { createPendingAuth, peekPendingAuth, consumePendingAuth, getSteamAuth, steamConnectedHtml } = require("./auth-steam");
 const { createPendingLogin, consumePendingLogin } = require("./auth-telegram-login");
@@ -1311,6 +1311,9 @@ function mdEscape(text) {
 // ko'rsatilmaydi. SteamApis vaqtincha xato bersa (code 305 / 5xx / tarmoq),
 // 2 marta qayta uriniladi; baribir bo'lmasa — xato userga ko'rsatiladi.
 async function getSellInventory(steamId64, force, token) {
+    // steamwebapi — trade-himoyadagi (yaqinda olingan/qimmat) skinlarni ham
+    // beradi; kaliti bo'lsa birinchi shu ishlatiladi.
+    if (process.env.STEAMWEBAPI_KEY) return steamWebApiInventory(steamId64, force);
     if (!process.env.STEAMAPIS_KEY) return inventoryBridge.requestInventory(steamId64, { force }, inventoryBridge.mongoDeps());
     try {
         return await fetchCommunityInventory(steamId64, force, steamApisGet, { token });

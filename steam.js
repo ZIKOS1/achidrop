@@ -240,6 +240,67 @@ async function fetchCommunityInventory(steamId64, force = false, get = fetchGet,
     return items;
 }
 
+// ── steamwebapi.com — trade-himoyadagi (yaqinda olingan) skinlarni ham beradi ──
+// Steam ommaviy inventarga qo'ymaydigan `owneronly` skinlarni ham qaytaradi
+// (`try_first_seven_days_blocked_items=1`), shuning uchun STEAMWEBAPI_KEY
+// bo'lsa Skin sotish inventari shu yerdan olinadi. Bitta so'rov = butun
+// inventar. Javob — item massivi yoki { error } (limit/xato).
+const WEBAPI_WEAR = { fn: "FN", mw: "MW", ft: "FT", ww: "WW", bs: "BS" };
+
+function parseWebApiInventory(arr) {
+    if (!Array.isArray(arr)) return [];
+    const items = [];
+    for (const it of arr) {
+        const mhn = it.markethashname || it.marketname;
+        if (!it.assetid || !mhn) continue;
+        const marketable = it.marketable !== false && it.marketable !== 0;
+        const tradable = it.tradable !== false && it.tradable !== 0;
+        items.push({
+            assetId: String(it.assetid),
+            name: it.marketname || mhn,
+            marketHashName: mhn,
+            wear: it.wear ? (WEBAPI_WEAR[String(it.wear).toLowerCase()] || null) : null,
+            float: it.float && Number.isFinite(it.float.floatvalue) ? it.float.floatvalue : null,
+            image: it.image || null,
+            rarity: it.rarity || null,
+            // medal/coin/graffiti (marketable:false) — sotilmaydi, lekin ko'rsatiladi.
+            tradable: tradable && marketable,
+            sellable: marketable,
+            lockedUntil: null,
+            stickers: [],
+        });
+    }
+    return items;
+}
+
+const webApiCache = new Map(); // steamId64 -> { data, ts }
+
+async function steamWebApiInventory(steamId64, force = false) {
+    if (!steamId64) throw new Error("Steam hisobingiz ulanmagan");
+    const key = process.env.STEAMWEBAPI_KEY;
+    if (!key) throw new Error("STEAMWEBAPI_KEY sozlanmagan");
+    const cached = webApiCache.get(steamId64);
+    if (!force && cached && Date.now() - cached.ts < CACHE_MS) return cached.data;
+
+    const url = `https://www.steamwebapi.com/steam/api/inventory?key=${encodeURIComponent(key)}`
+        + `&steam_id=${encodeURIComponent(steamId64)}&game=cs2&try_first_seven_days_blocked_items=1`;
+    const resp = await fetchGet(url);
+    let body = null;
+    try { body = JSON.parse(resp.text); } catch {}
+    if (body && !Array.isArray(body) && body.error) {
+        if (/limit|requests/i.test(body.error)) throw new Error("Inventar xizmati band (limit). Bir daqiqadan keyin «Yangilash»ni bosing");
+        if (/private|public/i.test(body.error)) throw new Error("Steam inventaringiz yopiq (private). Uni Steam sozlamalarida ochiq qiling");
+        throw new Error("Inventarni hozir yuklab bo'lmadi, keyinroq urinib ko'ring");
+    }
+    if (resp.status < 200 || resp.status >= 300 || !Array.isArray(body)) {
+        throw new Error("Inventarni hozir yuklab bo'lmadi, keyinroq urinib ko'ring");
+    }
+    const items = parseWebApiInventory(body);
+    webApiCache.set(steamId64, { data: items, ts: Date.now() });
+    communityInvCache.set(steamId64, { data: items, ts: Date.now(), totalCount: items.length, hiddenCount: 0 });
+    return items;
+}
+
 async function fetchInventory(force = false) {
     const steamId = getConfiguredSteamId();
     if (!steamId) throw new Error("Steam ID sozlanmagan (.env STEAM_ID64 yoki Admin Panel > Sozlamalar > Steam)");
@@ -250,4 +311,4 @@ async function fetchInventory(force = false) {
     return body;
 }
 
-module.exports = { fetchInventory, fetchUserInventory, fetchCommunityInventory, communityInventoryMeta, parseCommunityInventory, curlGet, steamApisGet };
+module.exports = { fetchInventory, fetchUserInventory, fetchCommunityInventory, communityInventoryMeta, parseCommunityInventory, parseWebApiInventory, steamWebApiInventory, curlGet, steamApisGet };
