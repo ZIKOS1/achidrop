@@ -197,7 +197,10 @@ async function fetchInventoryContext(steamId64, contextId, get, token) {
         let body = null;
         try { body = JSON.parse(resp.text); } catch {}
         if (!body) break;                                   // bo'sh inventar
-        if (body.success && body.rwgrsn === -2) return { blocked: true };  // protected, egasiga yopiq
+        // rwgrsn:-2 — protected bo'lim belgisi, LEKIN javobda skinlar bo'lsa ham
+        // keladi (SteamApis "2" bo'limi bilan shunday). "Yopiq" faqat skinlar
+        // umuman yo'q bo'lsa: aks holda bor skinlarni tashlab yubormaymiz.
+        if (!Array.isArray(body.assets) && body.success && body.rwgrsn === -2) return { blocked: true };
         totalCount = body.total_inventory_count || totalCount;
         items.push(...parseCommunityInventory(body));
         if (!body.more_items || !body.last_assetid) break;
