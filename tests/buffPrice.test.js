@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert");
-const { usdFromFeed, getBuffPricesUsd, _clearCache } = require("../backend/buffPrice");
+const { usdFromFeed, getBuffPricesUsd } = require("../backend/buffPrice");
 const { buffSellPriceSom } = require("../backend/lisSkinsPrice");
 
 const feed = {
@@ -16,19 +16,25 @@ test("usdFromFeed: faqat buy order > 0 bo'lgan nomlar", () => {
     assert.strictEqual(usdFromFeed(null, ["a"]).size, 0);
 });
 
-test("getBuffPricesUsd: feed bir marta yuklanadi va keshlanadi", async () => {
-    _clearCache();
+test("getBuffPricesUsd: har chaqiruvda feed qaytadan yuklanadi (kesh yo'q)", async () => {
     let calls = 0;
     const fake = async () => { calls++; return { ok: true, json: async () => feed }; };
     const a = await getBuffPricesUsd(["AK-47 | Redline (Field-Tested)", null], fake);
     const b = await getBuffPricesUsd(["AK-47 | Redline (Field-Tested)"], fake);
     assert.strictEqual(a.get("AK-47 | Redline (Field-Tested)"), 24.48);
     assert.strictEqual(b.size, 1);
-    assert.strictEqual(calls, 1);
+    assert.strictEqual(calls, 2);
+});
+
+test("getBuffPricesUsd: avval yuklangan bo'lsa ham, keyingi yuklash xato bersa — narx yo'q", async () => {
+    let ok = true;
+    const fake = async () => ok ? { ok: true, json: async () => feed } : { ok: false, status: 503 };
+    assert.strictEqual((await getBuffPricesUsd(["AK-47 | Redline (Field-Tested)"], fake)).size, 1);
+    ok = false;
+    assert.strictEqual((await getBuffPricesUsd(["AK-47 | Redline (Field-Tested)"], fake)).size, 0);
 });
 
 test("getBuffPricesUsd: feed yuklanmasa bo'sh Map (Lis formulasiga qaytadi)", async () => {
-    _clearCache();
     const fake = async () => ({ ok: false, status: 503 });
     const usd = await getBuffPricesUsd(["AK-47 | Redline (Field-Tested)"], fake);
     assert.strictEqual(usd.size, 0);
@@ -44,7 +50,6 @@ test("buffSellPriceSom: SELL_PRICE_RATIO yo'q, faqat marja", () => {
 test("getInstantSellPricesSom: BUFF buy order yo'q nomga narx yo'q (Lis'ga qaytmaydi)", async () => {
     const lis = require("../backend/lisSkinsPrice");
     const buff = require("../backend/buffPrice");
-    _clearCache();
     const orig = global.fetch;
     const urls = [];
     global.fetch = async (url) => {
@@ -59,5 +64,5 @@ test("getInstantSellPricesSom: BUFF buy order yo'q nomga narx yo'q (Lis'ga qaytm
         assert.strictEqual(m.has("No Order"), false);
         assert.strictEqual(m.has("Missing"), false);
         assert.deepStrictEqual(urls, [buff.FEED_URL]);
-    } finally { global.fetch = orig; delete process.env.LIS_SKINS_API_KEY; _clearCache(); }
+    } finally { global.fetch = orig; delete process.env.LIS_SKINS_API_KEY; }
 });
