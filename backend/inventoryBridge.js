@@ -21,13 +21,15 @@ const reqId = (sid) => `invReq_${sid}`;
 const resId = (sid) => `inv_${sid}`;
 
 // Sayt tomoni.
-async function requestInventory(steamId64, { force = false } = {}, deps) {
+async function requestInventory(steamId64, { force = false, token = null } = {}, deps) {
     if (!steamId64) throw new Error("Steam hisobingiz ulanmagan");
     const started = deps.now();
     const cached = await deps.readDoc(resId(steamId64));
     if (!force && cached && !cached.error && started - cached.fetchedAt < FRESH_MS) return cached.items;
 
-    await deps.writeDoc(reqId(steamId64), { at: started, force: !!force });
+    // token — userning Steam access_token'i (trade-himoyadagi "16" bo'limi uchun);
+    // so'rov hujjati bot uni olishi bilan o'chiriladi.
+    await deps.writeDoc(reqId(steamId64), { at: started, force: !!force, token: token || null });
     while (deps.now() - started < WAIT_MS) {
         await deps.sleep(POLL_MS);
         const res = await deps.readDoc(resId(steamId64));
@@ -49,7 +51,7 @@ async function processPendingRequests(deps) {
         const steamId64 = id.slice("invReq_".length);
         let doc;
         try {
-            const items = await deps.fetchInventory(steamId64, req.force);
+            const items = await deps.fetchInventory(steamId64, req.force, req.token || null);
             doc = { items, fetchedAt: deps.now(), error: null };
         } catch (err) {
             console.log(`INVENTAR ${steamId64}: ${err.message}`);

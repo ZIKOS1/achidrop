@@ -25,7 +25,7 @@ async function main() {
         try {
             await inventoryBridge.processPendingRequests({
                 ...inventoryBridge.mongoDeps(),
-                fetchInventory: (sid, force) => fetchCommunityInventory(sid, force, curlGet),
+                fetchInventory: (sid, force, token) => fetchCommunityInventory(sid, force, curlGet, { token }),
             });
         } catch (err) {
             console.log("INVENTAR SO'ROV XATO:", err.message);

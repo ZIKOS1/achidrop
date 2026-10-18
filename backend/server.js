@@ -1326,7 +1326,7 @@ async function getSellInventory(steamId64, force, token) {
         }
         return items;
     }
-    if (!process.env.STEAMAPIS_KEY) return inventoryBridge.requestInventory(steamId64, { force }, inventoryBridge.mongoDeps());
+    if (!process.env.STEAMAPIS_KEY) return inventoryBridge.requestInventory(steamId64, { force, token }, inventoryBridge.mongoDeps());
     try {
         return await fetchCommunityInventory(steamId64, force, steamApisGet, { token });
     } catch (err) {

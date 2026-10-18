@@ -85,3 +85,19 @@ test("bridge: eski natija (so'rovdan oldingi) yangi so'rovga javob deb olinmaydi
     };
     assert.deepEqual(await bridge.requestInventory("765", {}, deps), ITEMS);
 });
+
+test("bridge: inventar tokeni bot'ga yetkaziladi (trade-himoyadagi '16' bo'limi uchun)", async () => {
+    const store = fakeStore();
+    let now = 1_000_000;
+    const fetched = [];
+    const deps = {
+        ...store,
+        now: () => now,
+        sleep: async (ms) => {
+            now += ms;
+            await bridge.processPendingRequests({ ...store, now: () => now, fetchInventory: async (sid, force, token) => { fetched.push([sid, force, token]); return ITEMS; } });
+        },
+    };
+    await bridge.requestInventory("765", { force: true, token: "tok_1" }, deps);
+    assert.deepEqual(fetched, [["765", true, "tok_1"]]);
+});
