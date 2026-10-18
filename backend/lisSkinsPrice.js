@@ -171,7 +171,8 @@ function buffSellPriceSom(usd, rate, tiers) {
     return instantSellPriceSom(usd, rate, marginPercentForUsd(usd, tiers));
 }
 
-// names[] → Map(name -> priceSom|null). BUFF narxi bo'lsa — shu, bo'lmasa Lis formulasi.
+// names[] → Map(name -> priceSom). Faqat BUFF buy order bor nomlar — buy
+// order yo'q skinga narx berilmaydi (sotib bo'lmaydi), Lis'ga qaytilmaydi.
 async function getInstantSellPricesSom(names) {
     const rate = getUsdToSomRate();
     const tiers = getMarginTiers();
@@ -180,8 +181,6 @@ async function getInstantSellPricesSom(names) {
     catch (err) { console.log("BUFF NARX XATO:", err.message); }
     const out = new Map();
     for (const [name, usd] of buff) out.set(name, buffSellPriceSom(usd, rate, tiers));
-    const usdMap = await fetchLisPricesUsd(names.filter(n => !out.has(n)));
-    for (const [name, usd] of usdMap) out.set(name, instantSellPriceSomTiered(usd, rate, tiers));
     return out;
 }
 

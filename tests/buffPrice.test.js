@@ -40,3 +40,24 @@ test("buffSellPriceSom: SELL_PRICE_RATIO yo'q, faqat marja", () => {
     assert.strictEqual(buffSellPriceSom(100, 12700, tiers), 1143000);
     assert.strictEqual(buffSellPriceSom(0, 12700, tiers), null);
 });
+
+test("getInstantSellPricesSom: BUFF buy order yo'q nomga narx yo'q (Lis'ga qaytmaydi)", async () => {
+    const lis = require("../backend/lisSkinsPrice");
+    const buff = require("../backend/buffPrice");
+    _clearCache();
+    const orig = global.fetch;
+    const urls = [];
+    global.fetch = async (url) => {
+        urls.push(String(url));
+        if (String(url) === buff.FEED_URL) return { ok: true, json: async () => feed };
+        throw new Error("Lis so'ralmasligi kerak");
+    };
+    process.env.LIS_SKINS_API_KEY = "test";
+    try {
+        const m = await lis.getInstantSellPricesSom(["AK-47 | Redline (Field-Tested)", "No Order", "Missing"]);
+        assert.ok(m.get("AK-47 | Redline (Field-Tested)") > 0);
+        assert.strictEqual(m.has("No Order"), false);
+        assert.strictEqual(m.has("Missing"), false);
+        assert.deepStrictEqual(urls, [buff.FEED_URL]);
+    } finally { global.fetch = orig; delete process.env.LIS_SKINS_API_KEY; _clearCache(); }
+});
