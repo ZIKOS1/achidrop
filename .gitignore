@@ -32,3 +32,6 @@ package-lock.json
 
 # Subagent-driven-development ish maydoni (ledger, brieflar, review paketlari)
 .superpowers/
+
+# BUFF cookie faqat egasining kompyuterida qoladi
+buff_sync/

@@ -164,12 +164,23 @@ function instantSellPriceSomTiered(usd, rate, tiers) {
     return instantSellPriceSom(usd * SELL_PRICE_RATIO, rate, marginPercentForUsd(usd, tiers));
 }
 
-// names[] → Map(name -> priceSom|null)
+// BUFF buy order narxi (buffPrice.js) — bu allaqachon "darhol sotish" narxi,
+// shu sabab SELL_PRICE_RATIO qo'llanmaydi, faqat admin marjasi.
+function buffSellPriceSom(usd, rate, tiers) {
+    if (!Number.isFinite(usd) || usd <= 0) return null;
+    return instantSellPriceSom(usd, rate, marginPercentForUsd(usd, tiers));
+}
+
+// names[] → Map(name -> priceSom|null). BUFF narxi bo'lsa — shu, bo'lmasa Lis formulasi.
 async function getInstantSellPricesSom(names) {
-    const usdMap = await fetchLisPricesUsd(names);
     const rate = getUsdToSomRate();
     const tiers = getMarginTiers();
+    let buff = new Map();
+    try { buff = await require("./buffPrice").getBuffPricesUsd(names); }
+    catch (err) { console.log("BUFF NARX XATO:", err.message); }
     const out = new Map();
+    for (const [name, usd] of buff) out.set(name, buffSellPriceSom(usd, rate, tiers));
+    const usdMap = await fetchLisPricesUsd(names.filter(n => !out.has(n)));
     for (const [name, usd] of usdMap) out.set(name, instantSellPriceSomTiered(usd, rate, tiers));
     return out;
 }
@@ -195,4 +206,5 @@ module.exports = {
     getInstantSellPricesSom, getInstantSellPriceSom, getListPriceSom,
     getInstantSellMarginPercent, getUsdToSomRate, _clearCache,
     normalizeMarginTiers, marginTiersFromSettings, getMarginTiers, marginPercentForUsd, instantSellPriceSomTiered, SELL_PRICE_RATIO,
+    buffSellPriceSom,
 };

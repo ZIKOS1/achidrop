@@ -37,3 +37,8 @@ package-lock.json
 lis_autosell/
 lis-sync.bat
 .superpowers/
+
+# BUFF sync faqat egasining kompyuterida ishlaydi
+buff_sync/
+buffSync.js
+buff-sync.bat
