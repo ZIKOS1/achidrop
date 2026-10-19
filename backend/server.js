@@ -1418,6 +1418,7 @@ app.post("/api/steam-inv-token", auth, (req, res) => {
 // POST /api/instant-sell — { assetIds: [...] } — tanlangan skinlarni sotish
 // so'rovi. Pul DARHOL tushmaydi: user skinni trade linkimizga yuboradi,
 // admin Telegram'da "Oldim"ni bosgach tushadi.
+const LIS_AUTO_RATIO = 0.9; // adminga ko'rsatiladigan taxminiy Lis avtosell = Lis min narx × 0.9
 const INSTANT_SELL_ERRORS = {
     no_key: "Skin sotish tez orada ishga tushadi",
     empty: "Hech qanday skin tanlanmagan",
@@ -1463,14 +1464,28 @@ app.post("/api/instant-sell", auth, async (req, res) => {
     const request = result.request;
 
     if (process.env.ADMIN_ID) {
+        // Taxminiy Lis avtosell: Lis'dagi eng arzon narx × LIS_AUTO_RATIO —
+        // admin "Oldim"dan oldin foyda bor-yo'qligini ko'rishi uchun (faqat ma'lumot).
+        // Lis xato bersa ham xabar baribir ketadi ("narx yo'q" bilan).
+        let lisUsd = new Map();
+        try { lisUsd = await lisSkinsPrice.fetchLisPricesUsd(request.items.map(it => it.marketHashName)); }
+        catch (err) { console.log("LIS AVTO NARX XATO:", err.message); }
+        const rate = lisSkinsPrice.getUsdToSomRate();
+        const autoUsd = (it) => { const usd = lisUsd.get(it.marketHashName); return Number.isFinite(usd) ? usd * LIS_AUTO_RATIO : null; };
+        const autoText = (usd) => usd == null ? "Lis avto: narx yo'q" : `Lis avto ≈ $${usd.toFixed(2)} (${Math.round(usd * rate).toLocaleString()} so'm)`;
         const lines = request.items.slice(0, 15).map((it, i) =>
-            `${i + 1}. ${it.marketHashName}${it.float != null ? ` (float ${it.float.toFixed(4)})` : ""} — ${it.priceSom.toLocaleString()} so'm`);
+            `${i + 1}. ${it.marketHashName}${it.float != null ? ` (float ${it.float.toFixed(4)})` : ""} — ${it.priceSom.toLocaleString()} so'm\n    🤖 ${autoText(autoUsd(it))}`);
         if (request.items.length > 15) lines.push(`… va yana ${request.items.length - 15} ta`);
+        const autos = request.items.map(autoUsd);
+        const autoTotalUsd = autos.reduce((s, v) => s + (v ?? 0), 0);
+        const autoMissing = autos.filter(v => v == null).length;
+        const autoTotalLine = `🤖 Taxminiy Lis avto (×${LIS_AUTO_RATIO}): *$${autoTotalUsd.toFixed(2)} ≈ ${Math.round(autoTotalUsd * rate).toLocaleString()} so'm*` +
+            (autoMissing ? ` (${autoMissing} ta skin narxsiz)` : "");
         tgSendMessage(
             Number(process.env.ADMIN_ID),
             `💸 *SKIN SOTISH SO'ROVI #${request.id}*\n\n` +
             `👤 ${mdEscape(u.name ?? String(u.id))}\n🪪 \`${u.id}\`\n🎮 Steam: \`${u.steamId64}\`\n\n` +
-            `${lines.map(mdEscape).join("\n")}\n\n💰 Jami: *${request.totalSom.toLocaleString()} so'm*\n\n` +
+            `${lines.map(mdEscape).join("\n")}\n\n💰 Jami: *${request.totalSom.toLocaleString()} so'm*\n${autoTotalLine}\n\n` +
             `Steam'da skin(lar) kelganini tekshiring, keyin "Oldim"ni bosing.`,
             { inline_keyboard: [[
                 { text: "✅ Oldim", callback_data: `isell_ok_${request.id}` },
