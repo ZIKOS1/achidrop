@@ -71,7 +71,7 @@ function Brand({ onClick, compact }) {
     <button type="button" onClick={onClick} className="flex min-w-0 items-center gap-2.5">
       <span className="flex min-w-0 flex-col items-start leading-none">
         <span className={cn("truncate font-heading font-bold uppercase tracking-wider", compact ? "text-[19px]" : "text-[22px]")}>
-          <span className="text-[var(--heading)]">Achi</span><span className="text-grad">Drop</span>
+          <span className="text-[var(--logo-a)]">Achi</span><span className="text-[var(--logo-b)]">Drop</span>
         </span>
         {!compact && (
           <span className="mt-1 truncate text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
@@ -140,7 +140,7 @@ function Avatar({ user, initials, className }) {
       {user?.steamAvatar ? (
         <img src={user.steamAvatar} alt="" className="size-full rounded-[14px] object-cover" />
       ) : (
-        <span className="flex size-full items-center justify-center rounded-[14px] bg-[#1F1C17] font-heading font-bold text-[#E9D3A0]">{initials}</span>
+        <span className="flex size-full items-center justify-center rounded-[14px] bg-primary font-heading font-bold text-primary-foreground">{initials}</span>
       )}
     </span>
   );
@@ -412,7 +412,7 @@ export default function AppShell({ page, children }) {
             <button
               type="button"
               onClick={openTg}
-              className="flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-[7px] text-xs font-medium text-[#8FC3E8] transition-colors hover:border-[#8FC3E8]/50"
+              className="flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-[7px] text-xs font-medium text-foreground transition-colors hover:border-[#2AABEE]/60"
             >
               <TelegramLogo className="size-3.5" />
               {t("nav.telegramBot")}

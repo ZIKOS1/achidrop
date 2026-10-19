@@ -79,7 +79,7 @@ function InstantSellCard({ onClick, delay }) {
       whileHover={{ y: -3 }}
       className="group flex flex-col overflow-hidden border border-primary/40 bg-primary/5 text-left shadow-panel transition-colors hover:border-primary"
     >
-      <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_50%_35%,color-mix(in_oklch,var(--primary)_14%,var(--card)),var(--card))]">
+      <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-card">
         <Zap className="size-10 text-primary transition-transform duration-500 group-hover:scale-110" />
       </div>
       <div className="flex flex-1 flex-col gap-0.5 p-3">

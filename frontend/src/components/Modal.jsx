@@ -38,7 +38,7 @@ export default function Modal({ modal, onClose }) {
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted-foreground/40" />
         <div className="mb-4 flex flex-col items-center gap-2 text-center">
           {Icon && (
-            <span className="flex size-11 items-center justify-center bg-primary/15 text-primary shadow-[0_0_18px_-4px_color-mix(in_oklch,var(--primary)_60%,transparent)] clip-tactical">
+            <span className="flex size-11 items-center justify-center bg-primary/15 text-primary shadow-panel clip-tactical">
               <Icon className="size-5" />
             </span>
           )}

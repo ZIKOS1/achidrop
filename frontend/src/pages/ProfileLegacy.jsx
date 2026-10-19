@@ -126,7 +126,7 @@ export default function Profile() {
               <button
                 type="button"
                 onClick={() => navigate("balance")}
-                className="inline-flex items-center justify-center gap-2 bg-primary px-5 py-3 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground shadow-[0_10px_28px_-10px_color-mix(in_oklch,var(--primary)_75%,transparent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90"
+                className="inline-flex items-center justify-center gap-2 bg-primary px-5 py-3 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground shadow-panel transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90"
               >
                 {FEATURES.topup ? <Plus className="size-4" /> : <Wallet className="size-4" />}
                 {t(FEATURES.topup ? "profile.topUp" : "nav.balanceOnly")}

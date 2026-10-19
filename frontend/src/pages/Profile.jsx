@@ -17,7 +17,7 @@ function Avatar({ user, size }) {
       {user.steamAvatar ? (
         <img src={user.steamAvatar} alt="" className="size-full rounded-2xl object-cover lg:rounded-[22px]" />
       ) : (
-        <span className="flex size-full items-center justify-center rounded-2xl bg-[#1F1C17] font-heading text-[22px] font-bold text-[#E9D3A0] lg:rounded-[22px] lg:text-3xl">{initials}</span>
+        <span className="flex size-full items-center justify-center rounded-2xl bg-primary font-heading text-[22px] font-bold text-primary-foreground lg:rounded-[22px] lg:text-3xl">{initials}</span>
       )}
       {user.steamId64 && <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-success shadow-[0_0_0_3px_var(--background)] lg:size-3" />}
     </span>

@@ -24,12 +24,10 @@ export default function Login() {
     <div className="animate-fade-up mx-auto grid max-w-4xl overflow-hidden border border-border bg-card shadow-panel-lg lg:grid-cols-2">
       {/* Brand panel */}
       <div className="corner-brackets surface-grid relative hidden flex-col justify-center gap-6 overflow-hidden bg-[linear-gradient(160deg,var(--hero-a)_0%,var(--hero-b)_60%)] p-10 lg:flex">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,color-mix(in_oklch,var(--primary)_22%,transparent),transparent_60%)]" />
-        <div className="absolute bottom-0 right-0 h-2/3 w-2/3 bg-[radial-gradient(circle_at_90%_100%,color-mix(in_oklch,var(--accent)_16%,transparent),transparent_65%)]" />
         <div className="relative space-y-6">
           <div>
             <h1 className="font-heading text-4xl font-bold uppercase tracking-wide text-foreground">
-              Achi<span className="text-primary text-glow-primary">Drop</span>
+              <span className="text-[var(--logo-a)]">Achi</span><span className="text-[var(--logo-b)]">Drop</span>
             </h1>
             <p className="mt-2 max-w-xs text-sm leading-relaxed text-muted-foreground">
               {t("auctions.heroTitle1")} {t("auctions.heroTitleAccent")} {t("auctions.heroTitle2")} — {t("nav.headerSlogan")}
@@ -37,7 +35,7 @@ export default function Login() {
           </div>
           <ul className="space-y-3 text-sm text-foreground">
             <li className="flex items-center gap-3">
-              <span className="flex size-8 shrink-0 items-center justify-center bg-primary/15 text-primary shadow-[0_0_16px_-4px_color-mix(in_oklch,var(--primary)_60%,transparent)]"><Gavel className="size-4" /></span>
+              <span className="flex size-8 shrink-0 items-center justify-center bg-primary/15 text-primary shadow-panel"><Gavel className="size-4" /></span>
               {t("login.feature1")}
             </li>
             <li className="flex items-center gap-3">
@@ -55,7 +53,7 @@ export default function Login() {
       {/* Auth panel */}
       <div className="flex flex-col justify-center gap-1 p-8 sm:p-10">
         <h2 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground lg:hidden">
-          Achi<span className="text-primary">Drop</span>{t("login.welcome")}
+          <span className="text-[var(--logo-a)]">Achi</span><span className="text-[var(--logo-b)]">Drop</span>{t("login.welcome")}
         </h2>
         <p className="mb-6 text-sm text-muted-foreground">{t("login.subtitle")}</p>
 

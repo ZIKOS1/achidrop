@@ -13,7 +13,7 @@ import SupportChat from "../components/SupportChat";
 import TradeOnboardingWizard from "../components/TradeOnboardingWizard";
 import { SteamLogo } from "../components/BrandIcons";
 
-const CARD_HOVER = "group relative flex flex-col overflow-hidden border border-border bg-card shadow-panel transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_20px_48px_-16px_color-mix(in_oklch,var(--primary)_35%,transparent),0_0_0_1px_color-mix(in_oklch,var(--primary)_40%,transparent)]";
+const CARD_HOVER = "group relative flex flex-col overflow-hidden border border-border bg-card shadow-panel transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 hover:border-primary/50 ";
 
 // Steam trade-ban qolgan muddatini "X kun Y soat" ko'rinishida qaytaradi,
 // muddat o'tib ketgan bo'lsa null (ban tugagan, cheklov qo'yilmaydi).
@@ -305,7 +305,7 @@ export default function Inventory() {
                     <button
                       type="button"
                       onClick={() => withdraw(w.lotId)}
-                      className="mt-auto flex w-full items-center justify-center gap-2 bg-primary py-2 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground shadow-[0_6px_16px_-6px_color-mix(in_oklch,var(--primary)_70%,transparent)] transition-all duration-300 group-hover:bg-primary/90 group-hover:shadow-[0_10px_22px_-6px_color-mix(in_oklch,var(--primary)_80%,transparent)]"
+                      className="mt-auto flex w-full items-center justify-center gap-2 bg-primary py-2 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground shadow-panel transition-all duration-300 group-hover:bg-primary/90 "
                     >
                       <Send className="size-4" />
                       {["rejected", "auto_failed", "requested"].includes(w.status) ? t("inventory.retry") : t("inventory.take")}

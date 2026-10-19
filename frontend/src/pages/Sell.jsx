@@ -68,7 +68,7 @@ function SkinCard({ item, selected, disabled, priced, onToggle, index = 0 }) {
       style={{ "--fade-delay": `${Math.min((index % PAGE) * 30, 450)}ms` }}
       className={cn(
         "animate-fade-up group relative flex flex-col overflow-hidden rounded-2xl border bg-card text-left transition-[border-color,background-color,transform,box-shadow] duration-200",
-        selected ? "border-primary/60 bg-[var(--row-sel)] shadow-[0_14px_30px_-20px_var(--primary)]" : "border-border hover:-translate-y-0.5 hover:border-ring/60",
+        selected ? "border-primary/60 bg-[var(--row-sel)] shadow-panel" : "border-border hover:-translate-y-0.5 hover:border-ring/60",
         disabled ? "cursor-not-allowed opacity-50 hover:translate-y-0" : "active:scale-[0.98]"
       )}
     >
@@ -152,7 +152,7 @@ function SellButton({ count, submitting, onClick, className }) {
         "flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 font-heading text-sm font-semibold uppercase tracking-wide transition-all duration-200",
         off ? "bg-secondary text-muted-foreground"
           : submitting ? "bg-[var(--row-sel)] text-primary"
-          : "bg-gold-grad text-[#1A160F] hover:-translate-y-0.5 hover:shadow-[0_16px_30px_-14px_rgba(201,162,74,.8)] active:translate-y-0 active:scale-[0.97] active:brightness-95",
+          : "bg-gold-grad text-white hover:brightness-95 active:translate-y-px active:scale-[0.97] active:brightness-95",
         className
       )}
     >
@@ -201,7 +201,7 @@ function TradeLinkPanel({ request, botTradeUrl, onDone }) {
           <>
             <code className="block truncate rounded-xl border border-border bg-secondary px-3 py-2.5 font-mono text-[11px] text-foreground">{botTradeUrl}</code>
             <div className="flex gap-2">
-              <button type="button" onClick={openSteam} className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gold-grad py-3 text-sm font-semibold text-[#1A160F] transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.97]">
+              <button type="button" onClick={openSteam} className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gold-grad py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.97]">
                 <ExternalLink className="size-4" />
                 {t("sell.openSteam")}
               </button>
@@ -427,7 +427,7 @@ export default function Sell() {
     return (
       <div className="space-y-5">
         <EmptyState icon={Banknote} title={t("common.loginRequired")}>
-          <button type="button" onClick={() => navigate("login")} className="rounded-2xl bg-gold-grad px-5 py-2.5 font-heading text-sm font-semibold uppercase tracking-wide text-[#1A160F] transition-all hover:-translate-y-0.5">
+          <button type="button" onClick={() => navigate("login")} className="rounded-2xl bg-gold-grad px-5 py-2.5 font-heading text-sm font-semibold uppercase tracking-wide text-white transition-all hover:-translate-y-0.5">
             {t("common.login")}
           </button>
         </EmptyState>
@@ -500,7 +500,7 @@ export default function Sell() {
 
       {steamMissing ? (
         <EmptyState icon={SteamLogo} title={t("sellx.steamMissing")} desc={t("sell.connectSteam")}>
-          <button type="button" onClick={connectSteam} className="flex items-center gap-2 rounded-2xl bg-gold-grad px-5 py-2.5 font-heading text-sm font-semibold uppercase tracking-wide text-[#1A160F] transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.97]">
+          <button type="button" onClick={connectSteam} className="flex items-center gap-2 rounded-2xl bg-gold-grad px-5 py-2.5 font-heading text-sm font-semibold uppercase tracking-wide text-white transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.97]">
             <SteamLogo className="size-4" />
             {t("trade.connectSteam")}
           </button>
@@ -708,7 +708,7 @@ export default function Sell() {
             exit={{ y: "120%", opacity: 0, transition: { duration: 0.24, ease: "easeIn" } }}
             className="fixed inset-x-0 bottom-0 z-30 px-3.5 pb-[18px] lg:hidden"
           >
-            <div className="mx-auto flex max-w-xl items-center justify-between gap-3 rounded-[20px] bg-gold-grad py-3.5 pl-5 pr-4 text-[#1A160F] shadow-[0_18px_40px_-18px_rgba(201,162,74,.6)]">
+            <div className="mx-auto flex max-w-xl items-center justify-between gap-3 rounded-[20px] bg-gold-grad py-3.5 pl-5 pr-4 text-white shadow-panel-lg">
               <div className="min-w-0">
                 <p className="text-[10px] uppercase tracking-[0.14em] opacity-65">{t("sellx.nPicked", { n: selected.size })}</p>
                 <p className="font-heading text-[22px] font-bold tabular-nums">{fmtMoney(total)}</p>
@@ -717,9 +717,9 @@ export default function Sell() {
                 type="button"
                 onClick={confirmSell}
                 disabled={submitting}
-                className="flex shrink-0 items-center gap-2 rounded-2xl bg-[#1A160F] px-[18px] py-3 text-[13px] font-semibold text-[#E3CC98] transition-transform duration-100 active:scale-[0.96] disabled:opacity-70"
+                className="flex shrink-0 items-center gap-2 rounded-2xl bg-[#0A0A0A] px-[18px] py-3 text-[13px] font-semibold text-white transition-transform duration-100 active:scale-[0.96] disabled:opacity-70"
               >
-                {submitting && <span className="size-3.5 rounded-full border-2 border-[#E3CC98]/30 border-t-[#E3CC98] spin" />}
+                {submitting && <span className="size-3.5 rounded-full border-2 border-white/30 border-t-white spin" />}
                 {submitting ? t("sellx.sending") : `${t("sell.sellBtn")} →`}
               </button>
             </div>

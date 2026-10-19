@@ -34,7 +34,7 @@ export default function BalHistory() {
               const Icon = positive ? ArrowDownRight : ArrowUpRight;
               return (
                 <li key={i} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-secondary/30">
-                  <span className={"flex size-8 shrink-0 items-center justify-center " + (positive ? "bg-success/10 text-success shadow-[0_0_12px_-4px_color-mix(in_oklch,var(--success)_55%,transparent)]" : "bg-primary/10 text-primary shadow-[0_0_12px_-4px_color-mix(in_oklch,var(--primary)_55%,transparent)]")}>
+                  <span className={"flex size-8 shrink-0 items-center justify-center " + (positive ? "bg-success/10 text-success shadow-[0_0_12px_-4px_color-mix(in_oklch,var(--success)_55%,transparent)]" : "bg-primary/10 text-primary shadow-panel")}>
                     <Icon className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1">

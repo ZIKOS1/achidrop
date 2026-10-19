@@ -162,7 +162,7 @@ export default function Balance() {
                   key={p}
                   type="button"
                   onClick={() => setAmount(p)}
-                  className={"border px-2 py-2.5 font-heading text-sm font-bold transition-all duration-200 " + (amount === p ? "border-primary bg-primary/10 text-primary shadow-[0_0_20px_-8px_color-mix(in_oklch,var(--primary)_60%,transparent)]" : "border-border text-muted-foreground hover:-translate-y-0.5 hover:text-foreground")}
+                  className={"border px-2 py-2.5 font-heading text-sm font-bold transition-all duration-200 " + (amount === p ? "border-primary bg-primary/10 text-primary shadow-panel" : "border-border text-muted-foreground hover:-translate-y-0.5 hover:text-foreground")}
                 >
                   {fmtMoney(p)}
                 </button>
@@ -190,7 +190,7 @@ export default function Balance() {
               type="button"
               disabled={!method || !botUsername}
               onClick={openBot}
-              className="mt-4 flex w-full items-center justify-center gap-2 bg-primary py-3 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground shadow-[0_10px_28px_-10px_color-mix(in_oklch,var(--primary)_75%,transparent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+              className="mt-4 flex w-full items-center justify-center gap-2 bg-primary py-3 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground shadow-panel transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
             >
               <TelegramLogo className="size-4" />
               {t("balance.goToBot")}
@@ -278,7 +278,7 @@ export default function Balance() {
 function SectionTitle({ step, title }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="flex size-7 items-center justify-center bg-primary/15 font-heading text-sm font-bold text-primary shadow-[0_0_14px_-4px_color-mix(in_oklch,var(--primary)_60%,transparent)]">{step}</span>
+      <span className="flex size-7 items-center justify-center bg-primary/15 font-heading text-sm font-bold text-primary shadow-panel">{step}</span>
       <h2 className="font-heading text-base font-bold uppercase tracking-wide text-foreground">{title}</h2>
     </div>
   );

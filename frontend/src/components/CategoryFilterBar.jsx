@@ -64,7 +64,7 @@ export default function CategoryFilterBar({ value, onChange }) {
         className={
           "flex items-center gap-1.5 px-4 py-2 font-heading text-sm font-semibold uppercase tracking-wide transition-all duration-200 " +
           (!hasAny
-            ? "bg-primary text-primary-foreground shadow-[0_8px_20px_-8px_color-mix(in_oklch,var(--primary)_70%,transparent)]"
+            ? "bg-primary text-primary-foreground shadow-panel"
             : "border border-border bg-card text-muted-foreground hover:-translate-y-0.5 hover:border-primary/40 hover:text-foreground")
         }
       >
@@ -87,7 +87,7 @@ export default function CategoryFilterBar({ value, onChange }) {
               className={
                 "flex items-center gap-1.5 px-4 py-2 font-heading text-sm font-semibold uppercase tracking-wide transition-all duration-200 " +
                 (isActive
-                  ? "bg-primary text-primary-foreground shadow-[0_8px_20px_-8px_color-mix(in_oklch,var(--primary)_70%,transparent)]"
+                  ? "bg-primary text-primary-foreground shadow-panel"
                   : "border border-border bg-card text-muted-foreground hover:-translate-y-0.5 hover:border-primary/40 hover:text-foreground")
               }
             >

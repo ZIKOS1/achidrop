@@ -9,10 +9,8 @@ const ROTATE_MS = 5000;
 function DefaultHeroBanner() {
   return (
     <section className="corner-brackets surface-grid relative overflow-hidden border border-border bg-[linear-gradient(120deg,var(--hero-a)_0%,var(--hero-b)_55%)] p-6 shadow-panel-lg sm:p-10">
-      <div className="absolute right-0 top-0 h-full w-1/2 bg-[radial-gradient(circle_at_80%_20%,color-mix(in_oklch,var(--primary)_22%,transparent),transparent_60%)]" />
-      <div className="absolute bottom-0 left-0 h-2/3 w-1/3 bg-[radial-gradient(circle_at_10%_100%,color-mix(in_oklch,var(--accent)_16%,transparent),transparent_65%)]" />
       <div className="animate-fade-up relative max-w-xl space-y-4">
-        <span className="inline-flex items-center gap-2 border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary shadow-[0_0_20px_-6px_color-mix(in_oklch,var(--primary)_60%,transparent)]">
+        <span className="inline-flex items-center gap-2 border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary shadow-panel">
           <span className="size-1.5 animate-pulse rounded-full bg-primary" />
           {t("auctions.heroBadge")}
         </span>

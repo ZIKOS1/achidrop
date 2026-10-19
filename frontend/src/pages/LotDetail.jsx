@@ -272,7 +272,7 @@ export default function LotDetail({ id }) {
                     type="button"
                     onClick={placeBid}
                     disabled={tooLow || insufficient || busy}
-                    className="flex w-full items-center justify-center gap-2 bg-primary py-3 font-heading text-base font-bold uppercase tracking-wide text-primary-foreground shadow-[0_10px_28px_-10px_color-mix(in_oklch,var(--primary)_75%,transparent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-[0_14px_34px_-8px_color-mix(in_oklch,var(--primary)_85%,transparent)] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+                    className="flex w-full items-center justify-center gap-2 bg-primary py-3 font-heading text-base font-bold uppercase tracking-wide text-primary-foreground shadow-panel transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90  disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
                   >
                     <Gavel className="size-5" />
                     {busy ? "..." : t("auctions.placeBid")}

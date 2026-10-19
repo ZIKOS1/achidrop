@@ -37,105 +37,108 @@
 
 :root {
   color-scheme: dark;
-  /* Dark — iliq qora + yumshoq oltin (Claude Design v2, 2026-10-16) */
-  --background: #0E0D0C;
-  --foreground: #E9E3D7;        /* asosiy matn */
-  --heading: #F1EADC;           /* sarlavha matni */
-  --card: #151412;
-  --card-foreground: #E9E3D7;
-  --popover: #17150F;
-  --popover-foreground: #E9E3D7;
-  --primary: #D9BF84;           /* oltin (asosiy) */
-  --primary-foreground: #1A160F;
-  --secondary: #121110;
-  --secondary-foreground: #E9E3D7;
-  --muted: #151412;
-  --muted-foreground: #9B9488;  /* ikkinchi matn */
-  --accent: #D9BF84;            /* oltin matn / link */
-  --accent-foreground: #1A160F;
-  --destructive: #EB8B82;
-  --destructive-foreground: #1A160F;
-  --success: #8FD3A0;
-  --success-foreground: #10140F;
-  --warning: #E3CC98;
-  --warning-foreground: #1A160F;
-  --border: #23211D;
-  --input: #2C2924;
-  --ring: #D9BF84;
-  --sidebar: #0F0E0D;
-  --sidebar-foreground: #E9E3D7;
-  --sidebar-border: #1E1C19;
-  --hero-a: color-mix(in oklch, #D9BF84 9%, #121110);
-  --hero-b: #121110;
+  /* Dark — qora + qizil (2026-10-19). Gradient/nur yo'q: tekis yuzalar,
+     ingichka chegara, qizil faqat asosiy amal va urg'u uchun. */
+  --background: #0C0C0D;
+  --foreground: #E8E8EA;        /* asosiy matn */
+  --heading: #FFFFFF;           /* sarlavha matni */
+  --card: #151517;
+  --card-foreground: #E8E8EA;
+  --popover: #18181B;
+  --popover-foreground: #E8E8EA;
+  --primary: #E0242D;           /* qizil (asosiy) */
+  --primary-foreground: #FFFFFF;
+  --secondary: #121214;
+  --secondary-foreground: #E8E8EA;
+  --muted: #151517;
+  --muted-foreground: #9A9AA2;  /* ikkinchi matn */
+  --accent: #F2484F;            /* qizil matn / link — qora fonda o'qiladi */
+  --accent-foreground: #FFFFFF;
+  --destructive: #FF7A5C;       /* xato — qizildan ajralsin (to'q sariq-qizil) */
+  --destructive-foreground: #120C0B;
+  --success: #4FC278;
+  --success-foreground: #0B120D;
+  --warning: #E8B04B;
+  --warning-foreground: #14100A;
+  --border: #242428;
+  --input: #2E2E33;
+  --ring: #E0242D;
+  --sidebar: #0F0F11;
+  --sidebar-foreground: #E8E8EA;
+  --sidebar-border: #1F1F23;
+  --logo-a: #FFFFFF;            /* "ACHI" — qora fonda qora ko'rinmaydi, oq */
+  --logo-b: #E0242D;            /* "DROP" */
+  --hero-a: #151517;
+  --hero-b: #121214;
   /* Ro'yxatdagi tanlangan / kursor ostidagi qator foni */
-  --row-sel: rgba(217, 191, 132, 0.07);
+  --row-sel: rgba(224, 36, 45, 0.09);
   --row-hov: rgba(255, 255, 255, 0.035);
-  --gold-grad: linear-gradient(140deg, #E3CC98, #C3A15E);
-  /* Mayin gradient: och oltin -> oltin -> mis */
-  --g1: #E9D3A0; --g2: #D4B172; --g3: #C48C5C;
-  --grad-card-in: radial-gradient(120% 90% at 100% 0%, rgba(196,140,92,.08), transparent 55%), linear-gradient(160deg, #181613, #121110);
-  --grad-card-bd: linear-gradient(135deg, rgba(217,191,132,.38), rgba(196,140,92,.12) 55%, rgba(255,255,255,.04));
-  --orb-a: rgba(196,140,92,.09); --orb-b: rgba(217,191,132,.06);
-  --page-glow: radial-gradient(80% 45% at 85% -5%, rgba(217,191,132,.10), transparent 62%), radial-gradient(60% 35% at -5% 105%, rgba(214,42,36,.06), transparent 60%);
-  --shadow-color: rgb(0 0 0 / 60%);
-  --shadow-sm: 0 2px 10px -4px var(--shadow-color);
-  --shadow-md: 0 14px 34px -12px var(--shadow-color), 0 2px 8px -2px var(--shadow-color);
-  --shadow-lg: 0 28px 64px -20px var(--shadow-color), 0 8px 20px -8px var(--shadow-color);
+  --gold-grad: none;
+  --g1: #E0242D; --g2: #E0242D; --g3: #E0242D;
+  --grad-card-in: #151517;
+  --grad-card-bd: #242428;
+  --orb-a: transparent; --orb-b: transparent;
+  --page-glow: none;
+  --shadow-color: rgb(0 0 0 / 55%);
+  --shadow-sm: 0 1px 2px var(--shadow-color);
+  --shadow-md: 0 6px 18px -10px var(--shadow-color), 0 1px 2px var(--shadow-color);
+  --shadow-lg: 0 16px 40px -18px var(--shadow-color), 0 2px 6px -2px var(--shadow-color);
 }
 
 /* Yorug' (light) rejim — foydalanuvchi AppShell'dagi kun/tun tugmasi orqali
    almashtirganda <html data-theme="light"> qo'yiladi (theme.js). */
 :root[data-theme="light"] {
   color-scheme: light;
-  /* Light — iliq krem + oq yuzalar + oltin (Claude Design v3, 2026-10-16) */
-  --background: #F6F3EC;
-  --foreground: #221D16;
-  --heading: #1A160F;
+  /* Light — oq + qora matn + qizil (2026-10-19) */
+  --background: #F4F4F5;
+  --foreground: #18181B;
+  --heading: #0A0A0A;
   --card: #FFFFFF;
-  --card-foreground: #221D16;
+  --card-foreground: #18181B;
   --popover: #FFFFFF;
-  --popover-foreground: #221D16;
-  --primary: #C9A24A;           /* oltin (to'ldirish) */
-  --primary-foreground: #1A160F;
-  --secondary: #FBF9F4;
-  --secondary-foreground: #221D16;
-  --muted: #FBF9F4;
-  --muted-foreground: #6E665A;
-  --accent: #8A6418;            /* oltin matn — oq fonda o'qiladi */
+  --popover-foreground: #18181B;
+  --primary: #D41F28;           /* qizil (to'ldirish) */
+  --primary-foreground: #FFFFFF;
+  --secondary: #FAFAFA;
+  --secondary-foreground: #18181B;
+  --muted: #FAFAFA;
+  --muted-foreground: #63636B;
+  --accent: #C01B24;            /* qizil matn — oq fonda o'qiladi */
   --accent-foreground: #FFFFFF;
-  --destructive: #C2413A;
+  --destructive: #B4401F;
   --destructive-foreground: #FFFFFF;
-  --success: #2F8F4E;
+  --success: #1E8A4A;
   --success-foreground: #FFFFFF;
-  --warning: #8A6418;
+  --warning: #9A6A10;
   --warning-foreground: #FFFFFF;
-  --border: #E7E1D4;
-  --input: #DCD4C3;
-  --ring: #C9A24A;
-  --sidebar: #FBF9F4;
-  --sidebar-foreground: #221D16;
-  --sidebar-border: #E7E1D4;
-  --hero-a: #FBF6EA;
+  --border: #E4E4E7;
+  --input: #D6D6DB;
+  --ring: #D41F28;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #18181B;
+  --sidebar-border: #E4E4E7;
+  --logo-a: #0A0A0A;            /* "ACHI" — qora */
+  --logo-b: #D41F28;            /* "DROP" — qizil */
+  --hero-a: #FFFFFF;
   --hero-b: #FFFFFF;
-  --row-sel: rgba(201, 162, 74, 0.11);
-  --row-hov: rgba(34, 29, 22, 0.035);
-  --gold-grad: linear-gradient(140deg, #E8D3A0, #C9A24A);
-  --g1: #D9B465; --g2: #BE9440; --g3: #A8703F;
-  --grad-card-in: radial-gradient(120% 90% at 100% 0%, rgba(201,162,74,.08), transparent 55%), #FFFFFF;
-  --grad-card-bd: linear-gradient(135deg, rgba(190,148,64,.45), rgba(168,112,63,.15) 55%, #E7E1D4);
-  --orb-a: rgba(201,162,74,.10); --orb-b: rgba(168,112,63,.05);
-  --page-glow: radial-gradient(80% 45% at 85% -5%, rgba(201,162,74,.14), transparent 62%), radial-gradient(60% 35% at -5% 105%, rgba(214,42,36,.04), transparent 60%);
-  --shadow-color: rgb(60 48 30 / 16%);
-  --shadow-sm: 0 2px 10px -4px var(--shadow-color);
-  --shadow-md: 0 14px 34px -14px var(--shadow-color), 0 1px 2px var(--shadow-color);
-  --shadow-lg: 0 28px 64px -22px var(--shadow-color), 0 8px 20px -10px var(--shadow-color);
+  --row-sel: rgba(212, 31, 40, 0.07);
+  --row-hov: rgba(10, 10, 10, 0.035);
+  --gold-grad: none;
+  --g1: #D41F28; --g2: #D41F28; --g3: #D41F28;
+  --grad-card-in: #FFFFFF;
+  --grad-card-bd: #E4E4E7;
+  --orb-a: transparent; --orb-b: transparent;
+  --page-glow: none;
+  --shadow-color: rgb(10 10 10 / 10%);
+  --shadow-sm: 0 1px 2px var(--shadow-color);
+  --shadow-md: 0 6px 18px -12px var(--shadow-color), 0 1px 2px var(--shadow-color);
+  --shadow-lg: 0 16px 40px -20px var(--shadow-color), 0 2px 6px -3px var(--shadow-color);
 }
 
 * { -webkit-tap-highlight-color: transparent; }
 
-/* Asosiy rang (oltin) fon va tugmalar uchun; MATN uchun o'qiladigan varianti
-   --accent (yorug'da #8A6418). Oltin #C9A24A oq fonda matn sifatida deyarli
-   ko'rinmaydi — shu sabab text-primary matni --accent'dan olinadi. */
+/* Asosiy rang (qizil) fon va tugmalar uchun; MATN uchun --accent (fonga
+   qarab biroz och/to'q qizil — o'qilishi uchun). */
 .text-primary { color: var(--accent); }
 .font-heading.text-foreground { color: var(--heading); }
 html, body, #root { height: 100%; }
@@ -168,12 +171,13 @@ body {
   border-radius: var(--radius-lg);
 }
 
+/* Nurli matn olib tashlandi (2026-10-19) — klasslar qolgan joylarda jim. */
 @utility text-glow-primary {
-  text-shadow: 0 0 18px color-mix(in oklch, var(--primary) 45%, transparent);
+  text-shadow: none;
 }
 
 @utility text-glow-accent {
-  text-shadow: 0 0 18px color-mix(in oklch, var(--accent) 45%, transparent);
+  text-shadow: none;
 }
 
 /* Panel depth — flat bg-card/border-border ko'p joyda ishlatilgani uchun
@@ -345,16 +349,8 @@ body {
 }
 .float-skin { animation: float-skin 5s ease-in-out infinite; }
 
-/* Sarlavhadagi yaltiroq gradient */
-@keyframes text-shine { to { background-position: 200% center; } }
-.text-shine {
-  background: linear-gradient(100deg, var(--foreground) 35%, var(--accent) 50%, var(--foreground) 65%);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: text-shine 6s linear infinite;
-}
+/* Sarlavhadagi yaltiroq gradient o'rniga oddiy sarlavha rangi */
+.text-shine { color: var(--heading); }
 
 /* "So'nggi sotuvlar" lentasi — ikki nusxa, -50% (ticker keyframes yuqorida) */
 .ticker-track { animation: ticker linear infinite; }
@@ -406,44 +402,27 @@ body {
 }
 .swap-in { animation: swap-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 
-/* Oltin gradient fon (asosiy tugma, sotish paneli) */
-.bg-gold-grad { background-image: var(--gold-grad); }
+/* Asosiy tugma / sotish paneli — tekis qizil (eski nomi qoldi) */
+.bg-gold-grad { background-color: var(--primary); color: var(--primary-foreground); }
 
 @media (prefers-reduced-motion: reduce) {
   .tick-pop, .menu-in, .swap-in { animation: none !important; }
 }
 
-/* ===== Mayin gradientlar (Menyu va Gradient dizayni) ===== */
-.text-grad {
-  background: linear-gradient(100deg, var(--g1), var(--g2) 30%, var(--g3) 50%, var(--g2) 70%, var(--g1));
-  background-size: 200% 100%;
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-  animation: grad-flow 10s linear infinite;
-}
-@keyframes grad-flow { to { background-position: -200% 0; } }
-.bg-grad { background-image: linear-gradient(120deg, var(--g1), var(--g2) 65%, var(--g3)); color: #1A150E; }
+/* ===== Tekis urg'ular (oldingi "mayin gradient"lar o'rniga, 2026-10-19) =====
+   Klass nomlari o'zgarmadi — JSX'da ko'p joyda ishlatiladi. */
+.text-grad { color: var(--logo-b); }
+.bg-grad { background-color: var(--primary); color: var(--primary-foreground); }
 .btn-grad {
-  position: relative; overflow: hidden; isolation: isolate;
-  background-image: linear-gradient(120deg, var(--g1), var(--g2) 65%, var(--g3)); color: #1A150E;
-  box-shadow: 0 14px 30px -20px rgba(212,177,114,.55);
-  transition: transform .2s ease, box-shadow .2s ease, opacity .2s ease;
+  background-color: var(--primary); color: var(--primary-foreground);
+  transition: background-color .15s ease, transform .15s ease, opacity .15s ease;
 }
-.btn-grad:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 18px 34px -16px rgba(212,177,114,.7); }
-.btn-grad::after {
-  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.28) 50%, transparent 60%);
-  transform: translateX(-120%); animation: btn-shine 6s ease-in-out infinite 1.5s;
-}
-@keyframes btn-shine { 0%, 80% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
-.grad-card { position: relative; border-radius: 22px; padding: 1px; background: var(--grad-card-bd); }
-.grad-card > .grad-in { border-radius: 21px; background: var(--grad-card-in); height: 100%; }
-.grad-line { height: 1px; background: linear-gradient(90deg, transparent, rgba(217,191,132,.45), rgba(196,140,92,.3), transparent); }
-.aurora { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
-.aurora::before, .aurora::after { content: ""; position: absolute; border-radius: 50%; filter: blur(60px); }
-.aurora::before { width: 46vmax; height: 34vmax; right: -12vmax; top: -10vmax; background: var(--orb-a); animation: orb-a 28s ease-in-out infinite alternate; }
-.aurora::after { width: 40vmax; height: 34vmax; left: -14vmax; top: 30vh; background: var(--orb-b); animation: orb-b 32s ease-in-out infinite alternate; }
-@keyframes orb-a { to { transform: translate(-8vmax, 6vmax) scale(1.08); } }
-@keyframes orb-b { to { transform: translate(7vmax, -5vmax) scale(.94); } }
+.btn-grad:hover:not(:disabled) { background-color: color-mix(in oklch, var(--primary) 88%, black); }
+.btn-grad:active:not(:disabled) { transform: translateY(1px); }
+.grad-card { position: relative; border-radius: 16px; border: 1px solid var(--border); background: var(--card); }
+.grad-card > .grad-in { border-radius: 15px; background: var(--card); height: 100%; }
+.grad-line { height: 1px; background: var(--border); }
+.aurora { display: none; }
 .drawer-in { animation: drawer-in .28s cubic-bezier(.22,.8,.3,1) both; }
 @keyframes drawer-in { from { transform: translateX(-100%); } }
 .scrim-in { animation: scrim-in .25s ease both; }
@@ -454,5 +433,5 @@ body {
 .bar-fill { transform-origin: left; animation: bar-fill .6s cubic-bezier(.22,.8,.3,1) .15s both; }
 .bar-frozen { background: repeating-linear-gradient(135deg, rgba(143,195,232,.55) 0 4px, rgba(143,195,232,.3) 4px 8px); }
 @media (prefers-reduced-motion: reduce) {
-  .text-grad, .btn-grad::after, .aurora::before, .aurora::after, .drawer-in, .scrim-in, .stagger > *, .bar-fill { animation: none !important; }
+  .drawer-in, .scrim-in, .stagger > *, .bar-fill { animation: none !important; }
 }

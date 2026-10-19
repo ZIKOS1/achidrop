@@ -45,9 +45,6 @@ export function HeroDecor({ images = [] }) {
   return (
     <>
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="orb-drift absolute -right-16 -top-24 size-72 rounded-full bg-primary/20 blur-3xl" />
-        <div className="orb-drift-slow absolute -bottom-28 left-1/4 size-64 rounded-full bg-accent/10 blur-3xl" />
-        <div className="hero-grid absolute inset-0 opacity-[0.35]" />
       </div>
       {images.length > 0 && (
         <div aria-hidden className="pointer-events-none absolute right-4 top-1/2 hidden h-40 w-72 -translate-y-1/2 lg:block xl:w-96">
@@ -56,7 +53,7 @@ export function HeroDecor({ images = [] }) {
               key={src}
               src={imgSrc(src)}
               alt=""
-              className="float-skin absolute max-h-24 object-contain opacity-80 drop-shadow-[0_12px_18px_rgba(0,0,0,0.45)]"
+              className="absolute max-h-24 object-contain opacity-80 drop-shadow-[0_12px_18px_rgba(0,0,0,0.45)]"
               style={{
                 right: `${i * 28}%`,
                 top: `${[10, 45, 0][i]}%`,
@@ -113,7 +110,6 @@ export function TrustStats({ stats }) {
     <div className="grid grid-cols-3 gap-2">
       {tiles.map((tile) => (
         <div key={tile.label} className="relative overflow-hidden rounded-xl border border-border bg-card p-3 text-center">
-          <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-10 mx-auto size-24 rounded-full bg-primary/10 blur-2xl" />
           <p className="relative font-heading text-lg font-bold text-foreground sm:text-2xl"><CountUp value={tile.value} format={tile.fmt} /></p>
           <p className="relative text-[10px] uppercase tracking-wider text-muted-foreground">{tile.label}</p>
         </div>
@@ -183,7 +179,7 @@ export function HowItWorks() {
         {steps.map(({ icon: Icon, key }, i) => (
           <li key={key} className="group relative overflow-hidden rounded-xl border border-border bg-background/50 p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/40">
             <span aria-hidden className="absolute -right-2 -top-4 font-heading text-6xl font-black text-foreground/[0.04] transition-colors group-hover:text-primary/10">{i + 1}</span>
-            <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/60 text-primary-foreground shadow-[0_8px_20px_-8px_var(--primary)]">
+            <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
               <Icon className="size-5" />
             </span>
             <p className="mt-3 text-sm font-bold text-foreground">{t(`sellx.how.${key}`)}</p>
@@ -241,8 +237,7 @@ export function Faq() {
 export function TelegramBanner({ botUsername, onOpen }) {
   if (!botUsername) return null;
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-[#2AABEE]/30 bg-[linear-gradient(120deg,rgba(42,171,238,0.16),transparent_60%)] p-5">
-      <div aria-hidden className="orb-drift pointer-events-none absolute -right-10 -top-16 size-48 rounded-full bg-[#2AABEE]/20 blur-3xl" />
+    <div className="relative overflow-hidden rounded-2xl border border-[#2AABEE]/30 bg-[#2AABEE]/[0.07] p-5">
       <div className="relative flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="font-heading text-sm font-bold uppercase tracking-wide text-foreground">{t("sellx.tg.title")}</p>

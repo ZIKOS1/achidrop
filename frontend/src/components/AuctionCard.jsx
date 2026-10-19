@@ -72,7 +72,7 @@ export default function AuctionCard({ a, style, className }) {
       onKeyDown={handleKeyDown}
       style={style}
       className={cn(
-        "group relative flex cursor-pointer flex-col overflow-hidden rounded-lg border border-white/5 bg-[#16161a] text-left transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 hover:bg-[#1c1c22] hover:shadow-[0_20px_44px_-16px_color-mix(in_oklch,var(--primary)_35%,transparent),0_0_0_1px_color-mix(in_oklch,var(--primary)_40%,transparent)]",
+        "group relative flex cursor-pointer flex-col overflow-hidden rounded-lg border border-white/5 bg-[#16161a] text-left transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 hover:bg-[#1c1c22] ",
         className
       )}
     >
@@ -143,7 +143,7 @@ export default function AuctionCard({ a, style, className }) {
           <button
             type="button"
             onClick={handleBidClick}
-            className="flex w-full items-center justify-center gap-2 bg-primary py-2 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground shadow-[0_6px_16px_-6px_color-mix(in_oklch,var(--primary)_70%,transparent)] transition-colors hover:bg-primary/90"
+            className="flex w-full items-center justify-center gap-2 bg-primary py-2 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground shadow-panel transition-colors hover:bg-primary/90"
           >
             <Gavel className="size-4" />
             {t("auctions.placeBidShort")}
