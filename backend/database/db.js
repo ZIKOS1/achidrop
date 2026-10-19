@@ -23,7 +23,7 @@ async function connect() {
 
     const docs = await Store.find({}).lean();
     // inv_/invReq_ (inventoryBridge), steamAuth_ (auth-steam), sess_/admsess_ (tokenStore), lisAuto_ (lisAutosell) — keshga kerak emas.
-    for (const doc of docs) if (!/^(inv(Req)?|steamAuth|sess|admsess|lisAuto)_/.test(doc._id)) cache[doc._id] = doc.data;
+    for (const doc of docs) if (!/^(inv(Req)?|steamAuth|sess|admsess|lisAuto)_/.test(doc._id)) setCache(doc._id, doc.data);
     console.log("✅ Ma'lumotlar keshga yuklandi:", Object.keys(cache).join(", ") || "(bo'sh)");
 
     // Websaytdan Steam orqali (Telegramsiz) kiruvchi foydalanuvchilar qo'shilishi
@@ -53,8 +53,79 @@ function read(file) {
   return cache[file];
 }
 
-function write(file, data) {
+// ── "users" — butun massivni emas, faqat O'ZGARGAN maydonlarni yozish ─────
+// Muammo: sayt (Vercel nusxalari) va bot (VPS) har biri o'z keshidagi BUTUN
+// users massivini yozardi. Kesh bir necha soniya eski bo'lsa, masalan
+// trade-link saqlash boshqa jarayon tranzaksiyada o'zgartirgan balansni
+// eski qiymatga qaytarib qo'yardi (pul yechish tasdiqlangach balans tiklanishi).
+// Endi har massiv oxirgi sinxron holati (base) bilan solishtiriladi va faqat
+// farq yoziladi: balance — $inc (farq), balanceHistory — $push (yangi
+// yozuvlar), qolgan maydonlar — $set/$unset, yangi user — $push, o'chgan — $pull.
+const DIFF_FILES = new Set(["users"]);
+const baseOf = new WeakMap(); // massiv -> oxirgi sinxron nusxasi
+const fileBase = {};          // file -> oxirgi sinxron nusxasi (kuzatilmagan massiv uchun)
+
+function setCache(file, data) {
   cache[file] = data;
+  if (DIFF_FILES.has(file) && Array.isArray(data)) {
+    const snap = structuredClone(data);
+    baseOf.set(data, snap);
+    fileBase[file] = snap;
+  }
+}
+
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+// Sof funksiya (testlanadi): base → data farqidan Mongo bulkWrite amallari.
+function diffArrayOps(file, base, data) {
+  const ops = [];
+  const baseById = new Map(base.map(u => [u.id, u]));
+  const dataIds = new Set();
+  for (const u of data) {
+    dataIds.add(u.id);
+    const b = baseById.get(u.id);
+    if (!b) {
+      ops.push({ updateOne: { filter: { _id: file, "data.id": { $ne: u.id } }, update: { $push: { data: u } } } });
+      continue;
+    }
+    const $set = {}, $unset = {}, $inc = {}, $push = {};
+    for (const k of new Set([...Object.keys(b), ...Object.keys(u)])) {
+      if (same(u[k], b[k])) continue;
+      const path = `data.$.${k}`;
+      if (u[k] === undefined) { $unset[path] = ""; continue; }
+      if (k === "balance" && Number.isFinite(u[k]) && Number.isFinite(b[k])) { $inc[path] = u[k] - b[k]; continue; }
+      if (k === "balanceHistory" && Array.isArray(u[k]) && Array.isArray(b[k]) &&
+          u[k].length > b[k].length && same(u[k].slice(0, b[k].length), b[k])) {
+        $push[path] = { $each: u[k].slice(b[k].length) };
+        continue;
+      }
+      $set[path] = u[k];
+    }
+    const update = {};
+    if (Object.keys($set).length) update.$set = $set;
+    if (Object.keys($unset).length) update.$unset = $unset;
+    if (Object.keys($inc).length) update.$inc = $inc;
+    if (Object.keys($push).length) update.$push = $push;
+    if (Object.keys(update).length) ops.push({ updateOne: { filter: { _id: file, "data.id": u.id }, update } });
+  }
+  for (const b of base) {
+    if (!dataIds.has(b.id)) ops.push({ updateOne: { filter: { _id: file }, update: { $pull: { data: { id: b.id } } } } });
+  }
+  return ops;
+}
+
+function write(file, data) {
+  const base = DIFF_FILES.has(file) && Array.isArray(data) ? (baseOf.get(data) || fileBase[file]) : null;
+  if (base) {
+    const ops = diffArrayOps(file, base, data);
+    setCache(file, data);
+    if (!ops.length) return;
+    Store.bulkWrite(ops, { ordered: true }).catch((err) => {
+      console.log("MONGODB WRITE ERROR:", err.message);
+    });
+    return;
+  }
+  setCache(file, data);
   Store.updateOne({ _id: file }, { $set: { data } }, { upsert: true }).catch((err) => {
     console.log("MONGODB WRITE ERROR:", err.message);
   });
@@ -66,7 +137,7 @@ function write(file, data) {
 // muhim qidiruvlar (masalan, user topilmasa) uchun Mongo'dan qayta o'qiymiz.
 async function refresh(file) {
   const doc = await Store.findOne({ _id: file }).lean();
-  cache[file] = doc ? doc.data : [];
+  setCache(file, doc ? doc.data : []);
   return cache[file];
 }
 
@@ -97,7 +168,7 @@ async function withTransaction(fn) {
       result = await fn(session);
     });
     if (result && result.cacheUpdates) {
-      for (const [file, data] of Object.entries(result.cacheUpdates)) cache[file] = data;
+      for (const [file, data] of Object.entries(result.cacheUpdates)) setCache(file, data);
     }
     return result;
   } finally {
@@ -144,4 +215,4 @@ async function listIds(prefix) {
   return docs.map(d => d._id);
 }
 
-module.exports = { read, write, connect, refresh, withTransaction, readTx, writeTx, readDoc, writeDoc, removeDoc, takeDoc, listIds };
+module.exports = { read, write, connect, refresh, withTransaction, readTx, writeTx, readDoc, writeDoc, removeDoc, takeDoc, listIds, diffArrayOps };

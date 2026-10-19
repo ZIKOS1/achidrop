@@ -249,7 +249,9 @@ module.exports = (bot) => {
         await ctx.answerCbQuery();
         if (!isAdmin(ctx)) return;
         const id = Number(ctx.match[1]);
-        const result = balanceManager.approveWithdrawal(id);
+        let result;
+        try { result = await balanceManager.approveWithdrawal(id); }
+        catch (err) { return ctx.reply("❌ Xatolik: " + err.message); }
         if (result.error) return ctx.reply("❌ So'rov topilmadi yoki allaqachon ko'rib chiqilgan.");
         const { request, user } = result;
         ctx.editMessageText(
@@ -266,7 +268,9 @@ module.exports = (bot) => {
         await ctx.answerCbQuery();
         if (!isAdmin(ctx)) return;
         const id = Number(ctx.match[1]);
-        const result = balanceManager.rejectWithdrawal(id, null);
+        let result;
+        try { result = await balanceManager.rejectWithdrawal(id, null); }
+        catch (err) { return ctx.reply("❌ Xatolik: " + err.message); }
         if (result.error) return ctx.reply("❌ So'rov topilmadi yoki allaqachon ko'rib chiqilgan.");
         const { request } = result;
         ctx.editMessageText(`❌ *Rad etildi.*\n\n🪪 \`${request.userId}\``, { parse_mode: "Markdown" }).catch(() => ctx.reply("❌ Rad etildi."));

@@ -101,36 +101,44 @@ function getHoldSummary(userId) {
 // Tushum allaqachon balансга qo'shilgan va bidlashda ishlatilgan bo'lishi
 // mumkin — shu sabab so'ralayotgan summa joriy balansdan oshib ketmasligi
 // uchun cheklanadi (aks holda balans manfiyga tushib qolardi).
-function requestWithdrawal(userId, cardNumber) {
-    const ledgers = getAllLedgers();
-    const ledger = getOrCreateLedger(ledgers, userId);
-    const eligible = ledger.entries
-        .filter(e => !e.withdrawalStatus && isMatured(e))
-        .sort((a, b) => new Date(a.receivedAt) - new Date(b.receivedAt));
+// Uchala amal (so'rov / tasdiq / rad) BITTA MongoDB tranzaksiyasida: Vercel'ning
+// bir nechta nusxasi va bot (VPS) alohida keshlar bilan ishlaydi — keshdagi
+// read()/write() bilan parallel ikkita so'rov (masalan console'dan bir vaqtda
+// yuborilgan) bitta pulni ikki marta "pending" qilib, ikkita so'rov yaratishi,
+// yoki botning eski keshidagi `users` massivi saytda tushgan pulni bosib
+// yuborishi mumkin edi.
+function asArr(raw) { return Array.isArray(raw) ? raw : (raw ? Object.values(raw) : []); }
 
-    if (!eligible.length) return { error: "nothing_available" };
+async function requestWithdrawal(userId, cardNumber) {
+    return withTransaction(async (session) => {
+        const ledgers = asArr(await readTx(session, "tradeBalances"));
+        const ledger = ledgers.find(l => l.userId === userId);
+        const eligible = (ledger?.entries || [])
+            .filter(e => !e.withdrawalStatus && isMatured(e))
+            .sort((a, b) => new Date(a.receivedAt) - new Date(b.receivedAt));
+        if (!eligible.length) return { error: "nothing_available" };
 
-    const rawUsers = read("users");
-    const users = Array.isArray(rawUsers) ? rawUsers : Object.values(rawUsers);
-    const user = users.find(u => u.id === userId);
-    const currentBalance = user?.balance ?? 0;
-    if (currentBalance <= 0) return { error: "nothing_available" };
+        const users = asArr(await readTx(session, "users"));
+        const currentBalance = users.find(u => u.id === userId)?.balance ?? 0;
+        if (currentBalance <= 0) return { error: "nothing_available" };
 
-    const total = Math.min(eligible.reduce((s, e) => s + e.amount, 0), currentBalance);
-    const entryIds = eligible.map(e => e.id);
-    for (const e of eligible) e.withdrawalStatus = "pending";
-    saveLedgers(ledgers);
+        const total = Math.min(eligible.reduce((s, e) => s + e.amount, 0), currentBalance);
+        for (const e of eligible) e.withdrawalStatus = "pending";
 
-    const withdrawals = read("withdrawals") || [];
-    const request = {
-        id: Date.now(), userId, amount: total, cardNumber, entryIds,
-        status: "pending",
-        requestedAt: new Date().toISOString(),
-        resolvedAt: null, rejectComment: null,
-    };
-    withdrawals.push(request);
-    write("withdrawals", withdrawals);
-    return { request };
+        const withdrawals = asArr(await readTx(session, "withdrawals"));
+        let id = Date.now();
+        while (withdrawals.some(w => w.id === id)) id++;
+        const request = {
+            id, userId, amount: total, cardNumber, entryIds: eligible.map(e => e.id),
+            status: "pending",
+            requestedAt: new Date().toISOString(),
+            resolvedAt: null, rejectComment: null,
+        };
+        withdrawals.push(request);
+        await writeTx(session, "tradeBalances", ledgers);
+        await writeTx(session, "withdrawals", withdrawals);
+        return { request, cacheUpdates: { tradeBalances: ledgers, withdrawals } };
+    });
 }
 
 function getWithdrawalById(id) {
@@ -141,53 +149,54 @@ function getWithdrawalById(id) {
 // pul yechiladi (so'ralgan payt balansda bo'lgan, lekin shu orada yana
 // sarflangan bo'lishi mumkin — shu sabab bu yerda ham joriy balans bilan
 // qayta cheklanadi) va balans tarixiga yozuv qo'shiladi.
-function approveWithdrawal(id) {
-    const withdrawals = read("withdrawals") || [];
-    const request = withdrawals.find(w => w.id === id);
-    if (!request || request.status !== "pending") return { error: "not_found" };
+async function approveWithdrawal(id) {
+    return withTransaction(async (session) => {
+        const withdrawals = asArr(await readTx(session, "withdrawals"));
+        const request = withdrawals.find(w => w.id === id);
+        if (!request || request.status !== "pending") return { error: "not_found" };
 
-    const ledgers = getAllLedgers();
-    const ledger = getOrCreateLedger(ledgers, request.userId);
-    for (const e of ledger.entries) {
-        if (request.entryIds.includes(e.id)) e.withdrawalStatus = "withdrawn";
-    }
-    saveLedgers(ledgers);
+        const ledgers = asArr(await readTx(session, "tradeBalances"));
+        const ledger = ledgers.find(l => l.userId === request.userId);
+        for (const e of ledger?.entries || []) {
+            if (request.entryIds.includes(e.id)) e.withdrawalStatus = "withdrawn";
+        }
+        request.status = "approved";
+        request.resolvedAt = new Date().toISOString();
 
-    request.status = "approved";
-    request.resolvedAt = new Date().toISOString();
-    write("withdrawals", withdrawals);
-
-    const rawUsers = read("users");
-    const users = Array.isArray(rawUsers) ? rawUsers : Object.values(rawUsers);
-    const user = users.find(u => u.id === request.userId);
-    if (user) {
-        const deduct = Math.min(request.amount, user.balance ?? 0);
-        user.balance = (user.balance ?? 0) - deduct;
-        if (!Array.isArray(user.balanceHistory)) user.balanceHistory = [];
-        user.balanceHistory.push({ amount: -deduct, reason: "Obmen — pul chiqarish (karta)", date: new Date().toISOString() });
-        write("users", users);
-    }
-    return { request, user };
+        const users = asArr(await readTx(session, "users"));
+        const user = users.find(u => u.id === request.userId);
+        if (user) {
+            const deduct = Math.min(request.amount, user.balance ?? 0);
+            user.balance = (user.balance ?? 0) - deduct;
+            if (!Array.isArray(user.balanceHistory)) user.balanceHistory = [];
+            user.balanceHistory.push({ amount: -deduct, reason: "Obmen — pul chiqarish (karta)", date: new Date().toISOString() });
+        }
+        await writeTx(session, "tradeBalances", ledgers);
+        await writeTx(session, "withdrawals", withdrawals);
+        await writeTx(session, "users", users);
+        return { request, user, cacheUpdates: { tradeBalances: ledgers, withdrawals, users } };
+    });
 }
 
 // Rad etilsa — band qilingan yozuvlar yana "available" holatiga qaytadi.
-function rejectWithdrawal(id, comment) {
-    const withdrawals = read("withdrawals") || [];
-    const request = withdrawals.find(w => w.id === id);
-    if (!request || request.status !== "pending") return { error: "not_found" };
+async function rejectWithdrawal(id, comment) {
+    return withTransaction(async (session) => {
+        const withdrawals = asArr(await readTx(session, "withdrawals"));
+        const request = withdrawals.find(w => w.id === id);
+        if (!request || request.status !== "pending") return { error: "not_found" };
 
-    const ledgers = getAllLedgers();
-    const ledger = getOrCreateLedger(ledgers, request.userId);
-    for (const e of ledger.entries) {
-        if (request.entryIds.includes(e.id)) e.withdrawalStatus = null;
-    }
-    saveLedgers(ledgers);
-
-    request.status = "rejected";
-    request.resolvedAt = new Date().toISOString();
-    request.rejectComment = comment || null;
-    write("withdrawals", withdrawals);
-    return { request };
+        const ledgers = asArr(await readTx(session, "tradeBalances"));
+        const ledger = ledgers.find(l => l.userId === request.userId);
+        for (const e of ledger?.entries || []) {
+            if (request.entryIds.includes(e.id)) e.withdrawalStatus = null;
+        }
+        request.status = "rejected";
+        request.resolvedAt = new Date().toISOString();
+        request.rejectComment = comment || null;
+        await writeTx(session, "tradeBalances", ledgers);
+        await writeTx(session, "withdrawals", withdrawals);
+        return { request, cacheUpdates: { tradeBalances: ledgers, withdrawals } };
+    });
 }
 
 // Admin panel uchun — har bir foydalanuvchining muzlatilgan/bo'shatiladigan

@@ -393,7 +393,9 @@ module.exports = (bot) => {
         if (pendingWithdrawCard[userId]) {
             delete pendingWithdrawCard[userId];
             const user = getUser(userId);
-            const result = balanceManager.requestWithdrawal(userId, text);
+            let result;
+            try { result = await balanceManager.requestWithdrawal(userId, text); }
+            catch (err) { return ctx.reply("❌ Xatolik: " + err.message); }
             if (result.error) return ctx.reply("❌ Hozircha yechib olish mumkin bo'lgan mablag' yo'q.");
             const { request } = result;
             await ctx.reply(

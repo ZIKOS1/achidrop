@@ -1523,13 +1523,15 @@ app.get("/api/trade-hold-summary", auth, (req, res) => {
 });
 
 // POST /api/trade-withdraw — { cardNumber } orqali yechib olish so'rovi
-app.post("/api/trade-withdraw", auth, (req, res) => {
+app.post("/api/trade-withdraw", auth, async (req, res) => {
     const u = req.user;
     if (!u) return res.status(404).json({ error: "User not found" });
     const cardNumber = String(req.body.cardNumber || "").replace(/[\s-]/g, "");
     if (!/^\d{16}$/.test(cardNumber)) return res.status(400).json({ error: "Karta raqami 16 ta raqamdan iborat bo'lishi kerak" });
 
-    const result = balanceManager.requestWithdrawal(u.id, cardNumber);
+    let result;
+    try { result = await balanceManager.requestWithdrawal(u.id, cardNumber); }
+    catch (err) { return res.status(500).json({ error: err.message }); }
     if (result.error) return res.status(400).json({ error: "Hozircha yechib olish mumkin bo'lgan mablag' yo'q" });
     const { request } = result;
 
