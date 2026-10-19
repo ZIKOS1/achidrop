@@ -1310,7 +1310,7 @@ function mdEscape(text) {
 // Har safar Steam'dan YANGI inventar olinadi — eski nusxa yoki zaxira
 // ko'rsatilmaydi. SteamApis vaqtincha xato bersa (code 305 / 5xx / tarmoq),
 // 2 marta qayta uriniladi; baribir bo'lmasa — xato userga ko'rsatiladi.
-async function getSellInventory(steamId64, force, token) {
+async function getSellInventory(steamId64, force, token, { maxAgeMs } = {}) {
     // steamwebapi — trade-himoyadagi (yaqinda olingan/qimmat) skinlarni ham
     // beradi; kaliti bo'lsa birinchi shu ishlatiladi. Lekin u sotilmaydigan
     // collectible'larni (medal, graffiti, coin) BERMAYDI — ularni ko'rsatish
@@ -1326,7 +1326,7 @@ async function getSellInventory(steamId64, force, token) {
         }
         return items;
     }
-    if (!process.env.STEAMAPIS_KEY) return inventoryBridge.requestInventory(steamId64, { force, token }, inventoryBridge.mongoDeps());
+    if (!process.env.STEAMAPIS_KEY) return inventoryBridge.requestInventory(steamId64, { force, token, maxAgeMs }, inventoryBridge.mongoDeps());
     try {
         return await fetchCommunityInventory(steamId64, force, steamApisGet, { token });
     } catch (err) {
@@ -1418,6 +1418,7 @@ app.post("/api/steam-inv-token", auth, (req, res) => {
 // POST /api/instant-sell — { assetIds: [...] } — tanlangan skinlarni sotish
 // so'rovi. Pul DARHOL tushmaydi: user skinni trade linkimizga yuboradi,
 // admin Telegram'da "Oldim"ni bosgach tushadi.
+const SELL_CHECK_INV_MAX_AGE_MS = 15 * 60 * 1000;
 const LIS_AUTO_RATIO = 0.9; // adminga ko'rsatiladigan taxminiy Lis avtosell = Lis min narx × 0.9
 const INSTANT_SELL_ERRORS = {
     no_key: "Skin sotish tez orada ishga tushadi",
@@ -1441,7 +1442,9 @@ app.post("/api/instant-sell", auth, async (req, res) => {
     if (assetIds.length > instantSellManager.MAX_ITEMS_PER_REQUEST) return res.status(400).json({ error: INSTANT_SELL_ERRORS.too_many, code: "too_many" });
 
     let inv;
-    try { inv = await getSellInventory(u.steamId64, false, u.steamInvToken || null); }
+    // Sahifa ochilganda olingan inventar (15 daqiqagacha) — Steam'ga qayta so'rov
+    // yubormaymiz; admin baribir Steam'da skin kelganini tekshirib "Oldim"ni bosadi.
+    try { inv = await getSellInventory(u.steamId64, false, u.steamInvToken || null, { maxAgeMs: SELL_CHECK_INV_MAX_AGE_MS }); }
     catch (err) { return res.status(500).json({ error: err.message }); }
     const byId = new Map(inv.map(it => [String(it.assetId), it]));
     const notFound = assetIds.filter(a => !byId.has(a));

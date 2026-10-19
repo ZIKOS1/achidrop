@@ -163,3 +163,24 @@ test("parseWebApiInventory: massiv bo'lmasa bo'sh", () => {
     assert.deepEqual(steam.parseWebApiInventory({ error: "limit" }), []);
     assert.deepEqual(steam.parseWebApiInventory(null), []);
 });
+
+test("community: Steam 429 qaytarsa qisqa kutib qayta urinadi", async () => {
+    const { fetchCommunityInventory } = require("../backend/steam");
+    let calls = 0;
+    const slept = [];
+    const get = async () => (++calls < 3 ? { status: 429, text: "" } : { status: 200, text: "" });
+    const items = await fetchCommunityInventory("76500000000000429", true, get, { sleep: async (ms) => { slept.push(ms); } });
+    assert.deepEqual(items, []);
+    assert.equal(calls, 3);
+    assert.equal(slept.length, 2);
+});
+
+test("community: 429 takrorlansa 'Steam hozir band' xatosi", async () => {
+    const { fetchCommunityInventory } = require("../backend/steam");
+    let calls = 0;
+    const get = async () => { calls++; return { status: 429, text: "" }; };
+    await assert.rejects(
+        fetchCommunityInventory("76500000000000430", true, get, { sleep: async () => {} }),
+        /Steam hozir band/);
+    assert.equal(calls, 3);
+});

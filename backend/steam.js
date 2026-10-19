@@ -166,6 +166,25 @@ function steamApisGet(url) {
 }
 
 let steamBusyUntil = 0;
+const defaultSleep = (ms) => new Promise(r => setTimeout(r, ms));
+// Steam 429 odatda bir necha soniyalik — darhol "band" deb qaytarish o'rniga
+// shu oraliqlarda qayta urinamiz (jami bridge WAIT_MS 22s ichida qoladi).
+// Boshqa userlar ham shu qisqa oynada kutadi (xato emas), keyin davom etadi.
+const RETRY_WAITS_MS = [3000, 6000];
+
+async function getWithRetry(url, get, sleep) {
+    for (let attempt = 0; ; attempt++) {
+        const wait = steamBusyUntil - Date.now();
+        if (wait > 0) await sleep(Math.min(wait, RETRY_WAITS_MS[RETRY_WAITS_MS.length - 1]));
+        const resp = await get(url);
+        if (resp.status !== 429) { steamBusyUntil = 0; return resp; }
+        if (attempt >= RETRY_WAITS_MS.length) {
+            steamBusyUntil = Date.now() + RETRY_WAITS_MS[0];
+            throw new Error("Steam hozir band, 1-2 daqiqadan keyin urinib ko'ring");
+        }
+        steamBusyUntil = Date.now() + RETRY_WAITS_MS[attempt];
+    }
+}
 
 // Steam "jami" (total_inventory_count) qancha skin borligini aytadi, lekin
 // trade-himoyasidagi (yaqinda olingan) skinlarni OMMAGA bermaydi — ular
@@ -180,15 +199,13 @@ function communityInventoryMeta(steamId64) {
 
 // Bitta bo'limni (2 yoki 16) to'liq o'qiydi. { items, totalCount } yoki
 // protected bo'limi egasiga yopiq bo'lsa (token yo'q/xato) { blocked:true }.
-async function fetchInventoryContext(steamId64, contextId, get, token) {
+async function fetchInventoryContext(steamId64, contextId, get, token, sleep = defaultSleep) {
     const items = [];
     let start = null, totalCount = 0;
     for (let page = 0; page < 5; page++) {
         const q = `l=english&count=2000${token ? `&access_token=${encodeURIComponent(token)}` : ""}${start ? `&start_assetid=${start}` : ""}`;
         const url = `https://steamcommunity.com/inventory/${steamId64}/730/${contextId}?${q}`;
-        if (Date.now() < steamBusyUntil) throw new Error("Steam hozir band, 1-2 daqiqadan keyin urinib ko'ring");
-        const resp = await get(url);
-        if (resp.status === 429) { steamBusyUntil = Date.now() + 60_000; throw new Error("Steam hozir band, 1-2 daqiqadan keyin urinib ko'ring"); }
+        const resp = await getWithRetry(url, get, sleep);
         if (resp.status === 403) throw new Error("Steam inventaringiz yopiq (private). Uni Steam sozlamalarida ochiq (public) qiling");
         if (resp.status >= 500 || (resp.status === 400 && /"code"\s*:\s*305|try again later/i.test(resp.text || ""))) {
             throw new Error("Steam hozir javob bermayapti. Bir necha soniyadan keyin «Yangilash»ni bosing");
@@ -212,21 +229,21 @@ async function fetchInventoryContext(steamId64, contextId, get, token) {
 // token berilsa trade-himoyasidagi "16" bo'limi ham qo'shiladi (xato bo'lsa
 // jim o'tkaziladi — ochiq skinlar baribir ko'rsatiladi). hiddenCount keshga
 // yoziladi: Steam aytgan jami − biz ko'rsatayotgan son.
-async function fetchCommunityInventory(steamId64, force = false, get = fetchGet, { token } = {}) {
+async function fetchCommunityInventory(steamId64, force = false, get = fetchGet, { token, sleep = defaultSleep } = {}) {
     if (!steamId64) throw new Error("Steam hisobingiz ulanmagan");
     const cached = communityInvCache.get(steamId64);
     if (!force && cached && Date.now() - cached.ts < CACHE_MS) return cached.data;
 
     // "2" bo'limi egasiga yopiq bo'lsa ({blocked}) — bo'sh deb qaraymiz (eski
     // xatti-harakat), ishlamay qolmaymiz.
-    const main = await fetchInventoryContext(steamId64, 2, get, null);
+    const main = await fetchInventoryContext(steamId64, 2, get, null, sleep);
     const mainItems = main.items || [];
     const byId = new Map(mainItems.map(i => [i.assetId, i]));
     let totalCount = main.totalCount || mainItems.length;
 
     if (token) {
         try {
-            const prot = await fetchInventoryContext(steamId64, 16, get, token);
+            const prot = await fetchInventoryContext(steamId64, 16, get, token, sleep);
             if (!prot.blocked && prot.items) {
                 for (const it of prot.items) if (!byId.has(it.assetId)) byId.set(it.assetId, it);
                 totalCount += prot.totalCount || prot.items.length;

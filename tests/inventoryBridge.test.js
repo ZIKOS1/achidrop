@@ -101,3 +101,12 @@ test("bridge: inventar tokeni bot'ga yetkaziladi (trade-himoyadagi '16' bo'limi 
     await bridge.requestInventory("765", { force: true, token: "tok_1" }, deps);
     assert.deepEqual(fetched, [["765", true, "tok_1"]]);
 });
+
+test("bridge: maxAgeMs ichidagi natija qayta olinmaydi (sotishni tekshirish)", async () => {
+    const store = fakeStore();
+    const now = 10_000_000;
+    await store.writeDoc("inv_765", { items: ITEMS, fetchedAt: now - 10 * 60 * 1000, error: null });
+    const deps = { ...store, now: () => now, sleep: async () => { throw new Error("Steam'ga so'rov ketmasligi kerak"); } };
+    const items = await bridge.requestInventory("765", { maxAgeMs: 15 * 60 * 1000 }, deps);
+    assert.deepEqual(items, ITEMS);
+});

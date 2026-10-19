@@ -21,11 +21,13 @@ const reqId = (sid) => `invReq_${sid}`;
 const resId = (sid) => `inv_${sid}`;
 
 // Sayt tomoni.
-async function requestInventory(steamId64, { force = false, token = null } = {}, deps) {
+// maxAgeMs — shu yoshdagi natija qayta olinmaydi (sotish so'rovini tekshirish
+// sahifa ochilganda olingan inventarni qayta ishlatadi — Steam 429'ni kamaytiradi).
+async function requestInventory(steamId64, { force = false, token = null, maxAgeMs = FRESH_MS } = {}, deps) {
     if (!steamId64) throw new Error("Steam hisobingiz ulanmagan");
     const started = deps.now();
     const cached = await deps.readDoc(resId(steamId64));
-    if (!force && cached && !cached.error && started - cached.fetchedAt < FRESH_MS) return cached.items;
+    if (!force && cached && !cached.error && started - cached.fetchedAt < maxAgeMs) return cached.items;
 
     // token — userning Steam access_token'i (trade-himoyadagi "16" bo'limi uchun);
     // so'rov hujjati bot uni olishi bilan o'chiriladi.
