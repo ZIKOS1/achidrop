@@ -167,7 +167,7 @@ Kutilgan: xatosiz o'tadi.
 - [ ] **Step 6: Deploy'dan keyin health-check (o'qish-only, avtomatik o'tishi kerak)**
 
 ```bash
-curl -s -H "x-relay-secret: af05fe95d2752b1d8d0715d3795caab3bf8dff40755bbc9263bc6a8029d8b43d" https://155.133.22.217:8443/health
+curl -s -H "x-relay-secret: <STEAM_RELAY_SECRET>" https://155.133.22.217:8443/health
 ```
 
 Kutilgan: `{"loggedOn":true,...}` (yoki shunga o'xshash, `.env`dagi joriy RELAY_SECRET bilan).

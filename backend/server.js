@@ -40,6 +40,11 @@ const PORT = process.env.WEBAPP_PORT || 3000;
 // O'CHIRILGAN (Telegram'ning o'z domenidan iframe orqali yuklashini
 // bloklab qo'yishi mumkin edi). Faqat hech qanday joyni buzmaydigan,
 // universal xavfsiz sarlavhalar yoqilgan (HSTS, MIME-sniff himoyasi va h.k.).
+// Vercel oldidagi proksi haqiqiy IP'ni x-forwarded-for'da beradi — busiz
+// barcha userlar bitta IP bo'lib ko'rinadi va IP bo'yicha limitlar (admin
+// login) hammani birdan bloklab qo'yishi mumkin edi.
+if (process.env.VERCEL) app.set("trust proxy", 1);
+
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
@@ -73,6 +78,23 @@ const telegramLoginLimiter = rateLimit({
     legacyHeaders: false,
     message: { error: "Juda ko'p urinish. Birozdan keyin qayta urinib ko'ring." },
 });
+// Login qilingan user bo'yicha (auth'dan KEYIN qo'yiladi) — console'dan
+// so'rovlarni ketma-ket yuborib serverni/Steam'ni band qilishning oldini oladi.
+// Inventar yuklash alohida qattiqroq: har biri Steam'ga so'rov, ko'paysa VPS
+// IP'si 429 oladi va hamma userlarda "Steam hozir band" chiqadi.
+function userLimiter(windowMs, limit) {
+    return rateLimit({
+        windowMs, limit,
+        standardHeaders: true,
+        legacyHeaders: false,
+        keyGenerator: (req) => (req.user?.id != null ? `u${req.user.id}` : `ip${req.ip}`),
+        validate: { keyGeneratorIpFallback: false },
+        message: { error: "Juda ko'p so'rov. Birozdan keyin qayta urinib ko'ring." },
+    });
+}
+const inventoryLimiter = userLimiter(60 * 1000, 6);
+const sensitiveLimiter = userLimiter(60 * 1000, 10);
+
 const promoCheckLimiter = rateLimit({
     windowMs: 5 * 60 * 1000,
     limit: 30,
@@ -711,7 +733,7 @@ app.post("/api/market-withdraw/:purchaseId", auth, async (req, res) => {
 // bosilganda admin bilan to'g'ridan-to'g'ri chat (ticket) ochiladi.
 
 // POST /api/support/withdraw-issue — { lotId }
-app.post("/api/support/withdraw-issue", auth, (req, res) => {
+app.post("/api/support/withdraw-issue", auth, sensitiveLimiter, (req, res) => {
     const u = req.user;
     if (!u) return res.status(404).json({ error: "User not found" });
     const lotId = Number(req.body.lotId);
@@ -748,7 +770,7 @@ app.get("/api/support/:id", auth, (req, res) => {
 });
 
 // POST /api/support/:id/message — { text }
-app.post("/api/support/:id/message", auth, (req, res) => {
+app.post("/api/support/:id/message", auth, sensitiveLimiter, (req, res) => {
     const u = req.user;
     if (!u) return res.status(404).json({ error: "User not found" });
     const text = String(req.body.text || "").trim();
@@ -802,7 +824,7 @@ app.post("/api/admin/support/:id/close", requireAdminPanel, (req, res) => {
 // `steamPublicConfirmed` — obmen yo'riqnoma-wizard'ida foydalanuvchi Steam
 // inventarini public qilganini tasdiqlaganda yuboriladi (bir marta so'raladi,
 // keyingi obmenlarda wizard qayta chiqmasligi uchun saqlanadi).
-app.post("/api/trade-link", auth, (req, res) => {
+app.post("/api/trade-link", auth, sensitiveLimiter, (req, res) => {
     const u   = req.user;
     if (!u) return res.status(404).json({ error: "User not found" });
 
@@ -830,7 +852,7 @@ function otherPartyId(trade, viewerId) {
 
 // GET /api/trade-inventory — foydalanuvchining o'zi ulagan Steam hisobidagi
 // savdo qilinadigan itemlar (obmen ochish uchun tanlov ro'yxati).
-app.get("/api/trade-inventory", auth, async (req, res) => {
+app.get("/api/trade-inventory", auth, inventoryLimiter, async (req, res) => {
     const u = req.user;
     if (!u) return res.status(404).json({ error: "User not found" });
     if (!u.steamId64) return res.status(400).json({ error: "Avval Steam hisobingizni ulang" });
@@ -1362,7 +1384,7 @@ function sellItemView(it, prices) {
 // GET /api/instant-sell/quote — userning Steam inventari + har bir skin uchun
 // biz to'laydigan narx. Lis kaliti yo'q bo'lsa — `lisConfigured:false`,
 // narxlar null (UI "Tez orada ishga tushadi" ko'rsatadi).
-app.get("/api/instant-sell/quote", auth, async (req, res) => {
+app.get("/api/instant-sell/quote", auth, inventoryLimiter, async (req, res) => {
     const u = req.user;
     if (!u) return res.status(404).json({ error: "User not found" });
     const base = {
@@ -1402,7 +1424,7 @@ app.get("/api/instant-sell/quote", auth, async (req, res) => {
 // POST /api/steam-inv-token — { token } — Steam inventar access-token'i.
 // Berilsa trade-himoyasidagi skinlar ham ko'rinadi (getSellInventory).
 // bo'sh "" — tokenni o'chiradi. Token oddiy API kalit kabi saqlanadi.
-app.post("/api/steam-inv-token", auth, (req, res) => {
+app.post("/api/steam-inv-token", auth, sensitiveLimiter, (req, res) => {
     const u = req.user;
     if (!u) return res.status(404).json({ error: "User not found" });
     const raw = String(req.body.token ?? "").trim();
@@ -1430,7 +1452,7 @@ const INSTANT_SELL_ERRORS = {
     not_tradable: "Ba'zi skinlarni hozir yuborib bo'lmaydi (trade lock)",
     not_found: "Skin inventaringizda topilmadi (sahifani yangilang)",
 };
-app.post("/api/instant-sell", auth, async (req, res) => {
+app.post("/api/instant-sell", auth, sensitiveLimiter, async (req, res) => {
     const u = req.user;
     if (!u) return res.status(404).json({ error: "User not found" });
     if (!u.steamId64) return res.status(400).json({ error: "Avval Steam hisobingizni ulang" });
@@ -1523,7 +1545,7 @@ app.get("/api/trade-hold-summary", auth, (req, res) => {
 });
 
 // POST /api/trade-withdraw — { cardNumber } orqali yechib olish so'rovi
-app.post("/api/trade-withdraw", auth, async (req, res) => {
+app.post("/api/trade-withdraw", auth, sensitiveLimiter, async (req, res) => {
     const u = req.user;
     if (!u) return res.status(404).json({ error: "User not found" });
     const cardNumber = String(req.body.cardNumber || "").replace(/[\s-]/g, "");
