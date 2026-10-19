@@ -148,7 +148,9 @@ async function fetchGet(url) {
 function curlGet(url) {
     const { execFile } = require("child_process");
     return new Promise((resolve, reject) => {
-        execFile("curl", ["-s", "-m", "8", "-H", "User-Agent: Mozilla/5.0", "-w", "\n%{http_code}", url],
+        // User-Agent sarlavhasi YO'Q: 2026-10-19 da bir akkaunt uchun
+        // "Mozilla/5.0" + count=2000 doim 429 qaytardi, sarlavhasiz count=500 — 200.
+        execFile("curl", ["-s", "-m", "8", "-w", "\n%{http_code}", url],
             { maxBuffer: 64 * 1024 * 1024 }, (err, stdout) => {
                 if (err) return reject(new Error(err.code === 28 ? "Steam javob bermadi, keyinroq urinib ko'ring" : "Steam bilan bog'lanishda xato"));
                 const cut = stdout.lastIndexOf("\n");
@@ -202,8 +204,9 @@ function communityInventoryMeta(steamId64) {
 async function fetchInventoryContext(steamId64, contextId, get, token, sleep = defaultSleep) {
     const items = [];
     let start = null, totalCount = 0;
-    for (let page = 0; page < 5; page++) {
-        const q = `l=english&count=2000${token ? `&access_token=${encodeURIComponent(token)}` : ""}${start ? `&start_assetid=${start}` : ""}`;
+    // Sahifasiga 500 ta (curlGet izohiga qarang), ko'pi bilan 10 sahifa = 5000 ta.
+    for (let page = 0; page < 10; page++) {
+        const q = `l=english&count=500${token ? `&access_token=${encodeURIComponent(token)}` : ""}${start ? `&start_assetid=${start}` : ""}`;
         const url = `https://steamcommunity.com/inventory/${steamId64}/730/${contextId}?${q}`;
         const resp = await getWithRetry(url, get, sleep);
         if (resp.status === 403) throw new Error("Steam inventaringiz yopiq (private). Uni Steam sozlamalarida ochiq (public) qiling");
