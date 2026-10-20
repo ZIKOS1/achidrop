@@ -1616,6 +1616,15 @@ app.post("/api/notifications/:id/read", auth, (req, res) => {
     res.json({ success: true });
 });
 
+// POST /api/notifications/clear — foydalanuvchining barcha bildirishnomalarini o'chiradi
+app.post("/api/notifications/clear", auth, (req, res) => {
+    const u = req.user;
+    if (!u) return res.status(404).json({ error: "User not found" });
+    const list = read("notifications") || [];
+    write("notifications", list.filter(n => n.userId !== u.id));
+    res.json({ success: true });
+});
+
 // GET /api/image/:fileId — proxy Telegram images
 app.get("/api/image/:fileId", async (req, res) => {
     try {

@@ -396,6 +396,8 @@ const DICT = {
   "notifications.title": { uz: "Bildirishnomalar", ru: "Уведомления", en: "Notifications" },
   "notifications.emptyDesc": { uz: "Hozircha bildirishnoma yo'q", ru: "Уведомлений пока нет", en: "No notifications yet" },
   "notifications.empty": { uz: "Bildirishnoma yo'q", ru: "Уведомлений нет", en: "No notifications" },
+  "notifications.clear": { uz: "Tozalash", ru: "Очистить", en: "Clear" },
+  "notifications.clearConfirm": { uz: "Hammasini o'chirasizmi?", ru: "Удалить все?", en: "Delete all?" },
 
   "lot.minBidLabel": { uz: "Minimal bid", ru: "Мин. ставка", en: "Minimum bid" },
   "lot.floatLabel": { uz: "Float", ru: "Float", en: "Float" },
