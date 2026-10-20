@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import { Banknote, Check, CheckCircle2, ChevronDown, Clock, Copy, Crown, ExternalLink, Lock, Package, RefreshCw, Search, X, XCircle } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
@@ -41,12 +41,12 @@ function StatusBadge({ status }) {
   );
 }
 
-// Tanlash doirasi — tanlanganda oltin bilan "pop" qilib to'ladi (02).
+// Tanlash doirasi — tanlanganda qizil bilan "pop" qilib to'ladi.
 function Tick({ on }) {
   return (
-    <span className="relative flex size-[22px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-input bg-card">
+    <span className={cn("relative flex size-6 shrink-0 items-center justify-center rounded-full border-[1.5px]", on ? "border-[#E3141F]" : "border-white/35 bg-black/25")}>
       {on && (
-        <span className="tick-pop absolute -inset-[1.5px] flex items-center justify-center rounded-full bg-primary text-primary-foreground">
+        <span className="tick-pop absolute -inset-[1.5px] flex items-center justify-center rounded-full bg-[#E3141F] text-white">
           <Check className="size-3.5" strokeWidth={3} />
         </span>
       )}
@@ -54,8 +54,8 @@ function Tick({ on }) {
   );
 }
 
-// Skin kartochkasi: rasm (nodirlik nuri bilan), nom, "Nodirlik · Sifat", narx.
-// Nodirlik nuqtasi va matn orasida 8px (gap-2).
+// Skin kartochkasi (dizayn): binafsha nurli to'q fon, rasm 16:10, nom,
+// "Nodirlik · Sifat" (kvadrat nuqta bilan), narx. Tanlansa — qizil chegara va nur.
 function SkinCard({ item, selected, disabled, priced, onToggle, index = 0 }) {
   const rColor = rarityColor(item.rarity, item.name);
   const lockDays = item.lockedUntil ? Math.max(1, Math.ceil((Date.parse(item.lockedUntil) - Date.now()) / 86400000)) : 0;
@@ -67,35 +67,48 @@ function SkinCard({ item, selected, disabled, priced, onToggle, index = 0 }) {
       onClick={onToggle}
       style={{ "--fade-delay": `${Math.min((index % PAGE) * 30, 450)}ms` }}
       className={cn(
-        "animate-fade-up group relative flex flex-col overflow-hidden rounded-2xl border bg-card text-left transition-[border-color,background-color,transform,box-shadow] duration-200",
-        selected ? "border-primary/60 bg-[var(--row-sel)] shadow-panel" : "border-border hover:-translate-y-0.5 hover:border-ring/60",
+        "ad-skin animate-fade-up group relative flex flex-col gap-1.5 rounded-2xl border border-[var(--ad-line)] p-2.5 text-left transition-[border-color,box-shadow,transform] duration-150 sm:px-3.5 sm:pb-3.5 sm:pt-3",
+        selected ? "skin-sel" : "hover:-translate-y-0.5 hover:border-white/25",
         disabled ? "cursor-not-allowed opacity-50 hover:translate-y-0" : "active:scale-[0.98]"
       )}
     >
       <span className="absolute right-2.5 top-2.5 z-10"><Tick on={selected} /></span>
-      <span
-        className="flex h-24 items-center justify-center px-4 pt-3 sm:h-28"
-        style={{ background: `radial-gradient(ellipse at center, ${rColor}33, transparent 70%)` }}
-      >
-        {item.imageUrl ? <img src={imgSrc(item.imageUrl)} alt="" loading="lazy" className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105" /> : <Package className="size-7 text-muted-foreground" />}
+      <span className="flex aspect-[16/10] items-center justify-center overflow-hidden rounded-[10px]">
+        {item.imageUrl ? <img src={imgSrc(item.imageUrl)} alt="" loading="lazy" className="max-h-full max-w-full rounded-none object-contain transition-transform duration-300 group-hover:scale-105" /> : <Package className="size-7 text-muted-foreground" />}
       </span>
-      <span className="flex flex-1 flex-col px-3 pb-3 pt-2">
-        <span className="line-clamp-2 min-h-[2.5em] text-[12px] font-medium leading-[1.25] text-foreground">{item.name}</span>
-        <span className="mt-1.5 flex items-center gap-2">
-          <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: rColor, boxShadow: `0 0 8px ${rColor}` }} />
-          <span className="truncate text-[10.5px] text-muted-foreground">{rarityLabel(item)}{item.wear ? ` · ${item.wear}` : ""}</span>
-        </span>
-        <span className="mt-2 flex items-end justify-between gap-2">
-          <span className="whitespace-nowrap font-heading text-[15px] font-semibold tabular-nums text-foreground">{priced ? fmtMoney(item.priceSom) : "—"}</span>
-          {tag && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--row-sel)] px-2 py-0.5 text-[10px] font-semibold text-primary">
-              {!item.tradable && item.sellable !== false && <Lock className="size-2.5" />}
-              {tag}
-            </span>
-          )}
-        </span>
+      <span className="line-clamp-2 min-h-[2.4em] text-[13.5px] font-medium leading-[1.2] text-[var(--heading)] sm:text-[15px]">{item.name}</span>
+      <span className="flex items-center gap-[7px] text-xs text-muted-foreground sm:text-[13px]">
+        <span className="size-[7px] shrink-0 rounded-[2px]" style={{ backgroundColor: rColor }} />
+        <span className="truncate">{rarityLabel(item)}{item.wear ? ` · ${item.wear}` : ""}</span>
+      </span>
+      <span className="flex items-end justify-between gap-2">
+        <span className="whitespace-nowrap text-[15px] font-semibold tabular-nums text-[var(--heading)] sm:text-[17px]">{priced ? fmtMoney(item.priceSom) : "—"}</span>
+        {tag && (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--row-sel)] px-2 py-0.5 text-[10px] font-semibold text-primary">
+            {!item.tradable && item.sellable !== false && <Lock className="size-2.5" />}
+            {tag}
+          </span>
+        )}
       </span>
     </button>
+  );
+}
+
+// Inventar qiymati / Sotsa bo'ladi — ikki statistik blok
+function StatBoxes({ value, count, big }) {
+  return (
+    <div className={cn("grid gap-2.5", big ? "grid-cols-[1.15fr_1fr]" : "grid-cols-2")}>
+      <div className={cn("ad-panel", big ? "rounded-2xl px-4 py-3.5" : "rounded-[14px] px-3.5 py-3")}>
+        <p className={cn("uppercase tracking-[0.15em] text-muted-foreground", big ? "text-[11.5px]" : "text-[11px]")}>{t("sell.inventoryValue")}</p>
+        <p className={cn("mt-1 whitespace-nowrap font-bold tabular-nums text-[var(--heading)]", big ? "text-[26px]" : "text-[22px]")}>
+          {value.toLocaleString("ru-RU").replace(/ /g, " ")} <span className={cn("text-primary", big ? "text-[15px]" : "text-sm")}>so'm</span>
+        </p>
+      </div>
+      <div className={cn("ad-panel", big ? "rounded-2xl px-4 py-3.5" : "rounded-[14px] px-3.5 py-3")}>
+        <p className={cn("uppercase tracking-[0.15em] text-muted-foreground", big ? "text-[11.5px]" : "text-[11px]")}>{t("sell.sellableCount")}</p>
+        <p className={cn("mt-1 font-bold tabular-nums text-[var(--heading)]", big ? "text-[26px]" : "text-[22px]")}>{count}</p>
+      </div>
+    </div>
   );
 }
 
@@ -115,9 +128,9 @@ function SortMenu({ value, onChange }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={cn("flex items-center gap-1.5 whitespace-nowrap rounded-xl border bg-card px-3 py-2.5 text-xs transition-colors", open ? "border-ring" : "border-border hover:border-ring/60")}
+        className={cn("ad-field flex h-[46px] items-center gap-1.5 whitespace-nowrap rounded-[14px] px-3.5 text-[14.5px] transition-colors", open ? "!border-ring" : "hover:!border-ring/60")}
       >
-        <span className="hidden text-muted-foreground lg:inline">{t("sellx.sort.label")}:</span>
+        <span className="hidden text-muted-foreground sm:inline">{t("sellx.sort.label")}:</span>
         <span className="font-semibold text-primary">{t(`sellx.sort.${value}`)}</span>
         <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform duration-200", open && "rotate-180")} />
       </button>
@@ -140,7 +153,7 @@ function SortMenu({ value, onChange }) {
   );
 }
 
-// Asosiy oltin tugma holatlari (05): oddiy, kursor (ko'tariladi), bosilgan, o'chiq, yuborilmoqda.
+// Asosiy tugma (dizayn): qizil konturli, nurli. "SOTISH · N TA" / "SKIN TANLANG".
 function SellButton({ count, submitting, onClick, className }) {
   const off = count === 0;
   return (
@@ -148,16 +161,10 @@ function SellButton({ count, submitting, onClick, className }) {
       type="button"
       onClick={onClick}
       disabled={off || submitting}
-      className={cn(
-        "flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 font-heading text-sm font-semibold uppercase tracking-wide transition-all duration-200",
-        off ? "bg-secondary text-muted-foreground"
-          : submitting ? "bg-[var(--row-sel)] text-primary"
-          : "bg-gold-grad text-white hover:brightness-95 active:translate-y-px active:scale-[0.97] active:brightness-95",
-        className
-      )}
+      className={cn("ad-cta flex items-center justify-center gap-2 whitespace-nowrap rounded-[14px] text-[15px] uppercase", !off && "on", className)}
     >
-      {submitting ? <span className="size-4 rounded-full border-2 border-primary/30 border-t-primary spin" /> : null}
-      {off ? t("sellx.pickSkin") : submitting ? t("sellx.sending") : `${t("sell.sellBtn")} →`}
+      {submitting ? <span className="size-4 rounded-full border-2 border-white/30 border-t-[#FF3B45] spin" /> : null}
+      {off ? t("sellx.pickSkin") : submitting ? t("sellx.sending") : t("sellx.ctaSell", { n: count })}
     </button>
   );
 }
@@ -452,44 +459,24 @@ export default function Sell() {
   const steamMissing = !user.steamId64 || quote?.steamConnected === false;
 
   return (
-    <div className="space-y-5 pb-28 lg:pb-8">
+    <div className="space-y-5 pb-28 xl:pb-8">
       <Confetti show={confetti} />
 
-      {/* Sarlavha: telefonda katta "Inventaringiz qiymati", kompyuterda sarlavha + statistika */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="lg:hidden">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{t("sellx.invValue")}</p>
-          <p className="mt-2 flex items-baseline gap-2">
-            <span className="font-heading text-[42px] font-semibold leading-none tabular-nums text-foreground">{(quote?.lisConfigured ? inventoryValue : 0).toLocaleString("ru-RU").replace(/ /g, " ")}</span>
-            <span className="font-heading text-lg text-primary">so'm</span>
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <span className="rounded-full border border-border bg-card px-3 py-1 text-[11px] text-muted-foreground">{t("sellx.nSkins", { n: sellableItems.length })}</span>
-            <span className="rounded-full border border-border bg-card px-3 py-1 text-[11px] text-muted-foreground">{t("sellx.holdPill")}</span>
-          </div>
-        </div>
-        <div className="hidden lg:block">
-          <h1 className="font-heading text-3xl font-semibold text-foreground">{t("sell.title")}</h1>
-          <p className="mt-1 text-[13px] text-muted-foreground">{t("sellx.deskSubtitle")}</p>
+      {/* Sarlavha + (xl dan kichik ekranda) statistika */}
+      <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <h1 className="text-[30px] font-bold leading-[1.05] tracking-[-0.01em] text-[var(--heading)] lg:text-[40px]">{t("sell.title")}</h1>
+          <p className="text-[15px] text-muted-foreground [text-wrap:pretty]">{t("sellx.deskSubtitle")}</p>
         </div>
         {quote?.lisConfigured && sellableItems.length > 0 && (
-          <div className="hidden gap-2.5 lg:flex">
-            <div className="rounded-2xl border border-border bg-card px-4 py-2.5">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{t("sell.inventoryValue")}</p>
-              <p className="mt-0.5 whitespace-nowrap font-heading text-[22px] font-semibold tabular-nums text-foreground">{inventoryValue.toLocaleString("ru-RU").replace(/ /g, " ")} <span className="text-sm text-primary">so'm</span></p>
-            </div>
-            <div className="rounded-2xl border border-border bg-card px-4 py-2.5">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{t("sell.sellableCount")}</p>
-              <p className="mt-0.5 font-heading text-[22px] font-semibold tabular-nums text-foreground">{sellableItems.length}</p>
-            </div>
-          </div>
+          <div className="xl:hidden"><StatBoxes value={inventoryValue} count={sellableItems.length} /></div>
         )}
       </div>
 
       <RecentSales recent={stats?.recent} />
 
       {quote && !quote.lisConfigured && (
-        <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4">
+        <div className="ad-panel flex items-start gap-3 rounded-2xl p-4">
           <Clock className="mt-0.5 size-5 shrink-0 text-primary" />
           <div>
             <p className="text-sm font-semibold text-foreground">{t("sell.comingSoon")}</p>
@@ -506,17 +493,17 @@ export default function Sell() {
           </button>
         </EmptyState>
       ) : (
-        <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_330px] lg:items-start">
-          <section className="min-w-0 space-y-3">
-            {/* Qidiruv + saralash (+ kompyuterda Top-5) */}
-            <div className="flex items-center gap-2">
-              <label className="group flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl border border-border bg-card px-3.5 transition-[border-color,box-shadow] duration-200 focus-within:border-ring focus-within:shadow-[0_0_0_4px_color-mix(in_oklch,var(--primary)_20%,transparent)] lg:max-w-[340px]">
-                <Search className="size-4 shrink-0 text-muted-foreground transition-colors group-focus-within:text-primary" />
+        <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
+          <section className="min-w-0 space-y-[18px]">
+            {/* Qidiruv + saralash + Top-5 + yangilash */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <label className="ad-field group flex h-[46px] min-w-0 flex-[1_1_220px] max-xl:order-1 items-center gap-2.5 rounded-[14px] px-3.5 transition-[border-color,box-shadow] duration-200 focus-within:!border-ring sm:max-w-[320px]">
+                <Search className="size-[18px] shrink-0 text-muted-foreground transition-colors group-focus-within:text-primary" />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={t("sell.search")}
-                  className="w-full rounded-none bg-transparent py-2.5 text-[13px] text-foreground caret-primary outline-none placeholder:text-muted-foreground"
+                  className="w-full rounded-none bg-transparent text-[15px] text-foreground caret-primary outline-none placeholder:text-muted-foreground"
                 />
                 {query && (
                   <button type="button" onClick={() => setQuery("")} aria-label={t("sell.clear")} className="flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground hover:text-foreground">
@@ -524,43 +511,37 @@ export default function Sell() {
                   </button>
                 )}
               </label>
-              <span className="hidden flex-1 lg:block" />
-              {items.length > 0 && <SortMenu value={sort} onChange={setSort} />}
+              <span className="hidden min-w-0 flex-1 sm:block max-xl:order-3" />
+              {items.length > 0 && <div className="max-xl:order-4"><SortMenu value={sort} onChange={setSort} /></div>}
               {quote?.lisConfigured && sellableItems.length > 0 && (
-                <button type="button" onClick={selectTop5} className="hidden shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-primary/35 bg-[var(--row-sel)] px-3 py-2.5 text-xs font-medium text-primary transition-all duration-200 hover:-translate-y-0.5 active:scale-95 lg:flex">
-                  <Crown className="size-3.5" />
+                <button type="button" onClick={selectTop5} className="flex h-[46px] shrink-0 items-center gap-[7px] max-xl:order-5 whitespace-nowrap rounded-[14px] border border-[rgba(227,20,31,.7)] bg-[rgba(227,20,31,.1)] px-3.5 text-[14.5px] font-semibold text-primary transition-colors hover:bg-[rgba(227,20,31,.2)] active:scale-95">
+                  <Crown className="size-[17px]" />
                   {t("sellx.top5")}
                 </button>
               )}
-              <button type="button" onClick={() => load(true)} disabled={loading} aria-label={t("sell.refresh")} title={t("sell.refresh")} className="flex shrink-0 items-center justify-center rounded-xl border border-border bg-card p-2.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50">
-                <RefreshCw className={cn("size-4", loading && "spin")} />
+              <button type="button" onClick={() => load(true)} disabled={loading} aria-label={t("sell.refresh")} title={t("sell.refresh")} className="ad-field flex size-[46px] shrink-0 max-xl:order-2 items-center justify-center rounded-[14px] text-foreground transition-colors hover:!border-ring/60 disabled:opacity-50">
+                <RefreshCw className={cn("size-[18px]", loading && "spin")} />
               </button>
             </div>
-            {query && !loading && <p className="-mt-1 px-1 text-[11px] text-muted-foreground">{visible.length ? t("sellx.found", { n: visible.length }) : <span className="text-destructive">{t("sellx.notFound")}</span>}</p>}
+            {query && !loading && <p className="-mt-2 px-1 text-xs text-muted-foreground">{visible.length ? t("sellx.found", { n: visible.length }) : <span className="text-destructive">{t("sellx.notFound")}</span>}</p>}
 
-            {/* Filtr chiplari (03) */}
+            {/* Filtr chiplari */}
             {items.length > 0 && (
-              <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]">
+              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]">
                 {SELL_CATEGORIES.filter((c) => c === "all" || catCounts[c]).map((c) => (
                   <button
                     key={c}
                     type="button"
                     onClick={() => { setCategory(c); hap("selection"); }}
                     className={cn(
-                      "flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs transition-all duration-200 active:scale-95",
-                      category === c ? "border-primary bg-primary font-semibold text-primary-foreground" : "border-border bg-card font-medium text-muted-foreground hover:border-ring/60 hover:text-foreground"
+                      "flex h-[38px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-[15px] transition-all duration-200 active:scale-95",
+                      category === c ? "border-[#E3141F] bg-[#E3141F] font-bold text-white" : "border-[var(--ad-line)] bg-[var(--ad-field)] font-medium text-muted-foreground hover:text-foreground"
                     )}
                   >
                     {t(`sellx.cat.${c}`)}
-                    <span className="text-[10.5px] opacity-65">{catCounts[c] || 0}</span>
+                    <span className="opacity-75">{catCounts[c] || 0}</span>
                   </button>
                 ))}
-                {quote?.lisConfigured && sellableItems.length > 0 && (
-                  <button type="button" onClick={selectTop5} className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/35 bg-[var(--row-sel)] px-3.5 py-1.5 text-xs font-medium text-primary transition-all active:scale-95 lg:hidden">
-                    <Crown className="size-3.5" />
-                    {t("sellx.top5")}
-                  </button>
-                )}
               </div>
             )}
 
@@ -571,9 +552,9 @@ export default function Sell() {
                   <span className="size-4 rounded-full border-2 border-primary/30 border-t-primary spin" />
                   {t("sellx.loadingInv")}
                 </div>
-                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] sm:gap-3.5">
                   {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className="overflow-hidden rounded-2xl border border-border bg-card p-3">
+                    <div key={i} className="ad-skin overflow-hidden rounded-2xl border border-[var(--ad-line)] p-3">
                       <div className="skeleton h-20 w-full rounded-xl" />
                       <div className="skeleton mt-3 h-2.5 w-4/5 rounded-md" />
                       <div className="skeleton mt-2 h-2 w-1/2 rounded-md" />
@@ -597,7 +578,7 @@ export default function Sell() {
               ) : (
                 <div>
                   {/* Hammasi bir marta yuklangan — "Yana ko'rsatish" faqat ekranda ochadi, serverga so'rov yubormaydi. */}
-                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] sm:gap-3.5">
                     {visible.slice(0, shown).map((it, i) => (
                       <SkinCard
                         key={it.assetId}
@@ -625,42 +606,39 @@ export default function Sell() {
             )}
           </section>
 
-          {/* Kompyuter: "Tanlanganlar" paneli */}
-          <aside className="sticky top-6 hidden space-y-3.5 lg:block">
-            <div className="rounded-3xl border border-border bg-card p-[22px] shadow-panel">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{t("sellx.picked")}</p>
-              <div className="mt-3.5 max-h-72 space-y-2.5 overflow-y-auto">
-                {selectedItems.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">{t("sellx.pickedEmpty")}</p>
-                ) : selectedItems.map((it) => (
-                  <div key={it.assetId} className="animate-fade-up flex items-center gap-3">
-                    <span className="flex h-9 w-12 shrink-0 items-center justify-center rounded-lg" style={{ background: `radial-gradient(ellipse at center, ${rarityColor(it.rarity, it.name)}30, transparent 72%)` }}>
-                      {it.imageUrl ? <img src={imgSrc(it.imageUrl)} alt="" className="max-h-full max-w-full rounded-none object-contain" /> : <Package className="size-4 text-muted-foreground" />}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-xs text-foreground">{it.name}</span>
-                    <span className="shrink-0 whitespace-nowrap font-heading text-sm font-semibold tabular-nums text-foreground">{fmtMoney(it.priceSom)}</span>
-                  </div>
+          {/* Keng ekran: statistika + "Tanlanganlar" ramkasi + afzalliklar */}
+          <aside className="sticky top-24 hidden flex-col gap-3.5 xl:flex">
+            {quote?.lisConfigured && sellableItems.length > 0 && <StatBoxes value={inventoryValue} count={sellableItems.length} big />}
+            <div className="ad-frame">
+              <div className="ad-frame-in flex flex-col gap-3.5 px-5 pb-[22px] pt-5">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{t("sellx.picked")}</p>
+                <p className="text-[15px] text-foreground [text-wrap:pretty]">{selected.size ? t("sellx.nPicked", { n: selected.size }) : t("sellx.pickedEmpty")}</p>
+                <div className="h-px bg-[linear-gradient(90deg,transparent,var(--ad-line),transparent)]" />
+                <div className="flex items-baseline justify-between">
+                  <span className="text-base text-foreground">{t("sellx.totalLabel")}</span>
+                  <span className="text-[30px] font-bold tabular-nums text-[var(--heading)]">{total.toLocaleString("ru-RU").replace(/ /g, " ")} <span className="text-base text-primary">so'm</span></span>
+                </div>
+                <SellButton count={selected.size} submitting={submitting} onClick={confirmSell} className="h-[52px] w-full" />
+                <p className="text-sm leading-normal text-muted-foreground [text-wrap:pretty]">{t("sellx.nextStep")}</p>
+              </div>
+              <div className="ad-frame-glow" />
+            </div>
+            <div className="ad-frame-sm">
+              <div className="flex flex-col gap-3 px-[18px] py-4">
+                {["safe", "cards", "support"].map((k) => (
+                  <p key={k} className="flex items-center gap-3 text-[15px] text-foreground">
+                    <span className="size-[7px] shrink-0 rotate-45 bg-[#E3141F]" />
+                    {t(`sellx.bullet.${k}`)}
+                  </p>
                 ))}
               </div>
-              <div className="my-[18px] h-px bg-border" />
-              <div className="flex items-baseline justify-between">
-                <span className="text-[13px] text-muted-foreground">{t("sellx.totalLabel")}</span>
-                <span className="font-heading text-[28px] font-semibold tabular-nums text-foreground">{total.toLocaleString("ru-RU").replace(/ /g, " ")} <span className="text-[15px] text-primary">so'm</span></span>
-              </div>
-              <SellButton count={selected.size} submitting={submitting} onClick={confirmSell} className="mt-[18px] w-full" />
-              <p className="mt-3.5 text-[11.5px] leading-relaxed text-muted-foreground">{t("sellx.nextStep")}</p>
-            </div>
-            <div className="space-y-3 rounded-3xl border border-border bg-card px-5 py-[18px] text-xs shadow-panel">
-              {["safe", "cards", "support"].map((k) => (
-                <p key={k} className="flex items-center gap-2.5"><span className="text-primary">◆</span><span className="text-muted-foreground">{t(`sellx.bullet.${k}`)}</span></p>
-              ))}
             </div>
           </aside>
         </div>
       )}
 
       {mine.length > 0 && (
-        <div id="my-requests" className="scroll-mt-20 rounded-3xl border border-border bg-card p-4 shadow-panel sm:p-5">
+        <div id="my-requests" className="ad-panel scroll-mt-24 rounded-2xl p-4 sm:p-5">
           <h2 className="mb-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{t("sell.myRequests")}</h2>
           <ul>
             {mine.map((r) => (
@@ -699,33 +677,18 @@ export default function Sell() {
       <Faq />
       <TelegramBanner botUsername={botUsername} onOpen={openLink} />
 
-      {/* Telefon: pastda oltin "Sotish" paneli (03) */}
-      <AnimatePresence>
-        {selected.size > 0 && (
-          <motion.div
-            initial={{ y: "120%", opacity: 0 }}
-            animate={{ y: 0, opacity: 1, transition: { duration: 0.42, ease: [0.16, 1, 0.3, 1] } }}
-            exit={{ y: "120%", opacity: 0, transition: { duration: 0.24, ease: "easeIn" } }}
-            className="fixed inset-x-0 bottom-0 z-30 px-3.5 pb-[18px] lg:hidden"
-          >
-            <div className="mx-auto flex max-w-xl items-center justify-between gap-3 rounded-[20px] bg-gold-grad py-3.5 pl-5 pr-4 text-white shadow-panel-lg">
-              <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-[0.14em] opacity-65">{t("sellx.nPicked", { n: selected.size })}</p>
-                <p className="font-heading text-[22px] font-bold tabular-nums">{fmtMoney(total)}</p>
-              </div>
-              <button
-                type="button"
-                onClick={confirmSell}
-                disabled={submitting}
-                className="flex shrink-0 items-center gap-2 rounded-2xl bg-[#0A0A0A] px-[18px] py-3 text-[13px] font-semibold text-white transition-transform duration-100 active:scale-[0.96] disabled:opacity-70"
-              >
-                {submitting && <span className="size-3.5 rounded-full border-2 border-white/30 border-t-white spin" />}
-                {submitting ? t("sellx.sending") : `${t("sell.sellBtn")} →`}
-              </button>
+      {/* xl dan kichik ekran: pastda "Tanlandi · N" paneli */}
+      {!steamMissing && items.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-30 flex justify-center bg-[linear-gradient(180deg,transparent,var(--background)_30%)] px-3.5 pb-4 pt-3 lg:left-66 xl:hidden">
+          <div className="ad-bar flex w-full max-w-[560px] items-center gap-3 rounded-[18px] py-2.5 pl-4 pr-2.5">
+            <div className="flex min-w-0 flex-1 flex-col">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{t("sellx.pickedN", { n: selected.size })}</p>
+              <p className="whitespace-nowrap text-xl font-bold tabular-nums text-[var(--heading)]">{total.toLocaleString("ru-RU").replace(/ /g, " ")} <span className="text-[13px] text-primary">so'm</span></p>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <SellButton count={selected.size} submitting={submitting} onClick={confirmSell} className="h-12 px-[18px] text-sm" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

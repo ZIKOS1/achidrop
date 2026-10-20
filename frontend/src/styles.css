@@ -27,8 +27,8 @@
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-border: var(--sidebar-border);
-  --font-sans: "Inter", "Inter Fallback", sans-serif;
-  --font-heading: "Rajdhani", "Rajdhani Fallback", sans-serif;
+  --font-sans: "Barlow", system-ui, sans-serif;
+  --font-heading: "Barlow", system-ui, sans-serif;
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
@@ -37,22 +37,22 @@
 
 :root {
   color-scheme: dark;
-  /* Dark — qora + qizil (2026-10-19). Gradient/nur yo'q: tekis yuzalar,
-     ingichka chegara, qizil faqat asosiy amal va urg'u uchun. */
-  --background: #0C0C0D;
-  --foreground: #E8E8EA;        /* asosiy matn */
+  /* Dark — Claude Design "AchiDrop Skin Sotish Responsive" (2026-10-20):
+     qora fon, pastdan qizil nur, kumush yon menyu, qizil urg'u. */
+  --background: #101013;
+  --foreground: #ECEAEC;        /* asosiy matn */
   --heading: #FFFFFF;           /* sarlavha matni */
-  --card: #151517;
-  --card-foreground: #E8E8EA;
-  --popover: #18181B;
-  --popover-foreground: #E8E8EA;
-  --primary: #E0242D;           /* qizil (asosiy) */
+  --card: #1A181D;
+  --card-foreground: #ECEAEC;
+  --popover: #1F1E22;
+  --popover-foreground: #ECEAEC;
+  --primary: #E3141F;           /* qizil (asosiy) */
   --primary-foreground: #FFFFFF;
-  --secondary: #121214;
-  --secondary-foreground: #E8E8EA;
-  --muted: #151517;
-  --muted-foreground: #9A9AA2;  /* ikkinchi matn */
-  --accent: #F2484F;            /* qizil matn / link — qora fonda o'qiladi */
+  --secondary: #18161A;
+  --secondary-foreground: #ECEAEC;
+  --muted: #1A181D;
+  --muted-foreground: #A9A5AC;  /* ikkinchi matn */
+  --accent: #FF3B45;            /* qizil matn / link — qora fonda o'qiladi */
   --accent-foreground: #FFFFFF;
   --destructive: #FF7A5C;       /* xato — qizildan ajralsin (to'q sariq-qizil) */
   --destructive-foreground: #120C0B;
@@ -60,25 +60,33 @@
   --success-foreground: #0B120D;
   --warning: #E8B04B;
   --warning-foreground: #14100A;
-  --border: #242428;
-  --input: #2E2E33;
-  --ring: #E0242D;
+  --border: #2A282D;
+  --input: #34313A;
+  --ring: #E3141F;
   --sidebar: #0F0F11;
   --sidebar-foreground: #E8E8EA;
   --sidebar-border: #1F1F23;
-  --logo-a: #FFFFFF;            /* "ACHI" — qora fonda qora ko'rinmaydi, oq */
-  --logo-b: #E0242D;            /* "DROP" */
-  --hero-a: #151517;
-  --hero-b: #121214;
+  --logo-a: #E3141F;            /* "ACHI" — qizil */
+  --logo-b: #FFFFFF;            /* "DROP" — qora fonda oq (kumush menyuda qora) */
+  --hero-a: #1A181D;
+  --hero-b: #18161A;
   /* Ro'yxatdagi tanlangan / kursor ostidagi qator foni */
-  --row-sel: rgba(224, 36, 45, 0.09);
+  --row-sel: rgba(227, 20, 31, 0.1);
   --row-hov: rgba(255, 255, 255, 0.035);
   --gold-grad: none;
-  --g1: #E0242D; --g2: #E0242D; --g3: #E0242D;
-  --grad-card-in: #151517;
-  --grad-card-bd: #242428;
+  --g1: #E3141F; --g2: #E3141F; --g3: #E3141F;
+  --grad-card-in: #1A181D;
+  --grad-card-bd: #2A282D;
   --orb-a: transparent; --orb-b: transparent;
-  --page-glow: none;
+  --page-glow: radial-gradient(60% 50% at 100% 100%, rgba(190,18,30,.30), transparent 70%), radial-gradient(40% 35% at 0% 100%, rgba(190,18,30,.15), transparent 70%), linear-gradient(180deg, #141418 0%, #101013 100%);
+  /* Dizayndagi yuzalar (panel, maydon, skin kartasi, ramka ichi) */
+  --ad-panel: rgba(28, 26, 30, 0.75);
+  --ad-field: rgba(24, 22, 26, 0.8);
+  --ad-line: rgba(255, 255, 255, 0.1);
+  --ad-skin: radial-gradient(80% 60% at 50% 25%, rgba(70,40,95,.45), transparent 75%), #19171C;
+  --ad-frame-in: repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 3px, transparent 3px 7px), linear-gradient(180deg, #232226, #17161A);
+  --ad-bar: linear-gradient(180deg, #25242A, #18171B);
+  --ad-header: rgba(16, 16, 20, 0.78);
   --shadow-color: rgb(0 0 0 / 55%);
   --shadow-sm: 0 1px 2px var(--shadow-color);
   --shadow-md: 0 6px 18px -10px var(--shadow-color), 0 1px 2px var(--shadow-color);
@@ -117,8 +125,8 @@
   --sidebar: #FFFFFF;
   --sidebar-foreground: #18181B;
   --sidebar-border: #E4E4E7;
-  --logo-a: #0A0A0A;            /* "ACHI" — qora */
-  --logo-b: #D41F28;            /* "DROP" — qizil */
+  --logo-a: #D41F28;            /* "ACHI" — qizil */
+  --logo-b: #0A0A0A;            /* "DROP" — qora */
   --hero-a: #FFFFFF;
   --hero-b: #FFFFFF;
   --row-sel: rgba(212, 31, 40, 0.07);
@@ -128,7 +136,14 @@
   --grad-card-in: #FFFFFF;
   --grad-card-bd: #E4E4E7;
   --orb-a: transparent; --orb-b: transparent;
-  --page-glow: none;
+  --page-glow: radial-gradient(60% 50% at 100% 100%, rgba(212,31,40,.08), transparent 70%);
+  --ad-panel: #FFFFFF;
+  --ad-field: #FFFFFF;
+  --ad-line: #E4E4E7;
+  --ad-skin: radial-gradient(80% 60% at 50% 25%, rgba(120,80,160,.12), transparent 75%), #FFFFFF;
+  --ad-frame-in: repeating-linear-gradient(135deg, rgba(0,0,0,.025) 0 3px, transparent 3px 7px), linear-gradient(180deg, #FFFFFF, #F6F6F7);
+  --ad-bar: linear-gradient(180deg, #FFFFFF, #F6F6F7);
+  --ad-header: rgba(244, 244, 245, 0.82);
   --shadow-color: rgb(10 10 10 / 10%);
   --shadow-sm: 0 1px 2px var(--shadow-color);
   --shadow-md: 0 6px 18px -12px var(--shadow-color), 0 1px 2px var(--shadow-color);
@@ -411,7 +426,7 @@ body {
 
 /* ===== Tekis urg'ular (oldingi "mayin gradient"lar o'rniga, 2026-10-19) =====
    Klass nomlari o'zgarmadi — JSX'da ko'p joyda ishlatiladi. */
-.text-grad { color: var(--logo-b); }
+.text-grad { color: var(--accent); }
 .bg-grad { background-color: var(--primary); color: var(--primary-foreground); }
 .btn-grad {
   background-color: var(--primary); color: var(--primary-foreground);
@@ -435,3 +450,54 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .drawer-in, .scrim-in, .stagger > *, .bar-fill { animation: none !important; }
 }
+
+/* ===== Claude Design "AchiDrop Skin Sotish Responsive" (2026-10-20) ===== */
+.font-logo { font-family: "Barlow Condensed", var(--font-heading); font-weight: 800; letter-spacing: .01em; line-height: 1; }
+
+/* Kumush (metall) yon menyu — ikki rejimda ham bir xil, matni doim to'q */
+.side-metal {
+  background: linear-gradient(115deg, #5A5D64 0%, #9EA3AB 18%, #6B6F76 34%, #AEB2B9 52%, #5E6168 70%, #3A3C41 100%);
+  box-shadow: inset -1px 0 0 rgba(255,255,255,.12), 8px 0 30px rgba(0,0,0,.35);
+}
+.side-metal::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, transparent 1px 3px);
+}
+.logo-badge { background: linear-gradient(115deg, #8D9199, #C2C6CC 45%, #7A7E85); }
+
+/* Sahifaning o'ng tomonidagi nozik diagonal chiziqlar */
+.main-stripes::before {
+  content: ""; position: fixed; right: 0; top: 0; width: 55%; height: 100%; pointer-events: none; z-index: -1;
+  background: repeating-linear-gradient(135deg, rgba(255,255,255,.018) 0 2px, transparent 2px 6px);
+}
+:root[data-theme="light"] .main-stripes::before { background: repeating-linear-gradient(135deg, rgba(0,0,0,.02) 0 2px, transparent 2px 6px); }
+
+.ad-panel { background: var(--ad-panel); border: 1px solid var(--ad-line); }
+.ad-field { background: var(--ad-field); border: 1px solid var(--ad-line); }
+.ad-skin { background: var(--ad-skin); }
+.ad-bar { background: var(--ad-bar); border: 1px solid var(--ad-line); box-shadow: 0 12px 30px rgba(0,0,0,.45); }
+
+/* "Tanlanganlar" ramkasi: kumush → qizil gradient chegara, ichi chiziqli */
+.ad-frame { position: relative; padding: 5px; border-radius: 22px; background: linear-gradient(135deg, #9A9EA6, #4A4D53 40%, #7C2028 75%, #C21A24); }
+.ad-frame::before { content: ""; position: absolute; left: 30%; right: 30%; top: 0; height: 2px; background: linear-gradient(90deg, transparent, #fff, transparent); opacity: .8; }
+.ad-frame-in { position: relative; border-radius: 18px; background: var(--ad-frame-in); }
+.ad-frame-glow { position: absolute; left: 25%; right: 25%; bottom: -1px; height: 3px; border-radius: 3px; background: #FF2A35; filter: blur(1px); animation: ad-glow 2.4s ease-in-out infinite; }
+.ad-frame-sm { padding: 4px; border-radius: 20px; background: linear-gradient(135deg, #8E929A, #3E4046 45%, #8B1D26); }
+.ad-frame-sm > div { border-radius: 16px; background: var(--ad-frame-in); }
+@keyframes ad-glow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+
+/* Qizil konturli nurli tugma */
+.ad-cta {
+  border: 1.5px solid #E3141F; color: var(--heading); font-weight: 700; letter-spacing: .06em;
+  box-shadow: 0 0 22px rgba(227,20,31,.35), inset 0 0 18px rgba(227,20,31,.18);
+  transition: box-shadow .2s ease, background-color .2s ease, transform .1s ease;
+}
+.ad-cta.on { background: rgba(227,20,31,.22); }
+.ad-cta:hover:not(:disabled) { box-shadow: 0 0 30px rgba(227,20,31,.55), inset 0 0 22px rgba(227,20,31,.3); }
+.ad-cta:active:not(:disabled) { transform: translateY(1px); }
+.ad-cta:disabled { cursor: not-allowed; }
+
+/* Skin kartasi tanlanganda */
+.skin-sel { border-color: #E3141F !important; box-shadow: 0 0 0 1px #E3141F, 0 0 24px rgba(227,20,31,.35); }
+
+@media (prefers-reduced-motion: reduce) { .ad-frame-glow { animation: none !important; } }

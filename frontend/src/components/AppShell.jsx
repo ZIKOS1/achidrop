@@ -19,6 +19,7 @@ import {
   HelpCircle,
   MessageCircleQuestion,
   ChevronRight,
+  Menu,
 } from "lucide-react";
 import { cn } from "../lib/cn";
 import { useApp } from "../context";
@@ -66,81 +67,66 @@ const SECTIONS = [
   },
 ].map((s) => ({ ...s, items: s.items.filter((i) => !i.feature || FEATURES[i.feature]) }));
 
-function Brand({ onClick, compact }) {
+// Logo: "ACHI" qizil + "DROP". Kumush menyuda DROP doim to'q (dizayn bo'yicha);
+// `badge` — telefon yuqori panelidagi kumush yorliq ko'rinishi.
+function Brand({ onClick, size = 36, badge }) {
   return (
-    <button type="button" onClick={onClick} className="flex min-w-0 items-center gap-2.5">
-      <span className="flex min-w-0 flex-col items-start leading-none">
-        <span className={cn("truncate font-heading font-bold uppercase tracking-wider", compact ? "text-[19px]" : "text-[22px]")}>
-          <span className="text-[var(--logo-a)]">Achi</span><span className="text-[var(--logo-b)]">Drop</span>
-        </span>
-        {!compact && (
-          <span className="mt-1 truncate text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
-            {t("nav.tagline")}
-          </span>
-        )}
-      </span>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn("font-logo flex min-w-0 items-center gap-[0.22em] rounded-[9px]", badge && "logo-badge px-[9px] pb-[5px] pt-1.5")}
+      style={{ fontSize: size }}
+    >
+      <span className="text-[#E3141F]">ACHI</span><span className="text-[#0E0E10]">DROP</span>
     </button>
   );
 }
 
-function Seg({ options, value, onChange }) {
+// Yuqori paneldagi dumaloq (pill) tugmalar uchun umumiy ko'rinish
+const PILL = "flex h-10 items-center rounded-full border border-[var(--ad-line)] bg-[var(--row-hov)] transition-colors";
+
+function LangPill({ lang, setLang }) {
   return (
-    <div className="flex rounded-xl border border-border bg-card p-[3px]">
-      {options.map((o) => (
+    <div className={cn(PILL, "gap-0.5 p-1")}>
+      {LANGS.map((l) => (
         <button
-          key={o.value}
+          key={l.code}
           type="button"
-          onClick={() => onChange(o.value)}
+          onClick={() => setLang(l.code)}
           className={cn(
-            "flex items-center gap-1 rounded-[9px] px-2.5 py-1.5 text-[11px] font-semibold transition-colors",
-            value === o.value ? "bg-[var(--row-sel)] text-primary" : "text-muted-foreground hover:text-foreground"
+            "flex h-[30px] items-center rounded-full px-2.5 text-sm font-semibold transition-colors",
+            lang === l.code ? "bg-[rgba(227,20,31,.18)] text-primary" : "text-muted-foreground hover:text-foreground"
           )}
         >
-          {o.icon}
-          {o.label}
+          {l.label}
         </button>
       ))}
     </div>
   );
 }
 
-function LangSeg({ lang, setLang }) {
-  return <Seg value={lang} onChange={setLang} options={LANGS.map((l) => ({ value: l.code, label: l.label }))} />;
-}
-
-function ThemeSeg({ theme, toggleTheme }) {
-  return (
-    <Seg
-      value={theme}
-      onChange={(v) => v !== theme && toggleTheme()}
-      options={[
-        { value: "dark", label: t("menu.dark"), icon: <Moon className="size-3" /> },
-        { value: "light", label: t("menu.light"), icon: <Sun className="size-3" /> },
-      ]}
-    />
-  );
-}
-
-function ThemeToggle({ theme, toggleTheme }) {
+function ThemeToggle({ theme, toggleTheme, className }) {
   return (
     <button
       type="button"
       onClick={toggleTheme}
       aria-label={theme === "dark" ? t("common.switchToLight") : t("common.switchToDark")}
-      className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground transition-colors hover:border-ring/60 hover:text-primary"
+      className={cn(PILL, "w-10 shrink-0 justify-center text-foreground hover:border-ring/60 hover:text-primary", className)}
     >
-      {theme === "dark" ? <Sun className="size-[17px]" /> : <Moon className="size-[17px]" />}
+      {theme === "dark" ? <Sun className="size-[18px]" /> : <Moon className="size-[18px]" />}
     </button>
   );
 }
 
 function Avatar({ user, initials, className }) {
   return (
-    <span className={cn("block shrink-0 rounded-2xl bg-grad p-[2px]", className)}>
+    <span className={cn("flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[linear-gradient(135deg,#E9E9EC,#A9ACB3)] text-[#1A1A1E]", className)}>
       {user?.steamAvatar ? (
-        <img src={user.steamAvatar} alt="" className="size-full rounded-[14px] object-cover" />
+        <img src={user.steamAvatar} alt="" className="size-full rounded-none object-cover" />
+      ) : user ? (
+        <span className="font-heading text-sm font-bold">{initials}</span>
       ) : (
-        <span className="flex size-full items-center justify-center rounded-[14px] bg-primary font-heading font-bold text-primary-foreground">{initials}</span>
+        <User className="size-5" />
       )}
     </span>
   );
@@ -152,7 +138,7 @@ function BalancePill({ user, navigate }) {
       <button
         type="button"
         onClick={() => navigate("login")}
-        className="btn-grad inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-[13px] font-semibold"
+        className="btn-grad inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold"
       >
         <LogIn className="size-4" />
         {t("common.login")}
@@ -163,13 +149,14 @@ function BalancePill({ user, navigate }) {
     <button
       type="button"
       onClick={() => navigate("balance")}
-      className="whitespace-nowrap rounded-full border border-border bg-card px-3.5 py-[7px] text-xs font-semibold tabular-nums text-foreground transition-colors hover:border-ring/60"
+      className={cn(PILL, "whitespace-nowrap px-4 text-[15px] font-bold tabular-nums text-foreground hover:border-ring/60")}
     >
       {fmtMoney(user.balance ?? 0)}
     </button>
   );
 }
 
+// Kumush menyu qatori: oddiy holatda to'q matn, faol bo'lsa to'q-qizil gradient.
 function MenuItem({ item, active, count, onClick }) {
   const Icon = item.icon;
   return (
@@ -177,32 +164,27 @@ function MenuItem({ item, active, count, onClick }) {
       type="button"
       onClick={onClick}
       className={cn(
-        "group flex w-full items-center gap-3 rounded-[13px] px-2.5 py-[7px] text-left text-[13.5px] transition-colors",
-        active ? "bg-[var(--row-sel)] font-semibold text-[var(--heading)] shadow-[inset_2px_0_0_var(--primary)]" : "text-foreground hover:bg-[var(--row-hov)]"
+        "group flex w-full items-center gap-3 rounded-xl border px-2.5 py-1.5 text-left text-[15.5px] font-medium transition-colors",
+        active
+          ? "border-white/[.18] bg-[linear-gradient(90deg,rgba(120,20,28,.85),rgba(70,30,36,.75))] text-white shadow-[inset_3px_0_0_#E3141F,0_6px_16px_rgba(0,0,0,.3)]"
+          : "border-transparent text-[#121216] hover:bg-[rgba(20,20,24,.28)]"
       )}
     >
       <span
         className={cn(
-          "flex size-[30px] shrink-0 items-center justify-center rounded-[10px]",
-          active ? "bg-grad" : item.key === "tg" ? "bg-[rgba(111,169,210,.1)] text-[#6FA9D2]" : "bg-[var(--row-sel)] text-primary"
+          "flex size-8 shrink-0 items-center justify-center rounded-[9px]",
+          active ? "bg-[#E3141F] text-white" : item.key === "tg" ? "bg-[rgba(18,18,22,.55)] text-[#3AA8F0]" : "bg-[rgba(18,18,22,.55)] text-[#FF3B45]"
         )}
       >
-        <Icon className="size-[15px]" />
+        <Icon className="size-[17px]" />
       </span>
       <span className="min-w-0 flex-1 truncate">{t(item.labelKey)}</span>
       {count > 0 ? (
-        <span
-          className={cn(
-            "flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-[5px] text-[10px] font-bold",
-            item.badge === "notif" ? "bg-[#C9392F] text-white" : "border border-primary/30 bg-[var(--row-sel)] text-primary"
-          )}
-        >
-          {count}
-        </span>
+        <span className="flex h-5 min-w-[22px] items-center justify-center rounded-full bg-[#E3141F] px-1.5 text-[11px] font-bold text-white">{count}</span>
       ) : item.pill ? (
-        <span className="shrink-0 rounded-full border border-primary/25 bg-[var(--row-sel)] px-[7px] py-0.5 text-[9.5px] font-bold tracking-wider text-primary">{t(item.pill)}</span>
+        <span className="shrink-0 rounded-full border border-[#E3141F] bg-black/25 px-[7px] py-0.5 text-[10.5px] font-bold tracking-wider text-[#E3141F]">{t(item.pill)}</span>
       ) : !active ? (
-        <ChevronRight className="size-4 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+        <ChevronRight className="size-3.5 text-[#1E1F23] transition-transform group-hover:translate-x-0.5" />
       ) : null}
     </button>
   );
@@ -210,10 +192,10 @@ function MenuItem({ item, active, count, onClick }) {
 
 function MenuSections({ page, user, counts, onItem }) {
   return (
-    <nav className="stagger">
+    <nav className="stagger relative">
       {SECTIONS.filter((s) => !s.auth || user).map((s) => (
-        <div key={s.key}>
-          <p className="mx-2.5 mb-1 mt-3 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{t(`menu.sec.${s.key}`)}</p>
+        <div key={s.key} className="mb-1.5 flex flex-col gap-0.5">
+          <p className="px-2.5 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1E1F23]">{t(`menu.sec.${s.key}`)}</p>
           {s.items.map((item) => (
             <MenuItem
               key={item.key}
@@ -226,6 +208,19 @@ function MenuSections({ page, user, counts, onItem }) {
         </div>
       ))}
     </nav>
+  );
+}
+
+// Menyu pastidagi foydalanuvchi kartasi (to'q, yarim shaffof)
+function UserCard({ user, initials, onClick }) {
+  return (
+    <button type="button" onClick={onClick} className="relative flex w-full items-center gap-3 rounded-[14px] border border-white/[.12] bg-[rgba(14,14,18,.55)] px-3 py-2.5 text-left transition-colors hover:bg-[rgba(14,14,18,.7)]">
+      <Avatar user={user} initials={initials} className="size-10" />
+      <span className="flex min-w-0 flex-col gap-px">
+        <span className="truncate text-[14.5px] font-semibold text-white">{user.name}</span>
+        <span className="truncate text-[13px] tabular-nums text-[#FF3B45]">{fmtMoney(user.balance ?? 0)}</span>
+      </span>
+    </button>
   );
 }
 
@@ -289,141 +284,108 @@ export default function AppShell({ page, children }) {
     openWithdrawModal({ openModal, closeModal, showToast, refreshMe });
   }
 
-  return (
-    <div className="min-h-screen">
-      <div className="aurora" aria-hidden />
-
-      {/* Yon menyu (kompyuter) */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-border bg-sidebar/80 backdrop-blur lg:flex">
-        <div className="px-5 pb-2 pt-[22px]">
-          <Brand onClick={() => navigate(HOME)} />
-        </div>
-        <div className="flex-1 overflow-y-auto px-3 pb-3">
-          <MenuSections page={page} user={user} counts={counts} onItem={onItem} />
-        </div>
-        <div className="p-3">
-          {user ? (
-            <button type="button" onClick={() => navigate("profile")} className="grad-card block w-full text-left transition-transform hover:-translate-y-0.5">
-              <span className="grad-in flex items-center gap-2.5 p-3">
-                <Avatar user={user} initials={initials} className="size-9 rounded-xl [&>*]:rounded-[10px]" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-xs font-semibold text-[var(--heading)]">{user.name}</span>
-                  <span className="block truncate text-xs font-semibold tabular-nums text-primary">{fmtMoney(user.balance ?? 0)}</span>
-                </span>
-              </span>
-            </button>
-          ) : (
-            <button type="button" onClick={() => navigate("login")} className="btn-grad flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold">
-              <LogIn className="size-4" />
-              {t("common.login")}
-            </button>
-          )}
-        </div>
-      </aside>
-
-      {/* Telefon: yuqori panel */}
-      <div className="sticky top-0 z-40 lg:hidden">
-        <div className="flex h-14 items-center justify-between gap-2 bg-background/70 px-4 backdrop-blur-xl">
-          <Brand onClick={() => navigate(HOME)} compact />
-          <div className="flex shrink-0 items-center gap-2">
-            <BalancePill user={user} navigate={navigate} />
-            <button
-              type="button"
-              aria-label={t("common.menu")}
-              onClick={() => setOpen(true)}
-              className="relative flex size-9 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-border bg-card transition-colors hover:border-ring/60"
-            >
-              <span className="h-[1.6px] w-[15px] rounded bg-foreground" />
-              <span className="h-[1.6px] w-[15px] rounded bg-foreground" />
-              <span className="-ml-[5px] h-[1.6px] w-[10px] rounded bg-foreground" />
-              {counts.notif > 0 && <span className="absolute -right-1 -top-1 size-2 rounded-full bg-[#C9392F] shadow-[0_0_0_2px_var(--background)]" />}
-            </button>
-          </div>
-        </div>
-        <div className="grad-line" />
+  // Kumush menyuning ichi — kompyuterda doimiy, telefonda chapdan chiqadigan panel.
+  const sidebar = (mobile) => (
+    <>
+      <div className="relative flex items-center justify-between px-2 pb-[18px]">
+        <Brand onClick={() => onItem({ key: HOME })} size={36} />
+        {mobile && (
+          <button type="button" aria-label={t("common.close")} onClick={() => setOpen(false)} className="flex size-9 items-center justify-center rounded-[10px] border border-black/25 bg-black/25 text-white">
+            <X className="size-[18px]" />
+          </button>
+        )}
       </div>
 
-      {/* Telefon: burger menyu */}
+      {mobile && user && (
+        <div className="relative mb-2 rounded-[14px] border border-white/[.12] bg-[rgba(14,14,18,.6)] p-3.5">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-white/60">{t("menu.balance")}</p>
+          <div className="mt-1 flex items-end justify-between gap-2">
+            <span className="font-heading text-[26px] font-bold leading-none tabular-nums text-white">
+              {Math.round(user.balance ?? 0).toLocaleString("ru-RU")} <span className="text-sm text-[#FF3B45]">{t("common.somWithAmount")}</span>
+            </span>
+            <button type="button" onClick={withdraw} className="btn-grad shrink-0 rounded-[11px] px-3 py-2 text-xs font-semibold">{t("menu.withdraw")}</button>
+          </div>
+          {hold && (hold.available > 0 || hold.frozen > 0) && (
+            <p className="mt-1.5 text-[11px] text-white/60">
+              {t("menu.holdLine", { a: Math.round(hold.available || 0).toLocaleString("ru-RU"), f: Math.round(hold.frozen || 0).toLocaleString("ru-RU") })}
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="relative -mx-1 flex-1 overflow-y-auto px-1">
+        <MenuSections page={page} user={user} counts={counts} onItem={onItem} />
+      </div>
+
+      <div className="relative mt-2 space-y-2">
+        {mobile && (
+          <div className="flex items-center justify-between gap-2 rounded-[14px] bg-[rgba(14,14,18,.55)] p-1.5">
+            <div className="flex gap-0.5">
+              {LANGS.map((l) => (
+                <button key={l.code} type="button" onClick={() => setLang(l.code)} className={cn("h-[30px] rounded-full px-2.5 text-sm font-semibold", lang === l.code ? "bg-[rgba(227,20,31,.35)] text-white" : "text-white/60")}>
+                  {l.label}
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={toggleTheme} aria-label={theme === "dark" ? t("common.switchToLight") : t("common.switchToDark")} className="flex size-[30px] items-center justify-center rounded-full text-white/80">
+              {theme === "dark" ? <Sun className="size-[17px]" /> : <Moon className="size-[17px]" />}
+            </button>
+          </div>
+        )}
+        {user ? (
+          <UserCard user={user} initials={initials} onClick={() => onItem({ key: "profile" })} />
+        ) : (
+          <button type="button" onClick={() => onItem({ key: "login" })} className="btn-grad flex w-full items-center justify-center gap-2 rounded-[14px] py-3 text-sm font-semibold">
+            <LogIn className="size-4" />
+            {t("common.login")}
+          </button>
+        )}
+      </div>
+    </>
+  );
+
+  return (
+    <div className="main-stripes relative isolate min-h-screen">
+      {/* Yon menyu (kompyuter) — kumush */}
+      <aside className="side-metal fixed inset-y-0 left-0 z-40 hidden w-66 flex-col overflow-hidden px-3 pb-3 pt-[18px] lg:flex">
+        {sidebar(false)}
+      </aside>
+
+      {/* Telefon: chapdan chiqadigan kumush menyu */}
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="scrim-in absolute inset-0 bg-black/55" onClick={() => setOpen(false)} aria-hidden />
-          <div className="drawer-in absolute inset-y-0 left-0 flex w-[322px] max-w-[86vw] flex-col overflow-hidden border-r border-border bg-sidebar shadow-[30px_0_60px_-30px_rgba(0,0,0,.6)]">
-            <div className="pointer-events-none absolute -right-24 -top-16 h-44 w-56 rounded-full bg-[var(--orb-a)] blur-[50px]" />
-            <div className="relative flex items-center justify-between px-4 pb-2.5 pt-[18px]">
-              <Brand onClick={() => onItem({ key: HOME })} compact />
-              <button type="button" aria-label={t("common.close")} onClick={() => setOpen(false)} className="flex size-8 items-center justify-center rounded-[11px] border border-border text-muted-foreground transition-colors hover:text-foreground">
-                <X className="size-4" />
-              </button>
-            </div>
-
-            {user && (
-              <div className="relative px-3.5 pt-1">
-                <div className="grad-card">
-                  <div className="grad-in p-3.5">
-                    <button type="button" onClick={() => onItem({ key: "profile" })} className="flex w-full items-center gap-3 text-left">
-                      <Avatar user={user} initials={initials} className="size-[42px] [&>*]:text-[15px]" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13.5px] font-semibold text-[var(--heading)]">{user.name}</span>
-                        <span className="mt-0.5 block text-[11px] text-muted-foreground">● {t(user.steamId64 ? "menu.steamOn" : "menu.steamOff")}</span>
-                      </span>
-                    </button>
-                    <p className="mt-3 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{t("menu.balance")}</p>
-                    <div className="mt-0.5 flex items-end justify-between gap-2">
-                      <span className="font-heading text-[28px] font-semibold leading-none tabular-nums text-[var(--heading)]">
-                        {Math.round(user.balance ?? 0).toLocaleString("ru-RU")} <span className="text-sm text-primary">{t("common.somWithAmount")}</span>
-                      </span>
-                      <button type="button" onClick={withdraw} className="btn-grad shrink-0 rounded-[11px] px-3 py-2 text-xs font-semibold">{t("menu.withdraw")}</button>
-                    </div>
-                    {hold && (hold.available > 0 || hold.frozen > 0) && (
-                      <p className="mt-1.5 text-[10.5px] text-muted-foreground">
-                        {t("menu.holdLine", { a: Math.round(hold.available || 0).toLocaleString("ru-RU"), f: Math.round(hold.frozen || 0).toLocaleString("ru-RU") })}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="relative flex-1 overflow-y-auto px-2 pb-2">
-              <MenuSections page={page} user={user} counts={counts} onItem={onItem} />
-              {!user && (
-                <button type="button" onClick={() => onItem({ key: "login" })} className="btn-grad mx-2 mt-4 flex w-[calc(100%-1rem)] items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold">
-                  <LogIn className="size-4" />
-                  {t("common.login")}
-                </button>
-              )}
-            </div>
-
-            <div className="relative px-3.5 pb-[18px] pt-2">
-              <div className="grad-line -mx-3.5 mb-3" />
-              <div className="flex items-center justify-between gap-2">
-                <LangSeg lang={lang} setLang={setLang} />
-                <ThemeSeg theme={theme} toggleTheme={toggleTheme} />
-              </div>
-            </div>
+          <div className="scrim-in absolute inset-0 bg-[rgba(5,5,8,.6)] backdrop-blur-[3px]" onClick={() => setOpen(false)} aria-hidden />
+          <div className="side-metal drawer-in absolute inset-y-0 left-0 flex w-[290px] max-w-[86vw] flex-col overflow-hidden px-3 pb-3 pt-[18px]">
+            {sidebar(true)}
           </div>
         </div>
       )}
 
       {/* Asosiy qism */}
-      <div className="lg:pl-64">
-        <header className="sticky top-0 z-30 hidden lg:block">
-          <div className="flex h-16 items-center justify-end gap-2.5 bg-background/70 px-8 backdrop-blur-xl">
-            <button
-              type="button"
-              onClick={openTg}
-              className="flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-[7px] text-xs font-medium text-foreground transition-colors hover:border-[#2AABEE]/60"
-            >
-              <TelegramLogo className="size-3.5" />
+      <div className="lg:pl-66">
+        <header className="sticky top-0 z-30 flex items-center gap-2.5 border-b border-[var(--ad-line)] bg-[var(--ad-header)] px-3.5 py-3 backdrop-blur-[10px] lg:px-8 lg:py-[18px]">
+          <button
+            type="button"
+            aria-label={t("common.menu")}
+            onClick={() => setOpen(true)}
+            className="relative flex size-10 shrink-0 items-center justify-center rounded-xl border border-[var(--ad-line)] bg-[var(--row-hov)] text-foreground lg:hidden"
+          >
+            <Menu className="size-5" />
+            {counts.notif > 0 && <span className="absolute -right-1 -top-1 size-2.5 rounded-full bg-[#E3141F] shadow-[0_0_0_2px_var(--background)]" />}
+          </button>
+          <span className="lg:hidden"><Brand onClick={() => navigate(HOME)} size={24} badge /></span>
+          <span className="flex-1" />
+          <div className="hidden items-center gap-2.5 lg:flex">
+            <button type="button" onClick={openTg} className={cn(PILL, "gap-2 whitespace-nowrap px-4 text-[14.5px] font-medium text-foreground hover:border-[#2AABEE]/60")}>
+              <TelegramLogo className="size-[18px]" />
               {t("nav.telegramBot")}
             </button>
-            <LangSeg lang={lang} setLang={setLang} />
+            <LangPill lang={lang} setLang={setLang} />
             <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
-            <BalancePill user={user} navigate={navigate} />
           </div>
-          <div className="grad-line" />
+          <BalancePill user={user} navigate={navigate} />
         </header>
-        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">{children}</main>
+        <main className="mx-auto max-w-[1500px] px-3.5 py-5 sm:px-6 lg:px-10 lg:pb-12 lg:pt-10">{children}</main>
       </div>
     </div>
   );

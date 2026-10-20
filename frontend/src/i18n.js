@@ -142,6 +142,8 @@ const DICT = {
   "sellx.col.wear": { uz: "Sifat", ru: "Износ", en: "Wear" },
   "sellx.picked": { uz: "Tanlanganlar", ru: "Выбрано", en: "Selected" },
   "sellx.pickedEmpty": { uz: "Ro'yxatdan sotmoqchi bo'lgan skinlarni belgilang", ru: "Отметьте скины в списке", en: "Tick the skins you want to sell" },
+  "sellx.ctaSell": { uz: "Sotish · {n} ta", ru: "Продать · {n} шт", en: "Sell · {n}" },
+  "sellx.pickedN": { uz: "Tanlandi · {n}", ru: "Выбрано · {n}", en: "Selected · {n}" },
   "sellx.totalLabel": { uz: "Jami", ru: "Итого", en: "Total" },
   "sellx.nextStep": { uz: "Keyingi qadamda bizning trade linkimiz ochiladi — skinni Steam orqali o'zingiz yuborasiz. Pul admin qabul qilgach tushadi.", ru: "Далее откроется наша трейд-ссылка — отправите скин через Steam сами. Деньги поступят после приёма админом.", en: "Next, our trade link opens — you send the skin via Steam yourself. Money arrives once the admin accepts." },
   "sellx.bullet.safe": { uz: "Parolingizni hech qachon so'ramaymiz", ru: "Мы никогда не спрашиваем пароль", en: "We never ask for your password" },
