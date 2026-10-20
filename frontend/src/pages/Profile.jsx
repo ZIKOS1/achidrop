@@ -7,6 +7,7 @@ import { t } from "../i18n";
 import { cn } from "../lib/cn";
 import Empty from "../components/Empty";
 import { SteamLogo, TelegramLogo } from "../components/BrandIcons";
+import { TG_LINKS, openTgUser } from "../utils";
 import { StatusTag, fmtDate, fmtNum, useCountUp } from "../components/MoneyBits";
 import ProfileLegacy from "./ProfileLegacy";
 
@@ -61,7 +62,6 @@ function ProfileView() {
   const [mine, setMine] = useState(null);
   const [hold, setHold] = useState(null);
   const [unread, setUnread] = useState(0);
-  const [botUsername, setBotUsername] = useState(null);
   const balance = useCountUp(user?.balance ?? 0);
 
   useEffect(() => {
@@ -69,7 +69,6 @@ function ProfileView() {
     api("/api/instant-sell-mine").then(setMine).catch(() => setMine([]));
     api("/api/trade-hold-summary").then(setHold).catch(() => {});
     api("/api/notifications").then((l) => setUnread(l.filter((n) => !n.read).length)).catch(() => {});
-    api("/api/bot-info").then((r) => setBotUsername(r.username)).catch(() => {});
   }, [user?.id]);
 
   if (!user) {
@@ -96,11 +95,6 @@ function ProfileView() {
       showToast(e.error || t("common.genericError"), "err");
     }
   }
-  function openTg() {
-    const url = botUsername ? `https://t.me/${botUsername}` : "https://t.me";
-    if (tg?.openTelegramLink && botUsername) tg.openTelegramLink(url);
-    else window.open(url, "_blank", "noopener");
-  }
   async function logout() {
     try { await api("/api/auth/logout", { method: "POST" }); } catch {}
     location.href = "/";
@@ -121,7 +115,7 @@ function ProfileView() {
     <div className="overflow-hidden rounded-[20px] border border-border bg-card">
       <MenuRow icon={History} label={t("profile.balHistory")} onClick={() => navigate("bal-history")} />
       <MenuRow icon={Bell} label={t("profile.notifications")} badge={unread} onClick={() => navigate("notifications")} />
-      <MenuRow icon={TelegramLogo} label={t("menu.tgHelp")} extra={botUsername ? `@${botUsername}` : null} onClick={openTg} tgStyle />
+      <MenuRow icon={TelegramLogo} label={t("menu.tgHelp")} extra={`@${TG_LINKS.support}`} onClick={() => openTgUser(tg, TG_LINKS.support)} tgStyle />
     </div>
   );
 

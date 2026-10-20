@@ -24,6 +24,16 @@ export function badge(wins) {
   return "Rookie";
 }
 
+// Telegram manzillari: yordam (admin), kanal va chat.
+export const TG_LINKS = { support: "csggo", channel: "achi_drop", chat: "achi_chat" };
+
+// t.me havolasini ochadi — Telegram ichida bo'lsa o'z oynasida, aks holda yangi tabda.
+export function openTgUser(tg, username) {
+  const url = `https://t.me/${username}`;
+  if (tg?.openTelegramLink) tg.openTelegramLink(url);
+  else window.open(url, "_blank", "noopener");
+}
+
 export function imgSrc(image) {
   if (!image) return null;
   return /^https?:\/\//.test(image) ? image : `/api/image/${image}`;

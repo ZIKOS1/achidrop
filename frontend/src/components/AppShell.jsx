@@ -18,6 +18,8 @@ import {
   Gift,
   HelpCircle,
   MessageCircleQuestion,
+  Megaphone,
+  MessagesSquare,
   ChevronRight,
   Menu,
 } from "lucide-react";
@@ -25,7 +27,7 @@ import { cn } from "../lib/cn";
 import { useApp } from "../context";
 import { LANGS, t } from "../i18n";
 import { api } from "../api";
-import { fmtMoney, openWithdrawModal } from "../utils";
+import { fmtMoney, openWithdrawModal, TG_LINKS, openTgUser } from "../utils";
 import { TelegramLogo } from "./BrandIcons";
 import { FEATURES } from "../features";
 
@@ -62,7 +64,9 @@ const SECTIONS = [
     items: [
       { key: "how", page: "sell", section: "how", labelKey: "menu.how", icon: HelpCircle },
       { key: "faq", page: "sell", section: "faq", labelKey: "menu.faq", icon: MessageCircleQuestion },
-      { key: "tg", labelKey: "menu.tgHelp", icon: TelegramLogo, external: true },
+      { key: "tg", labelKey: "menu.tgHelp", icon: TelegramLogo, external: TG_LINKS.support },
+      { key: "tgChannel", labelKey: "menu.tgChannel", icon: Megaphone, external: TG_LINKS.channel },
+      { key: "tgChat", labelKey: "menu.tgChat", icon: MessagesSquare, external: TG_LINKS.chat },
     ],
   },
 ].map((s) => ({ ...s, items: s.items.filter((i) => !i.feature || FEATURES[i.feature]) }));
@@ -173,7 +177,7 @@ function MenuItem({ item, active, count, onClick }) {
       <span
         className={cn(
           "flex size-8 shrink-0 items-center justify-center rounded-[9px]",
-          active ? "bg-[#E3141F] text-white" : item.key === "tg" ? "bg-[rgba(18,18,22,.55)] text-[#3AA8F0]" : "bg-[rgba(18,18,22,.55)] text-[#FF3B45]"
+          active ? "bg-[#E3141F] text-white" : item.external ? "bg-[rgba(18,18,22,.55)] text-[#3AA8F0]" : "bg-[rgba(18,18,22,.55)] text-[#FF3B45]"
         )}
       >
         <Icon className="size-[17px]" />
@@ -265,7 +269,7 @@ export default function AppShell({ page, children }) {
 
   function onItem(item) {
     setOpen(false);
-    if (item.external) return openTg();
+    if (item.external) return openTgUser(tg, item.external);
     navigate(item.page || item.key);
     if (item.section) {
       // Sahifa yuklanayotganda (inventar, so'rovlar) balandligi o'zgaradi va
@@ -380,6 +384,12 @@ export default function AppShell({ page, children }) {
               <TelegramLogo className="size-[18px]" />
               {t("nav.telegramBot")}
             </button>
+            {[["channel", Megaphone, "nav.tgChannel"], ["chat", MessagesSquare, "nav.tgChat"]].map(([k, Icon, label]) => (
+              <button key={k} type="button" onClick={() => openTgUser(tg, TG_LINKS[k])} title={`@${TG_LINKS[k]}`} className={cn(PILL, "gap-2 whitespace-nowrap px-3 text-[14.5px] font-medium text-foreground hover:border-[#2AABEE]/60 xl:px-4")}>
+                <Icon className="size-[17px] text-[#3AA8F0]" />
+                <span className="hidden xl:inline">{t(label)}</span>
+              </button>
+            ))}
             <LangPill lang={lang} setLang={setLang} />
             <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
           </div>
