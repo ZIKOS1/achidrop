@@ -1,4 +1,5 @@
 const { Markup } = require("telegraf");
+const { isAdminId } = require("../../backend/adminIds");
 const { read, write } = require("../../backend/database/db");
 const { finishAuction, cancelAuction } = require("../../backend/auctionLifecycle");
 const { notifyUser, pushNotification } = require("../../backend/notify");
@@ -100,7 +101,7 @@ function userDetailKeyboard(u) {
 }
 
 module.exports = (bot) => {
-    const isAdmin = (ctx) => ctx.from.id === Number(process.env.ADMIN_ID);
+    const isAdmin = (ctx) => isAdminId(ctx.from?.id);
 
     // ── /admin komandasi ──────────────────────────────────────────────────────
     bot.command("admin", (ctx) => {

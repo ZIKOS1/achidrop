@@ -1,4 +1,5 @@
 require("dotenv").config();
+const { isAdminId, toAdmins } = require("./adminIds");
 const express     = require("express");
 const helmet      = require("helmet");
 const rateLimit   = require("express-rate-limit");
@@ -180,7 +181,7 @@ app.use("/api", async (req, res, next) => {
                     lotWebAppKeyboard(fa.id)
                 );
             } else if (process.env.ADMIN_ID) {
-                tgSendMessage(Number(process.env.ADMIN_ID), `⏰ *"${fa.name}"* auksioni tugadi, lekin hech kim bid qilmadi.`);
+                toAdmins((adminId) => tgSendMessage(adminId, `⏰ *"${fa.name}"* auksioni tugadi, lekin hech kim bid qilmadi.`));
             }
         }
     } catch (err) {
@@ -375,7 +376,7 @@ app.get("/api/me", auth, (req, res) => {
         referrals: (u.referrals || []).length,
         joined:    u.joined,
         blocked:   u.blocked  ?? false,
-        role:      u.id === Number(process.env.ADMIN_ID) ? "admin" : (u.role || "user"),
+        role:      isAdminId(u.id) ? "admin" : (u.role || "user"),
     });
 });
 
@@ -658,16 +659,14 @@ app.post("/api/withdraw/:lotId", auth, async (req, res) => {
     delete win.rejectComment;
     saveUsers(arr);
 
-    tgSendMessage(
-        Number(process.env.ADMIN_ID),
-        `📤 *SKIN CHIQARISH!*\n\n👤 *${user.name}*\n🪪 \`${user.id}\`\n🏷 *${win.lotName}*\n💰 ${(win.price ?? 0).toLocaleString()} so'm\n🔗 \`${user.tradeLink}\`\n⏰ ${new Date().toLocaleString("uz-UZ")}`,
+    toAdmins((adminId) => tgSendMessage(adminId, `📤 *SKIN CHIQARISH!*\n\n👤 *${user.name}*\n🪪 \`${user.id}\`\n🏷 *${win.lotName}*\n💰 ${(win.price ?? 0).toLocaleString()} so'm\n🔗 \`${user.tradeLink}\`\n⏰ ${new Date().toLocaleString("uz-UZ")}`,
         {
             inline_keyboard: [
                 [{ text: "✅ Skin yuborildi", callback_data: `skin_sent_${user.id}_${lotId}` }],
                 [{ text: "❌ Rad etish",      callback_data: `skin_reject_${user.id}_${lotId}` }],
             ],
         }
-    );
+    ));
 
     res.json({ success: true, auto: false });
 });
@@ -714,14 +713,12 @@ app.post("/api/market-withdraw/:purchaseId", auth, async (req, res) => {
     purchase.requestedAt = new Date().toISOString();
     delete purchase.rejectComment;
     saveUsers(arr);
-    tgSendMessage(
-        Number(process.env.ADMIN_ID),
-        `📤 *MARKET SKIN CHIQARISH!*\n\n👤 *${user.name}*\n🏷 *${purchase.lotName}*\n💰 ${(purchase.price ?? 0).toLocaleString()} so'm\n🔗 \`${user.tradeLink}\``,
+    toAdmins((adminId) => tgSendMessage(adminId, `📤 *MARKET SKIN CHIQARISH!*\n\n👤 *${user.name}*\n🏷 *${purchase.lotName}*\n💰 ${(purchase.price ?? 0).toLocaleString()} so'm\n🔗 \`${user.tradeLink}\``,
         { inline_keyboard: [
             [{ text: "✅ Skin yuborildi", callback_data: `mkt_skin_sent_${user.id}_${purchaseId}` }],
             [{ text: "❌ Rad etish", callback_data: `mkt_skin_reject_${user.id}_${purchaseId}` }],
         ]}
-    );
+    ));
     res.json({ success: true, auto: false });
 });
 
@@ -742,13 +739,12 @@ app.post("/api/support/withdraw-issue", auth, sensitiveLimiter, (req, res) => {
     const reason = win?.lastFailReason ? `Avtomatik yuborish muvaffaqiyatsiz bo'ldi: ${win.lastFailReason}` : null;
     const ticket = supportManager.openOrGet(u.id, u.name, lotId, lotName, reason);
     if (process.env.ADMIN_ID) {
-        tgSendMessage(Number(process.env.ADMIN_ID),
-            `🆘 *YORDAM SO'ROVI!*\n\n👤 ${mdEscape(u.name ?? String(u.id))}\n🪪 \`${u.id}\`\n🏷 ${lotName}\n🆔 Ticket #${ticket.id}`,
+        toAdmins((adminId) => tgSendMessage(adminId, `🆘 *YORDAM SO'ROVI!*\n\n👤 ${mdEscape(u.name ?? String(u.id))}\n🪪 \`${u.id}\`\n🏷 ${lotName}\n🆔 Ticket #${ticket.id}`,
             { inline_keyboard: [
                 [{ text: "💬 Javob berish", callback_data: `support_reply_${ticket.id}` }],
                 [{ text: "✅ Yopish", callback_data: `support_close_${ticket.id}` }],
             ]}
-        );
+        ));
     }
     res.json(ticket);
 });
@@ -780,12 +776,12 @@ app.post("/api/support/:id/message", auth, sensitiveLimiter, (req, res) => {
     const result = supportManager.addMessage(ticket.id, "user", u.name, text);
     if (result.error) return res.status(400).json({ error: result.error });
     if (process.env.ADMIN_ID) {
-        tgSendMessage(Number(process.env.ADMIN_ID), `🆘 *Ticket #${ticket.id}* (${mdEscape(u.name ?? String(u.id))}):\n${mdEscape(text)}`,
+        toAdmins((adminId) => tgSendMessage(adminId, `🆘 *Ticket #${ticket.id}* (${mdEscape(u.name ?? String(u.id))}):\n${mdEscape(text)}`,
             { inline_keyboard: [
                 [{ text: "💬 Javob berish", callback_data: `support_reply_${ticket.id}` }],
                 [{ text: "✅ Yopish", callback_data: `support_close_${ticket.id}` }],
             ]}
-        );
+        ));
     }
     res.json(result.ticket);
 });
@@ -1128,9 +1124,8 @@ app.post("/api/trades/:id/dispute", auth, async (req, res) => {
     const otherId = otherPartyId(trade, u.id);
     if (otherId) notifyUser(otherId, `⚠️ *Obmen #${trade.id}* bo'yicha muammo bildirildi. Admin tez orada bog'lanadi.`, tgSendMessage);
     if (process.env.ADMIN_ID) {
-        tgSendMessage(Number(process.env.ADMIN_ID),
-            `⚠️ *NIZOLI OBMEN!*\n\n🆔 #${trade.id}\n👤 Sotuvchi: \`${trade.sellerId}\`\n🛒 Xaridor: \`${trade.buyerId ?? "-"}\`\n📦 ${skinsLabel(trade)}\n💰 ${trade.agreedPrice ? trade.agreedPrice.toLocaleString() + " so'm" : "kelishilmagan"}`
-        );
+        toAdmins((adminId) => tgSendMessage(adminId, `⚠️ *NIZOLI OBMEN!*\n\n🆔 #${trade.id}\n👤 Sotuvchi: \`${trade.sellerId}\`\n🛒 Xaridor: \`${trade.buyerId ?? "-"}\`\n📦 ${skinsLabel(trade)}\n💰 ${trade.agreedPrice ? trade.agreedPrice.toLocaleString() + " so'm" : "kelishilmagan"}`
+        ));
     }
     res.json(enrichTrade(trade));
 });
@@ -1506,9 +1501,7 @@ app.post("/api/instant-sell", auth, sensitiveLimiter, async (req, res) => {
         const autoMissing = autos.filter(v => v == null).length;
         const autoTotalLine = `🤖 Taxminiy Lis avto (×${LIS_AUTO_RATIO}): *$${autoTotalUsd.toFixed(2)} ≈ ${Math.round(autoTotalUsd * rate).toLocaleString()} so'm*` +
             (autoMissing ? ` (${autoMissing} ta skin narxsiz)` : "");
-        tgSendMessage(
-            Number(process.env.ADMIN_ID),
-            `💸 *SKIN SOTISH SO'ROVI #${request.id}*\n\n` +
+        toAdmins((adminId) => tgSendMessage(adminId, `💸 *SKIN SOTISH SO'ROVI #${request.id}*\n\n` +
             `👤 ${mdEscape(u.name ?? String(u.id))}\n🪪 \`${u.id}\`\n🎮 Steam: \`${u.steamId64}\`\n\n` +
             `${lines.map(mdEscape).join("\n")}\n\n💰 Jami: *${request.totalSom.toLocaleString()} so'm*\n${autoTotalLine}\n\n` +
             `Steam'da skin(lar) kelganini tekshiring, keyin "Oldim"ni bosing.`,
@@ -1516,7 +1509,7 @@ app.post("/api/instant-sell", auth, sensitiveLimiter, async (req, res) => {
                 { text: "✅ Oldim", callback_data: `isell_ok_${request.id}` },
                 { text: "❌ Rad etish", callback_data: `isell_no_${request.id}` },
             ]] }
-        );
+        ));
     }
     res.json({ request, botTradeUrl: getBotTradeUrl() });
 });
@@ -1558,14 +1551,12 @@ app.post("/api/trade-withdraw", auth, sensitiveLimiter, async (req, res) => {
     const { request } = result;
 
     if (process.env.ADMIN_ID) {
-        tgSendMessage(
-            Number(process.env.ADMIN_ID),
-            `💸 *Pul chiqarish so'rovi!*\n\n👤 ${mdEscape(u.name ?? String(u.id))}\n🪪 \`${u.id}\`\n💰 *${request.amount.toLocaleString()} so'm*\n💳 \`${request.cardNumber}\``,
+        toAdmins((adminId) => tgSendMessage(adminId, `💸 *Pul chiqarish so'rovi!*\n\n👤 ${mdEscape(u.name ?? String(u.id))}\n🪪 \`${u.id}\`\n💰 *${request.amount.toLocaleString()} so'm*\n💳 \`${request.cardNumber}\``,
             { inline_keyboard: [[
                 { text: "✅ Tasdiqlash", callback_data: `wd_approve_${request.id}` },
                 { text: "❌ Rad etish",  callback_data: `wd_reject_${request.id}` },
             ]] }
-        );
+        ));
     }
     res.json({ request });
 });

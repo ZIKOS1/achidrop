@@ -1,4 +1,5 @@
 const { Markup } = require("telegraf");
+const { isAdminId, toAdmins } = require("../../backend/adminIds");
 const { read, refresh } = require("../../backend/database/db");
 const { notifyUser } = require("../../backend/notify");
 const { fetchUserInventory } = require("../../backend/steam");
@@ -35,7 +36,7 @@ const STATUS_LABELS = {
 };
 
 module.exports = (bot) => {
-    const isAdmin = (ctx) => ctx.from.id === Number(process.env.ADMIN_ID);
+    const isAdmin = (ctx) => isAdminId(ctx.from?.id);
 
     function notifyOther(trade, fromUserId, text) {
         const otherId = fromUserId === trade.sellerId ? trade.buyerId : trade.sellerId;
@@ -322,10 +323,9 @@ module.exports = (bot) => {
         if (result.error) return ctx.answerCbQuery("❌ Xatolik yuz berdi.", true);
         const trade = result.trade;
         notifyOther(trade, ctx.from.id, `⚠️ *Obmen #${trade.id}* bo'yicha muammo bildirildi. Admin tez orada bog'lanadi.`);
-        bot.telegram.sendMessage(Number(process.env.ADMIN_ID),
-            `⚠️ *NIZOLI OBMEN!*\n\n🆔 #${trade.id}\n👤 Sotuvchi: \`${trade.sellerId}\`\n🛒 Xaridor: \`${trade.buyerId ?? "-"}\`\n📦 ${skinsLabel(trade)}\n💰 ${trade.agreedPrice ? fmt(trade.agreedPrice) + " so'm" : "kelishilmagan"}`,
+        toAdmins((adminId) => bot.telegram.sendMessage(adminId, `⚠️ *NIZOLI OBMEN!*\n\n🆔 #${trade.id}\n👤 Sotuvchi: \`${trade.sellerId}\`\n🛒 Xaridor: \`${trade.buyerId ?? "-"}\`\n📦 ${skinsLabel(trade)}\n💰 ${trade.agreedPrice ? fmt(trade.agreedPrice) + " so'm" : "kelishilmagan"}`,
             { parse_mode: "Markdown" }
-        ).catch(() => {});
+        )).catch(() => {});
         await showTradeRoom(ctx, trade, ctx.from.id, true);
     });
 
@@ -402,13 +402,12 @@ module.exports = (bot) => {
                 `✅ *So'rov yuborildi!*\n\n💰 ${fmt(request.amount)} so'm\n💳 Karta: \`${request.cardNumber}\`\n\n⏳ Admin tekshirib, tez orada o'tkazadi.`,
                 { parse_mode: "Markdown" }
             );
-            bot.telegram.sendMessage(Number(process.env.ADMIN_ID),
-                `💸 *Pul chiqarish so'rovi!*\n\n👤 ${user?.name ?? userId}\n🪪 \`${userId}\`\n💰 *${fmt(request.amount)} so'm*\n💳 \`${request.cardNumber}\``,
+            toAdmins((adminId) => bot.telegram.sendMessage(adminId, `💸 *Pul chiqarish so'rovi!*\n\n👤 ${user?.name ?? userId}\n🪪 \`${userId}\`\n💰 *${fmt(request.amount)} so'm*\n💳 \`${request.cardNumber}\``,
                 { parse_mode: "Markdown", ...Markup.inlineKeyboard([[
                     Markup.button.callback("✅ Tasdiqlash", `wd_approve_${request.id}`),
                     Markup.button.callback("❌ Rad etish",  `wd_reject_${request.id}`),
                 ]])}
-            ).catch(() => {});
+            )).catch(() => {});
             return;
         }
 

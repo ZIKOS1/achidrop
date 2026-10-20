@@ -1,4 +1,5 @@
 require("dotenv").config();
+const { toAdmins } = require("../backend/adminIds");
 const { Telegraf, Markup } = require("telegraf");
 const { read, connect, refresh } = require("../backend/database/db");
 const { notifyUser } = require("../backend/notify");
@@ -133,11 +134,9 @@ async function main() {
                     );
                 }
             } else if (process.env.ADMIN_ID) {
-                bot.telegram.sendMessage(
-                    Number(process.env.ADMIN_ID),
-                    `⏰ *"${a.name}"* auksioi tugadi, lekin hech kim bid qilmadi.`,
+                toAdmins((adminId) => bot.telegram.sendMessage(adminId, `⏰ *"${a.name}"* auksioi tugadi, lekin hech kim bid qilmadi.`,
                     { parse_mode: "Markdown" }
-                ).catch(() => {});
+                )).catch(() => {});
             }
 
             // Lot xabarlarini "tugadi" deb yangilash

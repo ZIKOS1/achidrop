@@ -1,4 +1,5 @@
 const { Markup } = require("telegraf");
+const { isAdminId, toAdmins } = require("../../backend/adminIds");
 const { read, write, refresh } = require("../../backend/database/db");
 const { notifyUser } = require("../../backend/notify");
 const bidManager = require("../../backend/bidManager");
@@ -264,7 +265,7 @@ async function showInventory(ctx, user, edit = false) {
 }
 
 module.exports = (bot) => {
-    const isAdmin = (ctx) => ctx.from.id === Number(process.env.ADMIN_ID);
+    const isAdmin = (ctx) => isAdminId(ctx.from?.id);
 
     // ── ⏰ "Tugashiga N daqiqa qoldi" eslatmasi — o'sha auksionda bid qo'ygan
     //    ishtirokchilarning barchasiga (kuzatuvchilarga emas) yuboriladi ──────
@@ -500,10 +501,9 @@ module.exports = (bot) => {
         else ctx.editMessageText(newCaption, { parse_mode:"Markdown", ...newKeyboard }).catch(() => {});
 
         // Adminga xabar
-        bot.telegram.sendMessage(Number(process.env.ADMIN_ID),
-            `⚡ *TEZ BID!*\n\n📦 *${lot.name}*\n💰 *${amount.toLocaleString()} so'm*\n👤 ${user?.name}\n🪪 \`${userId}\`\n🔗 ${getUser(userId)?.tradeLink??"Yo'q"}`,
+        toAdmins((adminId) => bot.telegram.sendMessage(adminId, `⚡ *TEZ BID!*\n\n📦 *${lot.name}*\n💰 *${amount.toLocaleString()} so'm*\n👤 ${user?.name}\n🪪 \`${userId}\`\n🔗 ${getUser(userId)?.tradeLink??"Yo'q"}`,
             { parse_mode:"Markdown" }
-        ).catch(() => {});
+        )).catch(() => {});
     });
 
     // ── 🔔 Kuzatish ──────────────────────────────────────────────────────────
@@ -729,13 +729,12 @@ module.exports = (bot) => {
         ctx.editMessageText(`✅ *So'rov yuborildi!*\n\n🏷 *${win.lotName}*\n🔗 \`${user.tradeLink}\`\n\n⏳ Admin 1 soat ichida yuboradi.`,
             { parse_mode:"Markdown", ...Markup.inlineKeyboard([[Markup.button.callback("🎒 Inventar","my_inventory")]]) }
         ).catch(() => {});
-        bot.telegram.sendMessage(Number(process.env.ADMIN_ID),
-            `📤 *SKIN CHIQARISH!*\n\n👤 *${user.name}*\n🪪 \`${userId}\`\n🏷 *${win.lotName}*\n💰 ${(win.price??0).toLocaleString()} so'm\n🔗 \`${user.tradeLink}\`\n⏰ ${new Date().toLocaleString("uz-UZ")}`,
+        toAdmins((adminId) => bot.telegram.sendMessage(adminId, `📤 *SKIN CHIQARISH!*\n\n👤 *${user.name}*\n🪪 \`${userId}\`\n🏷 *${win.lotName}*\n💰 ${(win.price??0).toLocaleString()} so'm\n🔗 \`${user.tradeLink}\`\n⏰ ${new Date().toLocaleString("uz-UZ")}`,
             { parse_mode:"Markdown", ...Markup.inlineKeyboard([
                 [Markup.button.callback("✅ Skin yuborildi",`skin_sent_${userId}_${lotId}`)],
                 [Markup.button.callback("❌ Rad etish",`skin_reject_${userId}_${lotId}`)],
             ])}
-        ).catch(console.error);
+        )).catch(console.error);
     });
 
     bot.action(/^skin_sent_(\d+)_(\d+)$/, async (ctx) => {
@@ -1054,10 +1053,9 @@ module.exports = (bot) => {
         );
 
         // Adminga xabar
-        bot.telegram.sendMessage(Number(process.env.ADMIN_ID),
-            `🔥 *YANGI BID!*\n\n📦 *${lot.name}*\n💰 *${amount.toLocaleString()} so'm*\n👤 ${user?.name}\n🪪 \`${userId}\`\n🔗 ${getUser(userId)?.tradeLink??"Yo'q"}`,
+        toAdmins((adminId) => bot.telegram.sendMessage(adminId, `🔥 *YANGI BID!*\n\n📦 *${lot.name}*\n💰 *${amount.toLocaleString()} so'm*\n👤 ${user?.name}\n🪪 \`${userId}\`\n🔗 ${getUser(userId)?.tradeLink??"Yo'q"}`,
             { parse_mode:"Markdown" }
-        ).catch(() => {});
+        )).catch(() => {});
     });
 
     // ── 📸 Chek ───────────────────────────────────────────────────────────────
@@ -1075,7 +1073,7 @@ module.exports = (bot) => {
             `✅ *Chek qabul qilindi!*\n\n💰 *${topup.amount.toLocaleString()} so'm*\n${topup.promoCode ? `🎟 Promo: \`${topup.promoCode}\` (+${(topup.promoBonus??0).toLocaleString()} so'm)\n` : ""}💳 ${bankInfo.emoji} ${bankInfo.name}\n🔖 №\`${reqId}\`\n\n⏳ Admin 5 daqiqa ichida tasdiqlaydi.`,
             { parse_mode:"Markdown" }
         );
-        bot.telegram.sendPhoto(Number(process.env.ADMIN_ID), fileId, {
+        toAdmins((adminId) => bot.telegram.sendPhoto(adminId, fileId, {
             caption:
                 `💸 *Yangi to'lov so'rovi!*\n\n👤 *${user?.name??ctx.from.first_name}*\n🪪 \`${userId}\`\n` +
                 `💰 Depozit: *${topup.amount.toLocaleString()} so'm*\n` +
@@ -1086,7 +1084,7 @@ module.exports = (bot) => {
                 Markup.button.callback("✅ Tasdiqlash", `approve_topup_${userId}_${topup.amount}_${topup.promoBonus??0}_${topup.promoCode??""}`),
                 Markup.button.callback("❌ Rad etish",  `reject_topup_${userId}_${topup.promoCode??""}`),
             ]]),
-        }).catch(console.error);
+        })).catch(console.error);
     });
 
     // ── ✅ To'lov tasdiqlash ──────────────────────────────────────────────────

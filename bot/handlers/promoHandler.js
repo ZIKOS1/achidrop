@@ -1,4 +1,5 @@
 const { Markup } = require("telegraf");
+const { isAdminId } = require("../../backend/adminIds");
 const { read, write } = require("../../backend/database/db");
 
 // Global state — adminHandler ham ko'rishi uchun export qilamiz
@@ -6,7 +7,7 @@ const pendingPromo = {};
 module.exports.pendingPromo = pendingPromo;
 
 module.exports = (bot) => {
-    const isAdmin = (ctx) => ctx.from.id === Number(process.env.ADMIN_ID);
+    const isAdmin = (ctx) => isAdminId(ctx.from?.id);
 
     // /promo komandasi
     bot.command("promo", (ctx) => {

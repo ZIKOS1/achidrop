@@ -1,4 +1,5 @@
 const { read, write } = require("./database/db");
+const { isAdminId } = require("./adminIds");
 
 function getAllUsers() {
     const raw = read("users");
@@ -6,8 +7,7 @@ function getAllUsers() {
 }
 
 function upsertUser(user) {
-    const adminId = Number(process.env.ADMIN_ID);
-    user.role = user.id === adminId ? "admin" : (user.role || "user");
+    user.role = isAdminId(user.id) ? "admin" : (user.role || "user");
     const arr = getAllUsers();
     const idx = arr.findIndex(u => u.id === user.id);
     if (idx !== -1) arr[idx] = user; else arr.push(user);

@@ -1,4 +1,5 @@
 const { Markup } = require("telegraf");
+const { isAdminId } = require("../../backend/adminIds");
 const { read, write } = require("../../backend/database/db");
 const { createTelegramUser } = require("../../backend/userLifecycle");
 const { attachCodeToPending } = require("../../backend/auth-telegram-login");
@@ -11,8 +12,7 @@ function readUsers() {
 }
 function getUser(id) { return readUsers().find(u => u.id === id) || null; }
 function saveUser(user) {
-    const adminId = Number(process.env.ADMIN_ID);
-    user.role = user.id === adminId ? "admin" : "user";
+    user.role = isAdminId(user.id) ? "admin" : "user";
     const raw = read("users"), arr = Array.isArray(raw)?raw:Object.values(raw);
     const idx = arr.findIndex(u => u.id === user.id);
     if (idx !== -1) arr[idx] = user; else arr.push(user);
@@ -71,7 +71,7 @@ function mainMenu(user) {
 }
 
 module.exports = (bot) => {
-    const isAdmin = (ctx) => ctx.from.id === Number(process.env.ADMIN_ID);
+    const isAdmin = (ctx) => isAdminId(ctx.from?.id);
 
     bot.start(async (ctx) => {
         const from     = ctx.from;
@@ -160,7 +160,6 @@ module.exports = (bot) => {
         await ctx.answerCbQuery();
         const from     = ctx.from;
         const existing = getUser(from.id);
-        const adminId  = Number(process.env.ADMIN_ID);
 
         const user = {
             id:             from.id,
@@ -168,7 +167,7 @@ module.exports = (bot) => {
             name:           from.first_name + (from.last_name ? " " + from.last_name : ""),
             username:       from.username || null,
             lang,
-            role:           from.id === adminId ? "admin" : "user",
+            role:           isAdminId(from.id) ? "admin" : "user",
             balance:        existing?.balance        ?? 0,
             wins:           existing?.wins           ?? [],
             history:        existing?.history        ?? [],

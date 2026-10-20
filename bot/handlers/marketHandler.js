@@ -6,6 +6,7 @@
 // nizo/bekor qilish) tradeHandler.js'ning UMUMIY `showTradeRoom`'idan
 // (kind'ga qaramaydi) qayta ishlatiladi — market va obmen bir xil davomni bosib o'tadi.
 const { Markup } = require("telegraf");
+const { isAdminId } = require("../../backend/adminIds");
 const { read, write, refresh } = require("../../backend/database/db");
 const { notifyUser } = require("../../backend/notify");
 const { fetchUserInventory } = require("../../backend/steam");
@@ -31,7 +32,7 @@ function getUser(id) { return readUsers().find(u => u.id === id) || null; }
 function fmt(n) { return (n ?? 0).toLocaleString(); }
 
 module.exports = (bot) => {
-    const isAdmin = (ctx) => ctx.from.id === Number(process.env.ADMIN_ID);
+    const isAdmin = (ctx) => isAdminId(ctx.from?.id);
 
     // ── 🛒 Katalog ────────────────────────────────────────────────────────────
     async function showMarketList(ctx, user, edit) {

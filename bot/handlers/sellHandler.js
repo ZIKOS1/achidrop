@@ -7,6 +7,7 @@
 // bu yerda faqat (1) "💸 Skin sotish" tugmasi mini-appni ochadi, (2) admin
 // "✅ Oldim" / "❌ Rad etish" tugmalarini bosadi (server.js yuborgan xabarda).
 const { Markup } = require("telegraf");
+const { isAdminId } = require("../../backend/adminIds");
 const { refresh } = require("../../backend/database/db");
 const { notifyUser } = require("../../backend/notify");
 const { FEATURES } = require("../../backend/features");
@@ -36,7 +37,7 @@ function sellKeyboard() {
 }
 
 module.exports = (bot) => {
-    const isAdmin = (ctx) => ctx.from?.id === Number(process.env.ADMIN_ID);
+    const isAdmin = (ctx) => isAdminId(ctx.from?.id);
 
     bot.use(async (ctx, next) => {
         const text = ctx.message?.text;
