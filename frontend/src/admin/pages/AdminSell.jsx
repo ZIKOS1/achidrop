@@ -225,7 +225,7 @@ export default function AdminSell() {
                 <div>
                   <p className="font-heading text-sm font-bold text-foreground">#{r.id} · {r.userName || r.userId}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    ID {r.userId}{r.steamId64 ? ` · Steam ${r.steamId64}` : ""} · {new Date(r.createdAt).toLocaleString()}
+                    ID {r.userId}{r.steamId64 ? ` · Steam ${r.steamId64}` : ""} · {new Date(r.createdAt).toLocaleString()}{r.status === "awaiting_admin" && r.groupId != null ? (r.sentAt ? " · ✉️ yubordim dedi" : " · ⏳ hali yubormagan") : ""}
                   </p>
                 </div>
                 <span className="flex items-center gap-1 text-xs font-semibold">

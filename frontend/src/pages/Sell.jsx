@@ -54,6 +54,24 @@ function Tick({ on }) {
   );
 }
 
+// $0.15 dan arzon skinning narxi cheapPriceSom'da (priceSom null) — u faqat
+// jami bulkSellSom dan oshgan sotuvda tanlanadi.
+const sellPrice = (it) => (Number.isFinite(it.priceSom) ? it.priceSom : it.cheapPriceSom);
+
+// Bir sotuvdagi (groupId) ochiq skin so'rovlari → TradeLinkPanel uchun bitta ko'rinish.
+// groupId'siz eski so'rovlar adminga yaratilganda xabar qilingan — ular "yuborilgan" hisoblanadi.
+function groupOf(mine, r) {
+  const gid = r.groupId ?? r.id;
+  const list = mine.filter((x) => (x.groupId ?? x.id) === gid && x.status === "awaiting_admin");
+  return {
+    id: gid,
+    ids: list.map((x) => x.id),
+    items: list.flatMap((x) => x.items || []),
+    totalSom: list.reduce((n, x) => n + (x.totalSom || 0), 0),
+    sentAt: r.groupId == null ? r.createdAt : list.every((x) => x.sentAt) ? list[0]?.sentAt : null,
+  };
+}
+
 // Skin kartochkasi (dizayn): binafsha nurli to'q fon, rasm 16:10, nom,
 // "Nodirlik · Sifat" (kvadrat nuqta bilan), narx. Tanlansa — qizil chegara va nur.
 function SkinCard({ item, selected, disabled, priced, onToggle, index = 0 }) {
@@ -82,7 +100,7 @@ function SkinCard({ item, selected, disabled, priced, onToggle, index = 0 }) {
         <span className="truncate">{rarityLabel(item)}{item.wear ? ` · ${item.wear}` : ""}</span>
       </span>
       <span className="flex items-end justify-between gap-2">
-        <span className="whitespace-nowrap text-[15px] font-semibold tabular-nums text-[var(--heading)] sm:text-[17px]">{priced ? fmtMoney(item.priceSom) : "—"}</span>
+        <span className="whitespace-nowrap text-[15px] font-semibold tabular-nums text-[var(--heading)] sm:text-[17px]">{priced ? fmtMoney(sellPrice(item)) : "—"}</span>
         {tag && (
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--row-sel)] px-2 py-0.5 text-[10px] font-semibold text-primary">
             {!item.tradable && item.sellable !== false && <Lock className="size-2.5" />}
@@ -170,9 +188,26 @@ function SellButton({ count, submitting, onClick, className }) {
 }
 
 // So'rov yuborilgandan keyin: bizning trade link, "Steam'da ochish" va "Nusxalash" (07, 10).
-function TradeLinkPanel({ request, botTradeUrl, onDone }) {
-  const { tg } = useApp();
+function TradeLinkPanel({ request, botTradeUrl, onDone, onSent }) {
+  const { tg, showToast } = useApp();
   const [copied, setCopied] = useState(false);
+  const [sentAt, setSentAt] = useState(request.sentAt || null);
+  const [sending, setSending] = useState(false);
+  async function markSent() {
+    setSending(true);
+    try {
+      const r = await api("/api/instant-sell/sent", { method: "POST", body: JSON.stringify({ ids: request.ids || [request.id] }) });
+      hap("notif", "success");
+      setSentAt(r.sentAt || new Date().toISOString());
+      showToast(t("sell.sentDone"), "ok");
+      onSent?.();
+    } catch (e) {
+      hap("notif", "error");
+      showToast(e?.error || t("common.genericError"), "err");
+    } finally {
+      setSending(false);
+    }
+  }
   function copy() {
     navigator.clipboard?.writeText(botTradeUrl);
     hap("impact", "light");
@@ -245,6 +280,21 @@ function TradeLinkPanel({ request, botTradeUrl, onDone }) {
       <p className="text-xs text-primary">{t("sell.warnOnly")}</p>
       <p className="text-xs text-muted-foreground">{t("sell.afterAccept")}</p>
 
+      {sentAt ? (
+        <p className="flex items-center gap-2 rounded-2xl bg-success/12 p-3 text-sm font-medium text-success">
+          <CheckCircle2 className="size-4 shrink-0" />
+          {t("sell.sentDone")}
+        </p>
+      ) : (
+        <div className="space-y-2">
+          <button type="button" onClick={markSent} disabled={sending} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gold-grad py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.97] disabled:opacity-60">
+            {sending ? <span className="size-4 rounded-full border-2 border-white/30 border-t-white spin" /> : <CheckCircle2 className="size-4" />}
+            {t("sell.sentBtn")}
+          </button>
+          <p className="text-xs text-muted-foreground">{t("sell.sentHint")}</p>
+        </div>
+      )}
+
       <button type="button" onClick={onDone} className="w-full rounded-2xl border border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-ring/60 hover:text-foreground">
         {t("sell.done")}
       </button>
@@ -292,7 +342,7 @@ export default function Sell() {
         setQuote(q);
         // Inventar yangilanganda yo'qolgan/narxsiz skinlar tanlovdan chiqadi.
         setSelected((prev) => {
-          const ok = new Set(q.items.filter((i) => i.tradable && Number.isFinite(i.priceSom)).map((i) => i.assetId));
+          const ok = new Set(q.items.filter((i) => i.tradable && Number.isFinite(sellPrice(i))).map((i) => i.assetId));
           return new Set([...prev].filter((id) => ok.has(id)));
         });
       })
@@ -340,7 +390,7 @@ export default function Sell() {
   }, [user?.id, mine, loadMine]);
 
   const items = quote?.items || [];
-  const sellable = (it) => quote?.lisConfigured && it.tradable && Number.isFinite(it.priceSom);
+  const sellable = (it) => quote?.lisConfigured && it.tradable && Number.isFinite(sellPrice(it));
 
   const catCounts = useMemo(() => {
     const c = { all: items.length };
@@ -352,7 +402,7 @@ export default function Sell() {
     const q = query.trim().toLowerCase();
     let list = q ? items.filter((i) => i.name.toLowerCase().includes(q)) : items;
     if (category !== "all") list = list.filter((i) => sellCategory(i.marketHashName || i.name) === category);
-    const byPrice = sort === "asc" ? (a, b) => (a.priceSom || 0) - (b.priceSom || 0) : (a, b) => (b.priceSom || 0) - (a.priceSom || 0);
+    const byPrice = sort === "asc" ? (a, b) => (sellPrice(a) || 0) - (sellPrice(b) || 0) : (a, b) => (sellPrice(b) || 0) - (sellPrice(a) || 0);
     const cmp = sort === "name" ? (a, b) => a.name.localeCompare(b.name) : byPrice;
     // Sotiladiganlari doim oldinda, umuman sotilmaydiganlar (medal, coin...) eng oxirida.
     const rank = (it) => (sellable(it) ? 2 : it.sellable === false ? 0 : 1);
@@ -363,7 +413,7 @@ export default function Sell() {
   useEffect(() => { setShown(PAGE); }, [query, category, sort]);
 
   const selectedItems = items.filter((i) => selected.has(i.assetId));
-  const total = selectedItems.reduce((s, i) => s + (i.priceSom || 0), 0);
+  const total = selectedItems.reduce((s, i) => s + (sellPrice(i) || 0), 0);
   const maxItems = quote?.maxItems || 30;
 
   function toggle(it) {
@@ -385,7 +435,7 @@ export default function Sell() {
 
   function selectTop5() {
     hap("impact", "medium");
-    const top = items.filter(sellable).sort((a, b) => b.priceSom - a.priceSom).slice(0, Math.min(5, maxItems));
+    const top = items.filter((i) => sellable(i) && !i.tooCheap).sort((a, b) => b.priceSom - a.priceSom).slice(0, Math.min(5, maxItems));
     setSelected(new Set(top.map((i) => i.assetId)));
   }
 
@@ -418,6 +468,11 @@ export default function Sell() {
 
   function confirmSell() {
     if (!selected.size) return;
+    if (selectedItems.some((i) => i.tooCheap) && total < (quote?.bulkSellSom || 0)) {
+      hap("notif", "error");
+      showToast(t("sell.cheapBulk", { sum: fmtMoney(quote.bulkSellSom) }), "err");
+      return;
+    }
     openModal({
       title: t("sell.confirmTitle"),
       icon: Banknote,
@@ -449,13 +504,13 @@ export default function Sell() {
   if (result) {
     return (
       <div className="mx-auto max-w-xl">
-        <TradeLinkPanel request={result.request} botTradeUrl={result.botTradeUrl} onDone={() => { setResult(null); load(true); }} />
+        <TradeLinkPanel request={result.request} botTradeUrl={result.botTradeUrl} onSent={loadMine} onDone={() => { setResult(null); load(true); }} />
       </div>
     );
   }
 
   const sellableItems = items.filter(sellable);
-  const inventoryValue = sellableItems.reduce((sum, i) => sum + i.priceSom, 0);
+  const inventoryValue = sellableItems.reduce((sum, i) => sum + sellPrice(i), 0);
   const steamMissing = !user.steamId64 || quote?.steamConnected === false;
 
   return (
@@ -584,7 +639,7 @@ export default function Sell() {
                         key={it.assetId}
                         index={i}
                         item={it}
-                        priced={Number.isFinite(it.priceSom)}
+                        priced={Number.isFinite(sellPrice(it))}
                         selected={selected.has(it.assetId)}
                         disabled={!sellable(it)}
                         onToggle={() => toggle(it)}
@@ -660,7 +715,7 @@ export default function Sell() {
                   <span className="font-heading text-sm font-semibold tabular-nums text-foreground">{fmtMoney(r.totalSom ?? r.priceSom)}</span>
                   <StatusBadge status={r.status} />
                   {r.status === "awaiting_admin" && (
-                    <button type="button" onClick={() => setResult({ request: r, botTradeUrl: quote?.botTradeUrl })} className="text-xs text-primary underline-offset-2 hover:underline">
+                    <button type="button" onClick={() => setResult({ request: groupOf(mine, r), botTradeUrl: quote?.botTradeUrl })} className="text-xs text-primary underline-offset-2 hover:underline">
                       {t("sell.tradeLink")}
                     </button>
                   )}

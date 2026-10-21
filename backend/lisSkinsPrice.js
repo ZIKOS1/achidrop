@@ -171,13 +171,17 @@ function buffSellPriceSom(usd, rate, tiers) {
     return instantSellPriceSom(usd, rate, marginPercentForUsd(usd, tiers));
 }
 
-// Bozor narxi shundan arzon skin saytda sotilmaydi (narx berilmaydi).
+// Bozor narxi shundan arzon skin saytda alohida sotilmaydi (narx berilmaydi) —
+// faqat bitta sotuv jami BULK_SELL_USD dan oshsa, uning ichida sotsa bo'ladi.
 const MIN_SELL_USD = 0.15;
+const BULK_SELL_USD = 10;
 function minSellSom(rate = getUsdToSomRate()) { return Math.ceil(MIN_SELL_USD * rate); }
+function bulkSellSom(rate = getUsdToSomRate()) { return Math.ceil(BULK_SELL_USD * rate); }
 
-// names[] → { prices: Map(name -> priceSom|null), tooCheap: Set(name) }.
+// names[] → { prices: Map(name -> priceSom|null), tooCheap: Map(name -> priceSom) }.
 // Faqat BUFF buy order bor nomlar — buy order yo'q skinga narx berilmaydi
-// (sotib bo'lmaydi), Lis'ga qaytilmaydi. MIN_SELL_USD dan arzoniga ham.
+// (sotib bo'lmaydi), Lis'ga qaytilmaydi. MIN_SELL_USD dan arzoniga ham —
+// ularning narxi tooCheap'da (faqat katta sotuv ichida ishlatiladi).
 async function getInstantSellQuotesSom(names) {
     const rate = getUsdToSomRate();
     const tiers = getMarginTiers();
@@ -185,9 +189,9 @@ async function getInstantSellQuotesSom(names) {
     try { buff = await require("./buffPrice").getBuffPricesUsd(names); }
     catch (err) { console.log("BUFF NARX XATO:", err.message); }
     const prices = new Map();
-    const tooCheap = new Set();
+    const tooCheap = new Map();
     for (const [name, usd] of buff) {
-        if (Number.isFinite(usd) && usd > 0 && usd < MIN_SELL_USD) { tooCheap.add(name); prices.set(name, null); }
+        if (Number.isFinite(usd) && usd > 0 && usd < MIN_SELL_USD) { tooCheap.set(name, buffSellPriceSom(usd, rate, tiers)); prices.set(name, null); }
         else prices.set(name, buffSellPriceSom(usd, rate, tiers));
     }
     return { prices, tooCheap };
@@ -218,5 +222,5 @@ module.exports = {
     getInstantSellPricesSom, getInstantSellPriceSom, getListPriceSom,
     getInstantSellMarginPercent, getUsdToSomRate, _clearCache,
     normalizeMarginTiers, marginTiersFromSettings, getMarginTiers, marginPercentForUsd, instantSellPriceSomTiered, SELL_PRICE_RATIO,
-    buffSellPriceSom, getInstantSellQuotesSom, MIN_SELL_USD, minSellSom,
+    buffSellPriceSom, getInstantSellQuotesSom, MIN_SELL_USD, minSellSom, BULK_SELL_USD, bulkSellSom,
 };

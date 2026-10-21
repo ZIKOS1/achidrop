@@ -131,8 +131,33 @@ test("validateNewRequest: bir skin ikki ochiq so'rovda bo'lmaydi, ochiq so'rovla
     assert.deepEqual(ism.validateNewRequest(existing, 1, ["111", "444"]), { error: "already_requested", assetIds: ["111"] });
     assert.deepEqual(ism.validateNewRequest(existing, 1, ["222", "333"]), { ok: true });
 
-    const many = Array.from({ length: ism.MAX_OPEN_REQUESTS_PER_USER }, (_, i) => ({ userId: 5, status: "awaiting_admin", items: [{ assetId: String(i) }] }));
+    const many = Array.from({ length: ism.MAX_OPEN_REQUESTS_PER_USER }, (_, i) => ({ id: i + 1, userId: 5, status: "awaiting_admin", items: [{ assetId: String(i) }] }));
     assert.equal(ism.validateNewRequest(many, 5, ["999"]).error, "too_many_open");
+});
+
+test("validateNewRequest: bir sotuvning har-skin so'rovlari (bitta groupId) bitta ochiq sotuv hisoblanadi", () => {
+    const group = Array.from({ length: 10 }, (_, i) => ({ id: 100 + i, groupId: 100, userId: 7, status: "awaiting_admin", items: [{ assetId: "g" + i }] }));
+    assert.deepEqual(ism.validateNewRequest(group, 7, ["new"]), { ok: true });
+    assert.deepEqual(ism.validateNewRequest(group, 7, ["g3"]), { error: "already_requested", assetIds: ["g3"] });
+});
+
+test("createSellRequest: $0.15 dan arzon skin jami $10 dan kam sotuvda rad etiladi", async () => {
+    const buff = require("../backend/buffPrice");
+    const orig = global.fetch;
+    process.env.LIS_SKINS_API_KEY = "test";
+    global.fetch = async (url) => {
+        if (String(url) !== buff.FEED_URL) throw new Error("kutilmagan so'rov: " + url);
+        const feed = { "Cheap": { highest_order: { price: 0.1 } }, "Mid": { highest_order: { price: 2 } } };
+        for (let i = 0; i < 1000; i++) feed[`filler ${i}`] = { highest_order: { price: 1 } };
+        return { ok: true, json: async () => feed };
+    };
+    try {
+        const r = await ism.createSellRequest(1, [
+            { assetId: "1", marketHashName: "Cheap" },
+            { assetId: "2", marketHashName: "Mid" },
+        ]);
+        assert.deepEqual(r, { error: "too_cheap", assetIds: ["1"] });
+    } finally { global.fetch = orig; delete process.env.LIS_SKINS_API_KEY; }
 });
 
 test("creditRequestInTx: balans + tarix + ledger (holdMs bilan) yoziladi", () => {

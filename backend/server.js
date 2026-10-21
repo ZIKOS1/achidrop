@@ -1395,7 +1395,7 @@ app.get("/api/instant-sell/quote", auth, inventoryLimiter, async (req, res) => {
     catch (err) { return res.status(500).json({ error: err.message }); }
 
     let prices = null;
-    let tooCheap = new Set();
+    let tooCheap = new Map();
     if (base.lisConfigured) {
         // Qulfdagi skinlarning ham narxi ko'rsatiladi (tanlab bo'lmaydi, lekin qiymati ko'rinadi).
         const names = [...new Set(items.filter(it => it.sellable !== false).map(it => sellItemView(it, null).marketHashName))];
@@ -1407,11 +1407,13 @@ app.get("/api/instant-sell/quote", auth, inventoryLimiter, async (req, res) => {
     const minSom = lisSkinsPrice.minSellSom();
     res.json({
         ...base, steamConnected: true, lisAutosellPrices: !!ownerPrices, minSellUsd: lisSkinsPrice.MIN_SELL_USD,
+        // Arzon skinlar (cheapPriceSom) faqat jami bulkSellSom dan oshgan sotuvda tanlanadi.
+        bulkSellUsd: lisSkinsPrice.BULK_SELL_USD, bulkSellSom: lisSkinsPrice.bulkSellSom(),
         items: items.map(it => {
             const v = sellItemView(it, prices);
             const own = ownerPrices?.get(v.assetId);
-            if (own) return own < minSom ? { ...v, priceSom: null, tooCheap: true } : { ...v, priceSom: own };
-            return tooCheap.has(v.marketHashName) ? { ...v, tooCheap: true } : v;
+            if (own) return own < minSom ? { ...v, priceSom: null, tooCheap: true, cheapPriceSom: own } : { ...v, priceSom: own };
+            return tooCheap.has(v.marketHashName) ? { ...v, tooCheap: true, cheapPriceSom: tooCheap.get(v.marketHashName) } : v;
         }),
         // Steam yashirgan (trade-himoyasidagi) skinlar soni + token holati.
         hiddenCount: communityInventoryMeta(u.steamId64).hiddenCount,
@@ -1447,7 +1449,7 @@ const INSTANT_SELL_ERRORS = {
     too_many_open: "Sizda tasdiqlanmagan so'rovlar ko'p. Admin ko'rib chiqishini kuting",
     already_requested: "Bu skin(lar) uchun so'rov allaqachon yuborilgan",
     price_not_found: "Ba'zi skinlarning narxi topilmadi",
-    too_cheap: `Narxi $${lisSkinsPrice.MIN_SELL_USD} dan arzon skinlarni sotib bo'lmaydi`,
+    too_cheap: `Narxi $${lisSkinsPrice.MIN_SELL_USD} dan arzon skinlarni faqat jami $${lisSkinsPrice.BULK_SELL_USD} dan ko'p sotuvda sotish mumkin`,
     not_tradable: "Ba'zi skinlarni hozir yuborib bo'lmaydi (trade lock)",
     not_found: "Skin inventaringizda topilmadi (sahifani yangilang)",
 };
@@ -1485,37 +1487,66 @@ app.post("/api/instant-sell", auth, sensitiveLimiter, async (req, res) => {
     if (result.error) {
         return res.status(400).json({ error: INSTANT_SELL_ERRORS[result.error] || result.error, code: result.error, assetIds: result.assetIds });
     }
-    const request = result.request;
+    // Adminga xabar hozir EMAS — user "Skinni yubordim"ni bosganda (/api/instant-sell/sent).
+    const { requests } = result;
+    res.json({ request: groupView(requests), requests, botTradeUrl: getBotTradeUrl() });
+});
 
-    if (process.env.ADMIN_ID) {
-        // Taxminiy Lis avtosell: Lis'dagi eng arzon narx × LIS_AUTO_RATIO —
-        // admin "Oldim"dan oldin foyda bor-yo'qligini ko'rishi uchun (faqat ma'lumot).
-        // Lis xato bersa ham xabar baribir ketadi ("narx yo'q" bilan).
-        let lisUsd = new Map();
-        try { lisUsd = await lisSkinsPrice.fetchLisPricesUsd(request.items.map(it => it.marketHashName)); }
-        catch (err) { console.log("LIS AVTO NARX XATO:", err.message); }
-        const rate = lisSkinsPrice.getUsdToSomRate();
-        const autoUsd = (it) => { const usd = lisUsd.get(it.marketHashName); return Number.isFinite(usd) ? usd * LIS_AUTO_RATIO : null; };
-        const autoText = (usd) => usd == null ? "Lis avto: narx yo'q" : `Lis avto ≈ $${usd.toFixed(2)} (${Math.round(usd * rate).toLocaleString()} so'm)`;
-        const lines = request.items.slice(0, 15).map((it, i) =>
-            `${i + 1}. ${it.marketHashName}${it.float != null ? ` (float ${it.float.toFixed(4)})` : ""} — ${it.priceSom.toLocaleString()} so'm\n    🤖 ${autoText(autoUsd(it))}`);
-        if (request.items.length > 15) lines.push(`… va yana ${request.items.length - 15} ta`);
-        const autos = request.items.map(autoUsd);
-        const autoTotalUsd = autos.reduce((s, v) => s + (v ?? 0), 0);
-        const autoMissing = autos.filter(v => v == null).length;
-        const autoTotalLine = `🤖 Taxminiy Lis avto (×${LIS_AUTO_RATIO}): *$${autoTotalUsd.toFixed(2)} ≈ ${Math.round(autoTotalUsd * rate).toLocaleString()} so'm*` +
-            (autoMissing ? ` (${autoMissing} ta skin narxsiz)` : "");
-        toAdmins((adminId) => tgSendMessage(adminId, `💸 *SKIN SOTISH SO'ROVI #${request.id}*\n\n` +
-            `👤 ${mdEscape(u.name ?? String(u.id))}\n🪪 \`${u.id}\`\n🎮 Steam: \`${u.steamId64}\`\n\n` +
-            `${lines.map(mdEscape).join("\n")}\n\n💰 Jami: *${request.totalSom.toLocaleString()} so'm*\n${autoTotalLine}\n\n` +
-            `Steam'da skin(lar) kelganini tekshiring, keyin "Oldim"ni bosing.`,
+// Bir sotuvdagi (bitta groupId) skin so'rovlarini UI uchun bitta ko'rinishga yig'adi.
+function groupView(requests) {
+    return {
+        id: requests[0].groupId ?? requests[0].id,
+        ids: requests.map(r => r.id),
+        items: requests.flatMap(r => r.items),
+        totalSom: requests.reduce((n, r) => n + r.totalSom, 0),
+        sentAt: requests.every(r => r.sentAt) ? requests[0].sentAt : null,
+    };
+}
+
+// Har skin uchun adminga ALOHIDA xabar (o'zining "Oldim"/"Rad etish" tugmalari bilan).
+// Taxminiy Lis avtosell: Lis'dagi eng arzon narx × LIS_AUTO_RATIO — admin
+// "Oldim"dan oldin foyda bor-yo'qligini ko'rishi uchun (faqat ma'lumot).
+// Lis xato bersa ham xabar baribir ketadi ("narx yo'q" bilan).
+async function notifyAdminsSellSent(u, requests) {
+    if (!process.env.ADMIN_ID || !requests.length) return;
+    let lisUsd = new Map();
+    try { lisUsd = await lisSkinsPrice.fetchLisPricesUsd([...new Set(requests.map(r => r.items[0].marketHashName))]); }
+    catch (err) { console.log("LIS AVTO NARX XATO:", err.message); }
+    const rate = lisSkinsPrice.getUsdToSomRate();
+    const autoText = (name) => {
+        const usd = lisUsd.get(name);
+        return Number.isFinite(usd) ? `Lis avto ≈ $${(usd * LIS_AUTO_RATIO).toFixed(2)} (${Math.round(usd * LIS_AUTO_RATIO * rate).toLocaleString()} so'm)` : "Lis avto: narx yo'q";
+    };
+    const who = `👤 ${mdEscape(u.name ?? String(u.id))}\n🪪 \`${u.id}\`\n🎮 Steam: \`${u.steamId64}\``;
+    // Ketma-ket — 30 ta xabarni birdan yuborib Telegram limitiga urilmaslik uchun.
+    for (const [i, r] of requests.entries()) {
+        const it = r.items[0];
+        const line = `${it.marketHashName}${it.float != null ? ` (float ${it.float.toFixed(4)})` : ""}`;
+        const part = requests.length > 1 ? ` (${i + 1}/${requests.length})` : "";
+        await toAdmins((adminId) => tgSendMessage(adminId, `💸 *SKIN SOTISH #${r.id}*${part}\n\n${who}\n\n` +
+            `🔫 ${mdEscape(line)}\n💰 *${r.totalSom.toLocaleString()} so'm*\n🤖 ${mdEscape(autoText(it.marketHashName))}\n\n` +
+            `✉️ User skinni yubordim dedi. Steam'da kelganini tekshiring, keyin "Oldim"ni bosing.`,
             { inline_keyboard: [[
-                { text: "✅ Oldim", callback_data: `isell_ok_${request.id}` },
-                { text: "❌ Rad etish", callback_data: `isell_no_${request.id}` },
+                { text: "✅ Oldim", callback_data: `isell_ok_${r.id}` },
+                { text: "❌ Rad etish", callback_data: `isell_no_${r.id}` },
             ]] }
         ));
     }
-    res.json({ request, botTradeUrl: getBotTradeUrl() });
+}
+
+// POST /api/instant-sell/sent — { ids: [...] } — user skin(lar)ni Steam'da
+// yubordi. Shundagina adminga har skin uchun alohida xabar ketadi.
+app.post("/api/instant-sell/sent", auth, sensitiveLimiter, async (req, res) => {
+    const u = req.user;
+    if (!u) return res.status(404).json({ error: "User not found" });
+    const ids = (Array.isArray(req.body.ids) ? req.body.ids : []).map(Number).filter(Number.isFinite);
+    if (!ids.length || ids.length > instantSellManager.MAX_ITEMS_PER_REQUEST) return res.status(400).json({ error: "So'rov topilmadi" });
+    let result;
+    try { result = await instantSellManager.markSent(u.id, ids); }
+    catch (err) { return res.status(500).json({ error: err.message }); }
+    try { await notifyAdminsSellSent(u, result.requests); }
+    catch (err) { console.log("SELL SENT NOTIFY ERROR:", err.message); }
+    res.json({ marked: result.requests.length, sentAt: result.requests[0]?.sentAt ?? null });
 });
 
 // GET /api/public-stats — ochiq: tasdiqlangan sotuvlar soni/summasi va so'nggi

@@ -83,5 +83,6 @@ test("getInstantSellQuotesSom: $0.15 dan arzon skinga narx yo'q (tooCheap)", asy
         assert.ok(tooCheap.has("Cheap"));
         assert.ok(prices.get("Edge") > 0);
         assert.strictEqual(tooCheap.has("Edge"), false);
+        assert.ok(tooCheap.get("Cheap") > 0); // katta sotuv ichida ishlatiladigan narx
     } finally { global.fetch = orig; }
 });

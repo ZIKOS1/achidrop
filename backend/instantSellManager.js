@@ -15,7 +15,7 @@
 // tegiladi. Shu sabab admin tugmani ikki marta bossa ham (yoki ikki joydan)
 // pul ikki marta tushmaydi.
 const { read, refresh, withTransaction, readTx, writeTx } = require("./database/db");
-const { getInstantSellQuotesSom, minSellSom, isLisConfigured } = require("./lisSkinsPrice");
+const { getInstantSellQuotesSom, minSellSom, bulkSellSom, isLisConfigured } = require("./lisSkinsPrice");
 
 const SELL_HOLD_MS = (8 * 24 + 12) * 60 * 60 * 1000; // 8 kun 12 soat
 const MAX_ITEMS_PER_REQUEST = 30;
@@ -43,9 +43,11 @@ function getRequestsForAdmin(status) {
 // Sof funksiya (testlanadi): yangi so'rovni mavjudlariga nisbatan tekshiradi.
 // Bir xil skin (assetId) ikkita ochiq so'rovda bo'lmasin — aks holda user
 // bitta skinni yuborib, ikki marta pul olishga urinishi mumkin.
+// Har skin alohida so'rov, lekin bir sotuvdagilari bitta groupId'da —
+// ochiq sotuvlar soni guruh bo'yicha cheklanadi.
 function validateNewRequest(existing, userId, assetIds) {
     const open = existing.filter(r => r.userId === userId && r.status === "awaiting_admin");
-    if (open.length >= MAX_OPEN_REQUESTS_PER_USER) return { error: "too_many_open" };
+    if (new Set(open.map(r => r.groupId ?? r.id)).size >= MAX_OPEN_REQUESTS_PER_USER) return { error: "too_many_open" };
     const busy = new Set(open.flatMap(r => (r.items || []).map(i => String(i.assetId))));
     const dup = assetIds.filter(a => busy.has(String(a)));
     if (dup.length) return { error: "already_requested", assetIds: dup };
@@ -62,6 +64,8 @@ function nextId(existing) {
 // items: [{ assetId, marketHashName, name, imageUrl?, float? }]
 // priceByAsset: Map(assetId -> so'm) — Lis avtosell narxi (faqat Lis cookie
 // egasi uchun, lisAutosell.ownerPricesSom); bor bo'lsa formula o'rniga shu.
+// Har skin uchun ALOHIDA so'rov yaratiladi (admin har birini alohida
+// "Oldim"/"Rad etadi"), hammasi bitta groupId bilan. Natija: { requests }.
 async function createSellRequest(userId, items, { priceByAsset = null } = {}) {
     if (!isLisConfigured()) return { error: "no_key" };
     if (!Array.isArray(items) || !items.length) return { error: "empty" };
@@ -72,9 +76,15 @@ async function createSellRequest(userId, items, { priceByAsset = null } = {}) {
     const { prices: byName, tooCheap } = await getInstantSellQuotesSom(items.filter(i => !Number.isFinite(fixed(i))).map(i => i.marketHashName));
     const priceOf = (i) => Number.isFinite(fixed(i)) ? fixed(i) : byName.get(i.marketHashName);
     const minSom = minSellSom();
-    const cheap = items.filter(i => Number.isFinite(fixed(i)) ? fixed(i) < minSom : tooCheap.has(i.marketHashName));
-    if (cheap.length) return { error: "too_cheap", assetIds: cheap.map(i => String(i.assetId)) };
-    const missing = items.filter(i => !Number.isFinite(priceOf(i)));
+    const isCheap = (i) => Number.isFinite(fixed(i)) ? fixed(i) < minSom : tooCheap.has(i.marketHashName);
+    // Arzon skinning narxi tooCheap'da (prices'da null).
+    const sellPrice = (i) => !Number.isFinite(fixed(i)) && tooCheap.has(i.marketHashName) ? tooCheap.get(i.marketHashName) : priceOf(i);
+    const cheap = items.filter(isCheap);
+    // Arzon skinlar faqat jami BULK_SELL_USD dan oshgan sotuv ichida.
+    if (cheap.length && items.reduce((n, i) => n + (sellPrice(i) || 0), 0) < bulkSellSom()) {
+        return { error: "too_cheap", assetIds: cheap.map(i => String(i.assetId)) };
+    }
+    const missing = items.filter(i => !Number.isFinite(sellPrice(i)));
     if (missing.length) return { error: "price_not_found", assetIds: missing.map(i => String(i.assetId)) };
 
     const priced = items.map(i => ({
@@ -83,27 +93,49 @@ async function createSellRequest(userId, items, { priceByAsset = null } = {}) {
         name: i.name ?? i.marketHashName,
         imageUrl: i.imageUrl ?? null,
         float: Number.isFinite(i.float) ? i.float : null,
-        priceSom: priceOf(i),
+        priceSom: sellPrice(i),
     }));
-    const totalSom = priced.reduce((s, i) => s + i.priceSom, 0);
 
     const result = await withTransaction(async (session) => {
         const requests = asArray(await readTx(session, "instantSellRequests"));
         const check = validateNewRequest(requests, userId, priced.map(i => i.assetId));
         if (check.error) return check;
 
-        const request = {
-            id: nextId(requests), userId,
-            items: priced, totalSom,
-            status: "awaiting_admin", // awaiting_admin | credited | rejected
-            createdAt: new Date().toISOString(),
-            resolvedAt: null, rejectReason: null,
-        };
-        requests.push(request);
+        const createdAt = new Date().toISOString();
+        let groupId = null;
+        const created = priced.map(item => {
+            const id = nextId(requests);
+            groupId ??= id;
+            const request = {
+                id, groupId, userId,
+                items: [item], totalSom: item.priceSom,
+                status: "awaiting_admin", // awaiting_admin | credited | rejected
+                createdAt, sentAt: null, // sentAt — user "Skinni yubordim"ni bosgan vaqt
+                resolvedAt: null, rejectReason: null,
+            };
+            requests.push(request);
+            return request;
+        });
         await writeTx(session, "instantSellRequests", requests);
-        return { request, cacheUpdates: { instantSellRequests: requests } };
+        return { requests: created, cacheUpdates: { instantSellRequests: requests } };
     });
     return result;
+}
+
+// User "Skinni yubordim"ni bosdi — o'zining ochiq so'rovlariga sentAt qo'yiladi.
+// Faqat YANGI belgilanganlari qaytadi (adminga xabar shular uchun ketadi) —
+// ikki marta bosilsa xabar takrorlanmaydi.
+async function markSent(userId, ids) {
+    const want = new Set(ids.map(Number));
+    return withTransaction(async (session) => {
+        const requests = asArray(await readTx(session, "instantSellRequests"));
+        const now = new Date().toISOString();
+        const marked = requests.filter(r => want.has(r.id) && r.userId === userId && r.status === "awaiting_admin" && !r.sentAt);
+        if (!marked.length) return { requests: [] };
+        for (const r of marked) r.sentAt = now;
+        await writeTx(session, "instantSellRequests", requests);
+        return { requests: marked, cacheUpdates: { instantSellRequests: requests } };
+    });
 }
 
 // Sof funksiya (testlanadi) — tranzaksiya ichida users/ledgers massivlarini
@@ -207,7 +239,7 @@ async function refreshRequests() {
 
 module.exports = {
     SELL_HOLD_MS, MAX_ITEMS_PER_REQUEST, MAX_OPEN_REQUESTS_PER_USER,
-    createSellRequest, approveSellRequest, rejectSellRequest,
+    createSellRequest, markSent, approveSellRequest, rejectSellRequest,
     getInstantSellRequest, getMyInstantSellRequests, getRequestsForAdmin, refreshRequests,
     validateNewRequest, creditRequestInTx, approvedText, rejectedText, publicStats,
     getAllRequests,
