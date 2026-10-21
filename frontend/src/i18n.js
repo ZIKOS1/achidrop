@@ -173,6 +173,7 @@ const DICT = {
   "sell.emptyDesc": { uz: "Steam inventaringiz ochiq (public) ekanini tekshiring", ru: "Проверьте, что инвентарь Steam открыт", en: "Make sure your Steam inventory is public" },
   "sell.locked": { uz: "Qulf", ru: "Трейд-лок", en: "Trade lock" },
   "sell.noPrice": { uz: "Narx yo'q", ru: "Нет цены", en: "No price" },
+  "sell.tooCheap": { uz: "$0.15 dan arzon", ru: "Дешевле $0.15", en: "Under $0.15" },
   "sell.notSellable": { uz: "Sotilmaydi", ru: "Не продаётся", en: "Not sellable" },
   "sell.selected": { uz: "{n} ta tanlandi", ru: "Выбрано: {n}", en: "{n} selected" },
   "sell.total": { uz: "Jami", ru: "Итого", en: "Total" },

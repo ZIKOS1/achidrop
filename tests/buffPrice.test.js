@@ -7,6 +7,8 @@ const feed = {
     "AK-47 | Redline (Field-Tested)": { starting_at: { price: 25.04 }, highest_order: { price: 24.481 } },
     "No Order": { starting_at: { price: 3 }, highest_order: { price: 0 } },
     "Broken": { starting_at: { price: 3 } },
+    "Cheap": { highest_order: { price: 0.14 } },
+    "Edge": { highest_order: { price: 0.15 } },
 };
 for (let i = 0; i < 1000; i++) feed[`filler ${i}`] = { highest_order: { price: 1 } };
 
@@ -65,4 +67,21 @@ test("getInstantSellPricesSom: BUFF buy order yo'q nomga narx yo'q (Lis'ga qaytm
         assert.strictEqual(m.has("Missing"), false);
         assert.deepStrictEqual(urls, [buff.FEED_URL]);
     } finally { global.fetch = orig; delete process.env.LIS_SKINS_API_KEY; }
+});
+
+test("getInstantSellQuotesSom: $0.15 dan arzon skinga narx yo'q (tooCheap)", async () => {
+    const lis = require("../backend/lisSkinsPrice");
+    const buff = require("../backend/buffPrice");
+    const orig = global.fetch;
+    global.fetch = async (url) => {
+        if (String(url) === buff.FEED_URL) return { ok: true, json: async () => feed };
+        throw new Error("Lis so'ralmasligi kerak");
+    };
+    try {
+        const { prices, tooCheap } = await lis.getInstantSellQuotesSom(["Cheap", "Edge"]);
+        assert.strictEqual(prices.get("Cheap"), null);
+        assert.ok(tooCheap.has("Cheap"));
+        assert.ok(prices.get("Edge") > 0);
+        assert.strictEqual(tooCheap.has("Edge"), false);
+    } finally { global.fetch = orig; }
 });

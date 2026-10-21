@@ -15,7 +15,7 @@
 // tegiladi. Shu sabab admin tugmani ikki marta bossa ham (yoki ikki joydan)
 // pul ikki marta tushmaydi.
 const { read, refresh, withTransaction, readTx, writeTx } = require("./database/db");
-const { getInstantSellPricesSom, isLisConfigured } = require("./lisSkinsPrice");
+const { getInstantSellQuotesSom, minSellSom, isLisConfigured } = require("./lisSkinsPrice");
 
 const SELL_HOLD_MS = (8 * 24 + 12) * 60 * 60 * 1000; // 8 kun 12 soat
 const MAX_ITEMS_PER_REQUEST = 30;
@@ -69,8 +69,11 @@ async function createSellRequest(userId, items, { priceByAsset = null } = {}) {
 
     // Tashqi I/O (Lis) — tranzaksiyadan TASHQARIDA (fn qayta ishga tushishi mumkin).
     const fixed = (i) => priceByAsset?.get(String(i.assetId));
-    const byName = await getInstantSellPricesSom(items.filter(i => !Number.isFinite(fixed(i))).map(i => i.marketHashName));
+    const { prices: byName, tooCheap } = await getInstantSellQuotesSom(items.filter(i => !Number.isFinite(fixed(i))).map(i => i.marketHashName));
     const priceOf = (i) => Number.isFinite(fixed(i)) ? fixed(i) : byName.get(i.marketHashName);
+    const minSom = minSellSom();
+    const cheap = items.filter(i => Number.isFinite(fixed(i)) ? fixed(i) < minSom : tooCheap.has(i.marketHashName));
+    if (cheap.length) return { error: "too_cheap", assetIds: cheap.map(i => String(i.assetId)) };
     const missing = items.filter(i => !Number.isFinite(priceOf(i)));
     if (missing.length) return { error: "price_not_found", assetIds: missing.map(i => String(i.assetId)) };
 

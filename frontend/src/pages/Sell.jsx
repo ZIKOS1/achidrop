@@ -59,7 +59,7 @@ function Tick({ on }) {
 function SkinCard({ item, selected, disabled, priced, onToggle, index = 0 }) {
   const rColor = rarityColor(item.rarity, item.name);
   const lockDays = item.lockedUntil ? Math.max(1, Math.ceil((Date.parse(item.lockedUntil) - Date.now()) / 86400000)) : 0;
-  const tag = item.sellable === false ? t("sell.notSellable") : !item.tradable ? (lockDays ? t("sellx.lockDays", { n: lockDays }) : t("sell.locked")) : !priced ? t("sell.noPrice") : null;
+  const tag = item.sellable === false ? t("sell.notSellable") : !item.tradable ? (lockDays ? t("sellx.lockDays", { n: lockDays }) : t("sell.locked")) : item.tooCheap ? t("sell.tooCheap") : !priced ? t("sell.noPrice") : null;
   return (
     <button
       type="button"

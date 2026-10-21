@@ -171,17 +171,30 @@ function buffSellPriceSom(usd, rate, tiers) {
     return instantSellPriceSom(usd, rate, marginPercentForUsd(usd, tiers));
 }
 
-// names[] → Map(name -> priceSom). Faqat BUFF buy order bor nomlar — buy
-// order yo'q skinga narx berilmaydi (sotib bo'lmaydi), Lis'ga qaytilmaydi.
-async function getInstantSellPricesSom(names) {
+// Bozor narxi shundan arzon skin saytda sotilmaydi (narx berilmaydi).
+const MIN_SELL_USD = 0.15;
+function minSellSom(rate = getUsdToSomRate()) { return Math.ceil(MIN_SELL_USD * rate); }
+
+// names[] → { prices: Map(name -> priceSom|null), tooCheap: Set(name) }.
+// Faqat BUFF buy order bor nomlar — buy order yo'q skinga narx berilmaydi
+// (sotib bo'lmaydi), Lis'ga qaytilmaydi. MIN_SELL_USD dan arzoniga ham.
+async function getInstantSellQuotesSom(names) {
     const rate = getUsdToSomRate();
     const tiers = getMarginTiers();
     let buff = new Map();
     try { buff = await require("./buffPrice").getBuffPricesUsd(names); }
     catch (err) { console.log("BUFF NARX XATO:", err.message); }
-    const out = new Map();
-    for (const [name, usd] of buff) out.set(name, buffSellPriceSom(usd, rate, tiers));
-    return out;
+    const prices = new Map();
+    const tooCheap = new Set();
+    for (const [name, usd] of buff) {
+        if (Number.isFinite(usd) && usd > 0 && usd < MIN_SELL_USD) { tooCheap.add(name); prices.set(name, null); }
+        else prices.set(name, buffSellPriceSom(usd, rate, tiers));
+    }
+    return { prices, tooCheap };
+}
+
+async function getInstantSellPricesSom(names) {
+    return (await getInstantSellQuotesSom(names)).prices;
 }
 
 async function getInstantSellPriceSom(marketHashName) {
@@ -205,5 +218,5 @@ module.exports = {
     getInstantSellPricesSom, getInstantSellPriceSom, getListPriceSom,
     getInstantSellMarginPercent, getUsdToSomRate, _clearCache,
     normalizeMarginTiers, marginTiersFromSettings, getMarginTiers, marginPercentForUsd, instantSellPriceSomTiered, SELL_PRICE_RATIO,
-    buffSellPriceSom,
+    buffSellPriceSom, getInstantSellQuotesSom, MIN_SELL_USD, minSellSom,
 };

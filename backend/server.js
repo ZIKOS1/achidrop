@@ -1395,20 +1395,23 @@ app.get("/api/instant-sell/quote", auth, inventoryLimiter, async (req, res) => {
     catch (err) { return res.status(500).json({ error: err.message }); }
 
     let prices = null;
+    let tooCheap = new Set();
     if (base.lisConfigured) {
         // Qulfdagi skinlarning ham narxi ko'rsatiladi (tanlab bo'lmaydi, lekin qiymati ko'rinadi).
         const names = [...new Set(items.filter(it => it.sellable !== false).map(it => sellItemView(it, null).marketHashName))];
-        try { prices = await lisSkinsPrice.getInstantSellPricesSom(names); }
+        try { ({ prices, tooCheap } = await lisSkinsPrice.getInstantSellQuotesSom(names)); }
         catch (err) { console.log("LIS PRICE ERROR:", err.message); }
     }
     // Lis cookie egasi — Lis avtosell narxining o'zi (lisAutosell.ownerPricesSom).
     const ownerPrices = await lisAutosell.getOwnerPricesSom(u.steamId64, lisSkinsPrice.getUsdToSomRate());
+    const minSom = lisSkinsPrice.minSellSom();
     res.json({
-        ...base, steamConnected: true, lisAutosellPrices: !!ownerPrices,
+        ...base, steamConnected: true, lisAutosellPrices: !!ownerPrices, minSellUsd: lisSkinsPrice.MIN_SELL_USD,
         items: items.map(it => {
             const v = sellItemView(it, prices);
             const own = ownerPrices?.get(v.assetId);
-            return own ? { ...v, priceSom: own } : v;
+            if (own) return own < minSom ? { ...v, priceSom: null, tooCheap: true } : { ...v, priceSom: own };
+            return tooCheap.has(v.marketHashName) ? { ...v, tooCheap: true } : v;
         }),
         // Steam yashirgan (trade-himoyasidagi) skinlar soni + token holati.
         hiddenCount: communityInventoryMeta(u.steamId64).hiddenCount,
@@ -1444,6 +1447,7 @@ const INSTANT_SELL_ERRORS = {
     too_many_open: "Sizda tasdiqlanmagan so'rovlar ko'p. Admin ko'rib chiqishini kuting",
     already_requested: "Bu skin(lar) uchun so'rov allaqachon yuborilgan",
     price_not_found: "Ba'zi skinlarning narxi topilmadi",
+    too_cheap: `Narxi $${lisSkinsPrice.MIN_SELL_USD} dan arzon skinlarni sotib bo'lmaydi`,
     not_tradable: "Ba'zi skinlarni hozir yuborib bo'lmaydi (trade lock)",
     not_found: "Skin inventaringizda topilmadi (sahifani yangilang)",
 };
