@@ -1395,7 +1395,9 @@ app.get("/api/instant-sell/quote", auth, inventoryLimiter, async (req, res) => {
     if (!u.steamId64) return res.json({ ...base, steamConnected: false, items: [] });
 
     let items;
-    try { items = await getSellInventory(u.steamId64, req.query.refresh === "1", u.steamInvToken || null); }
+    // Har ochilish/yangilashda Steam'dan YANGI inventar (user talabi, 2026-10-22) —
+    // keshdagi eski holat (qulf ochilmagan, yangi skin yo'q) ko'rsatilmaydi.
+    try { items = await getSellInventory(u.steamId64, true, u.steamInvToken || null); }
     catch (err) { return res.status(500).json({ error: err.message }); }
 
     let prices = null;
