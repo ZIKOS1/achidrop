@@ -73,12 +73,14 @@ async function createSellRequest(userId, items, { priceByAsset = null } = {}) {
 
     // Tashqi I/O (Lis) — tranzaksiyadan TASHQARIDA (fn qayta ishga tushishi mumkin).
     const fixed = (i) => priceByAsset?.get(String(i.assetId));
-    const { prices: byName, tooCheap } = await getInstantSellQuotesSom(items.filter(i => !Number.isFinite(fixed(i))).map(i => i.marketHashName));
-    const priceOf = (i) => Number.isFinite(fixed(i)) ? fixed(i) : byName.get(i.marketHashName);
+    // Narx kaliti — Doppler'da nom + faza (buffPrice.priceKey), boshqasida nomning o'zi.
+    const key = (i) => i.priceKey || i.marketHashName;
+    const { prices: byName, tooCheap } = await getInstantSellQuotesSom(items.filter(i => !Number.isFinite(fixed(i))).map(key));
+    const priceOf = (i) => Number.isFinite(fixed(i)) ? fixed(i) : byName.get(key(i));
     const minSom = minSellSom();
-    const isCheap = (i) => Number.isFinite(fixed(i)) ? fixed(i) < minSom : tooCheap.has(i.marketHashName);
+    const isCheap = (i) => Number.isFinite(fixed(i)) ? fixed(i) < minSom : tooCheap.has(key(i));
     // Arzon skinning narxi tooCheap'da (prices'da null).
-    const sellPrice = (i) => !Number.isFinite(fixed(i)) && tooCheap.has(i.marketHashName) ? tooCheap.get(i.marketHashName) : priceOf(i);
+    const sellPrice = (i) => !Number.isFinite(fixed(i)) && tooCheap.has(key(i)) ? tooCheap.get(key(i)) : priceOf(i);
     const cheap = items.filter(isCheap);
     // Arzon skinlar faqat jami BULK_SELL_USD dan oshgan sotuv ichida.
     if (cheap.length && items.reduce((n, i) => n + (sellPrice(i) || 0), 0) < bulkSellSom()) {
@@ -90,6 +92,7 @@ async function createSellRequest(userId, items, { priceByAsset = null } = {}) {
     const priced = items.map(i => ({
         assetId: String(i.assetId),
         marketHashName: i.marketHashName,
+        phase: i.phase || null,
         name: i.name ?? i.marketHashName,
         imageUrl: i.imageUrl ?? null,
         float: Number.isFinite(i.float) ? i.float : null,

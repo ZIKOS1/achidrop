@@ -17,12 +17,25 @@ function num(v) {
     return Number.isFinite(n) ? n : null;
 }
 
-// (sof funksiya) feed + nomlar → Map(name -> usd) faqat buy order bor nomlar uchun.
-function usdFromFeed(feed, names) {
+// Doppler/Gamma Doppler narxi fazaga bog'liq (Ruby P1 dan 3x qimmat), lekin
+// market_hash_name'da faza yo'q. Shu sabab narx kaliti — nom + PHASE_SEP + faza;
+// feed'da `highest_order.doppler[faza]` bor. Faza narxi bo'lmasa — umumiy
+// (eng arzon fazaning) buy orderi.
+const PHASE_SEP = "\u001f"; // nomlarda uchramaydi ("|" esa "AK-47 | Redline"da bor)
+function priceKey(name, phase) {
+    return phase ? `${name}${PHASE_SEP}${phase}` : name;
+}
+
+// (sof funksiya) feed + kalitlar (priceKey) → Map(key -> usd) faqat buy order bor kalitlar uchun.
+function usdFromFeed(feed, keys) {
     const usd = new Map();
-    for (const name of names) {
-        const p = num(feed?.[name]?.highest_order?.price);
-        if (p > 0) usd.set(name, Math.round(p * 100) / 100);
+    for (const key of keys) {
+        const sep = key.lastIndexOf(PHASE_SEP);
+        const name = sep > 0 ? key.slice(0, sep) : key;
+        const order = feed?.[name]?.highest_order;
+        const phaseP = sep > 0 ? num(order?.doppler?.[key.slice(sep + 1)]) : null;
+        const p = phaseP > 0 ? phaseP : num(order?.price);
+        if (p > 0) usd.set(key, Math.round(p * 100) / 100);
     }
     return usd;
 }
@@ -35,7 +48,7 @@ async function loadFeed(fetchImpl = fetch) {
     return feed;
 }
 
-// names[] → Map(name -> usd) faqat BUFF buy order bor nomlar uchun.
+// names[] (priceKey) → Map(key -> usd) faqat BUFF buy order bor kalitlar uchun.
 async function getBuffPricesUsd(names, fetchImpl = fetch) {
     let feed;
     try { feed = await loadFeed(fetchImpl); }
@@ -43,4 +56,4 @@ async function getBuffPricesUsd(names, fetchImpl = fetch) {
     return usdFromFeed(feed, [...new Set(names.filter(Boolean))]);
 }
 
-module.exports = { FEED_URL, usdFromFeed, getBuffPricesUsd };
+module.exports = { FEED_URL, priceKey, usdFromFeed, getBuffPricesUsd };

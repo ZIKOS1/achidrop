@@ -30,6 +30,7 @@ const skinUtils      = require("./skinUtils");
 const { trySendAutoOffer, maybeCheckPendingWithdrawals } = require("./withdrawDelivery");
 const supportManager = require("./supportManager");
 const instantSellManager = require("./instantSellManager");
+const buffPrice = require("./buffPrice");
 const lisSkinsPrice = require("./lisSkinsPrice");
 const lisAutosell = require("./lisAutosell");
 
@@ -1361,11 +1362,14 @@ async function getSellInventory(steamId64, force, token, { maxAgeMs } = {}) {
 // Skin sotish inventari relay'siz steamcommunity'dan keladi (bot orqali —
 // inventoryBridge.js) — u yerda Steam'ning o'z market_hash_name'i bor,
 // float esa yo'q, shu sabab nom float'dan emas, Steam'dan olinadi.
+// Doppler'da narx fazaga bog'liq — narx kaliti buffPrice.priceKey (nom + faza).
 function sellItemView(it, prices) {
     const marketHashName = it.marketHashName || skinUtils.marketHashName(it.name, it.float);
-    const priceSom = prices ? prices.get(marketHashName) ?? null : null;
+    const phase = it.phase || null;
+    const priceKey = buffPrice.priceKey(marketHashName, phase);
+    const priceSom = prices ? prices.get(priceKey) ?? null : null;
     return {
-        assetId: String(it.assetId), name: it.name, marketHashName,
+        assetId: String(it.assetId), name: phase ? `${it.name} · ${phase}` : it.name, marketHashName, phase, priceKey,
         imageUrl: it.image || null, float: it.float ?? null,
         wear: it.wear ?? skinUtils.wearCode(it.float),
         rarity: it.rarity ?? null,
@@ -1398,7 +1402,7 @@ app.get("/api/instant-sell/quote", auth, inventoryLimiter, async (req, res) => {
     let tooCheap = new Map();
     if (base.lisConfigured) {
         // Qulfdagi skinlarning ham narxi ko'rsatiladi (tanlab bo'lmaydi, lekin qiymati ko'rinadi).
-        const names = [...new Set(items.filter(it => it.sellable !== false).map(it => sellItemView(it, null).marketHashName))];
+        const names = [...new Set(items.filter(it => it.sellable !== false).map(it => sellItemView(it, null).priceKey))];
         try { ({ prices, tooCheap } = await lisSkinsPrice.getInstantSellQuotesSom(names)); }
         catch (err) { console.log("LIS PRICE ERROR:", err.message); }
     }
@@ -1413,7 +1417,7 @@ app.get("/api/instant-sell/quote", auth, inventoryLimiter, async (req, res) => {
             const v = sellItemView(it, prices);
             const own = ownerPrices?.get(v.assetId);
             if (own) return own < minSom ? { ...v, priceSom: null, tooCheap: true, cheapPriceSom: own } : { ...v, priceSom: own };
-            return tooCheap.has(v.marketHashName) ? { ...v, tooCheap: true, cheapPriceSom: tooCheap.get(v.marketHashName) } : v;
+            return tooCheap.has(v.priceKey) ? { ...v, tooCheap: true, cheapPriceSom: tooCheap.get(v.priceKey) } : v;
         }),
         // Steam yashirgan (trade-himoyasidagi) skinlar soni + token holati.
         hiddenCount: communityInventoryMeta(u.steamId64).hiddenCount,
@@ -1477,7 +1481,7 @@ app.post("/api/instant-sell", auth, sensitiveLimiter, async (req, res) => {
 
     const items = assetIds.map(a => {
         const v = sellItemView(byId.get(a), null);
-        return { assetId: v.assetId, marketHashName: v.marketHashName, name: v.name, imageUrl: v.imageUrl, float: v.float };
+        return { assetId: v.assetId, marketHashName: v.marketHashName, priceKey: v.priceKey, phase: v.phase, name: v.name, imageUrl: v.imageUrl, float: v.float };
     });
 
     let result;

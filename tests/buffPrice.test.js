@@ -86,3 +86,25 @@ test("getInstantSellQuotesSom: $0.15 dan arzon skinga narx yo'q (tooCheap)", asy
         assert.ok(tooCheap.get("Cheap") > 0); // katta sotuv ichida ishlatiladigan narx
     } finally { global.fetch = orig; }
 });
+
+const { priceKey } = require("../backend/buffPrice");
+const dopplerFeed = {
+    "★ Skeleton Knife | Doppler (Factory New)": {
+        highest_order: { price: 497.85, doppler: { "Phase 1": 497.85, "Phase 2": 617.45, "Ruby": 1698.36, "Black Pearl": null } },
+    },
+};
+
+test("usdFromFeed: Doppler fazasi bo'yicha buy order narxi", () => {
+    const n = "★ Skeleton Knife | Doppler (Factory New)";
+    const usd = usdFromFeed(dopplerFeed, [priceKey(n, "Ruby"), priceKey(n, "Phase 2"), priceKey(n, null)]);
+    assert.strictEqual(usd.get(priceKey(n, "Ruby")), 1698.36);
+    assert.strictEqual(usd.get(priceKey(n, "Phase 2")), 617.45);
+    assert.strictEqual(usd.get(n), 497.85);
+});
+
+test("usdFromFeed: faza narxi yo'q bo'lsa — umumiy (eng past) buy order", () => {
+    const n = "★ Skeleton Knife | Doppler (Factory New)";
+    const usd = usdFromFeed(dopplerFeed, [priceKey(n, "Black Pearl"), priceKey(n, "Sapphire")]);
+    assert.strictEqual(usd.get(priceKey(n, "Black Pearl")), 497.85);
+    assert.strictEqual(usd.get(priceKey(n, "Sapphire")), 497.85);
+});

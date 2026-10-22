@@ -267,6 +267,24 @@ async function fetchCommunityInventory(steamId64, force = false, get = fetchGet,
 // inventar. Javob — item massivi yoki { error } (limit/xato).
 const WEBAPI_WEAR = { fn: "FN", mw: "MW", ft: "FT", ww: "WW", bs: "BS" };
 
+// Doppler / Gamma Doppler fazasi paint index bo'yicha (BUFF narxi fazaga bog'liq,
+// buffPrice.priceKey). Noma'lum index bo'lsa — steamwebapi'ning float.phase'i.
+const DOPPLER_PHASES = {
+    415: "Ruby", 416: "Sapphire", 417: "Black Pearl", 418: "Phase 1", 419: "Phase 2", 420: "Phase 3", 421: "Phase 4",
+    617: "Black Pearl", 618: "Phase 2", 619: "Sapphire", 852: "Phase 1", 853: "Phase 2", 854: "Phase 3", 855: "Phase 4",
+    568: "Emerald", 569: "Phase 1", 570: "Phase 2", 571: "Phase 3", 572: "Phase 4",
+    1119: "Emerald", 1120: "Phase 1", 1121: "Phase 2", 1122: "Phase 3", 1123: "Phase 4",
+};
+function dopplerPhase(it, mhn) {
+    if (!/Doppler/i.test(mhn)) return null;
+    const byIndex = DOPPLER_PHASES[Number(it.paintindex ?? it.float?.paintindex)];
+    if (byIndex) return byIndex;
+    const raw = String(it.float?.phase || "").trim();
+    const m = raw.match(/^phase\s*([1-4])$/i);
+    if (m) return `Phase ${m[1]}`;
+    return ["Ruby", "Sapphire", "Black Pearl", "Emerald"].find(p => p.toLowerCase() === raw.toLowerCase()) || null;
+}
+
 function parseWebApiInventory(arr) {
     if (!Array.isArray(arr)) return [];
     const items = [];
@@ -287,6 +305,7 @@ function parseWebApiInventory(arr) {
             tradable: tradable && marketable,
             sellable: marketable,
             lockedUntil: null,
+            phase: dopplerPhase(it, mhn),
             stickers: [],
         });
     }
@@ -303,7 +322,11 @@ async function steamWebApiInventory(steamId64, force = false) {
     if (!force && cached && Date.now() - cached.ts < CACHE_MS) return cached.data;
 
     const url = `https://www.steamwebapi.com/steam/api/inventory?key=${encodeURIComponent(key)}`
-        + `&steam_id=${encodeURIComponent(steamId64)}&game=cs2&try_first_seven_days_blocked_items=1`;
+        + `&steam_id=${encodeURIComponent(steamId64)}&game=cs2&try_first_seven_days_blocked_items=1`
+        // no_cache — aks holda steamwebapi kunlab eski nusxani beradi (2026-10-22:
+        // 5 kunlik kesh — yangi skinlar ko'rinmas, qulfi ochilganlar "qulf" edi).
+        // O'zimizning 3 daqiqalik keshimiz (webApiCache) limitdan saqlaydi.
+        + `&no_cache=1`;
     const resp = await fetchGet(url);
     let body = null;
     try { body = JSON.parse(resp.text); } catch {}
