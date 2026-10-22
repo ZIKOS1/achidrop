@@ -293,6 +293,10 @@ function parseWebApiInventory(arr) {
         if (!it.assetid || !mhn) continue;
         const marketable = it.marketable !== false && it.marketable !== 0;
         const tradable = it.tradable !== false && it.tradable !== 0;
+        // tradeprotectedmaxdays — aniq ochilish vaqti EMAS, steamwebapi hujjati
+        // bo'yicha "ko'pi bilan N kun qoldi" (0–7, ularning birinchi kuzatuvidan).
+        const maxDays = Number(it.tradeprotectedmaxdays);
+        const lockMaxUntil = !tradable && maxDays > 0 ? new Date(Date.now() + maxDays * 86400000).toISOString() : null;
         items.push({
             assetId: String(it.assetid),
             name: it.marketname || mhn,
@@ -305,6 +309,7 @@ function parseWebApiInventory(arr) {
             tradable: tradable && marketable,
             sellable: marketable,
             lockedUntil: null,
+            lockMaxUntil,
             phase: dopplerPhase(it, mhn),
             stickers: [],
         });

@@ -24,3 +24,14 @@ test("parseWebApiInventory: faza faqat Doppler nomli skinlarga", () => {
     const it = { ...knife(415), markethashname: "AK-47 | Redline (Field-Tested)", marketname: "AK-47 | Redline (Field-Tested)" };
     assert.strictEqual(parseWebApiInventory([it])[0].phase, null);
 });
+
+test("parseWebApiInventory: trade-himoya — ko'pi bilan N kun (lockMaxUntil)", () => {
+    const base = { assetid: "2", markethashname: "AWP | Phobos (Minimal Wear)", marketable: true };
+    const before = Date.now();
+    const [locked] = parseWebApiInventory([{ ...base, tradable: false, tradeprotected: true, tradeprotectedmaxdays: 3 }]);
+    const ms = Date.parse(locked.lockMaxUntil) - before;
+    assert.ok(ms >= 3 * 86400000 && ms < 3 * 86400000 + 5000);
+    assert.strictEqual(locked.tradable, false);
+    assert.strictEqual(parseWebApiInventory([{ ...base, tradable: true, tradeprotectedmaxdays: 0 }])[0].lockMaxUntil, null);
+    assert.strictEqual(parseWebApiInventory([{ ...base, tradable: false }])[0].lockMaxUntil, null);
+});

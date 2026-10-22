@@ -72,16 +72,33 @@ function groupOf(mine, r) {
   };
 }
 
+// Trade lock qachon tugashi: lockedUntil — Steam'ning aniq sanasi,
+// lockMaxUntil — steamwebapi'ning "ko'pi bilan N kun" chegarasi (taxminiy).
+const isLocked = (it) => !it.tradable && it.sellable !== false;
+function lockInfo(it) {
+  const until = it.lockedUntil || it.lockMaxUntil;
+  if (!until) return null;
+  const days = Math.max(1, Math.ceil((Date.parse(until) - Date.now()) / 86400000));
+  const date = new Date(until).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+  return { days, date, approx: !it.lockedUntil };
+}
+function lockMessage(it) {
+  const l = lockInfo(it);
+  if (!l) return t("sellx.lockUnknown");
+  return t(l.approx ? "sellx.lockUntilMax" : "sellx.lockUntil", { n: l.days, date: l.date });
+}
+
 // Skin kartochkasi (dizayn): binafsha nurli to'q fon, rasm 16:10, nom,
 // "Nodirlik · Sifat" (kvadrat nuqta bilan), narx. Tanlansa — qizil chegara va nur.
 function SkinCard({ item, selected, disabled, priced, onToggle, index = 0 }) {
   const rColor = rarityColor(item.rarity, item.name);
-  const lockDays = item.lockedUntil ? Math.max(1, Math.ceil((Date.parse(item.lockedUntil) - Date.now()) / 86400000)) : 0;
-  const tag = item.sellable === false ? t("sell.notSellable") : !item.tradable ? (lockDays ? t("sellx.lockDays", { n: lockDays }) : t("sell.locked")) : item.tooCheap ? t("sell.tooCheap") : !priced ? t("sell.noPrice") : null;
+  const lock = lockInfo(item);
+  const tag = item.sellable === false ? t("sell.notSellable") : !item.tradable ? (lock ? t(lock.approx ? "sellx.lockDaysMax" : "sellx.lockDays", { n: lock.days }) : t("sell.locked")) : item.tooCheap ? t("sell.tooCheap") : !priced ? t("sell.noPrice") : null;
   return (
     <button
       type="button"
-      disabled={disabled}
+      // Qulfdagi skin tanlanmaydi, lakin bosilsa qulf qachon tugashi ko'rsatiladi.
+      disabled={disabled && !isLocked(item)}
       onClick={onToggle}
       style={{ "--fade-delay": `${Math.min((index % PAGE) * 30, 450)}ms` }}
       className={cn(
@@ -417,6 +434,7 @@ export default function Sell() {
   const maxItems = quote?.maxItems || 30;
 
   function toggle(it) {
+    if (isLocked(it)) { hap("selection"); showToast(lockMessage(it)); return; }
     if (!sellable(it)) return;
     hap("impact", "light");
     setSelected((prev) => {

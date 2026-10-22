@@ -1376,6 +1376,7 @@ function sellItemView(it, prices) {
         tradable: it.tradable !== false && it.sellable !== false,
         sellable: it.sellable !== false,
         lockedUntil: it.lockedUntil || null,
+        lockMaxUntil: it.lockMaxUntil || null,
         priceSom,
     };
 }
