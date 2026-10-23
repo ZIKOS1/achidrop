@@ -21,8 +21,10 @@ function findUserById(id) {
 function findUserByTelegramId(tgId) {
     return getAllUsers().find(u => u.telegramId === tgId) || null;
 }
+// Dublikat bo'lsa (accountMerge.js'gacha qolgan) — Telegram'li akkaunt afzal.
 function findUserBySteamId(steamId64) {
-    return getAllUsers().find(u => u.steamId64 === steamId64) || null;
+    const all = getAllUsers().filter(u => u.steamId64 === steamId64);
+    return all.find(u => u.telegramId != null) || all[0] || null;
 }
 
 // steamId64 17 xonali (~7.6x10^16) — JavaScript Number xavfsiz butun son

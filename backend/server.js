@@ -12,6 +12,7 @@ const { createPendingAuth, peekPendingAuth, consumePendingAuth, getSteamAuth, st
 const { createPendingLogin, consumePendingLogin } = require("./auth-telegram-login");
 const { finishAuction, cancelAuction } = require("./auctionLifecycle");
 const { createTelegramUser, findUserBySteamId, createSteamUser } = require("./userLifecycle");
+const { mergeSteamDuplicatesInto } = require("./accountMerge");
 const { createSession, getSessionUser, destroySession, getSessionToken, setSessionCookie, clearSessionCookie } = require("./session");
 const {
     createAdminSession, getAdminSession, destroyAdminSession,
@@ -2536,6 +2537,12 @@ app.get("/api/auth/steam/callback", async (req, res) => {
             setSessionCookie(res, token);
             return res.redirect(process.env.WEBAPP_URL || "/");
         } else {
+            if (!getUsers().some(x => x.id === pending.tgId)) {
+                return res.status(404).send("Foydalanuvchi topilmadi — botga /start yuboring va qaytadan urinib ko'ring.");
+            }
+            // Shu Steam bilan saytda (Telegramsiz) ochilgan akkaunt bo'lsa — shu
+            // Telegram akkauntiga qo'shiladi: bitta Steam = bitta akkaunt, bitta balans.
+            await mergeSteamDuplicatesInto(pending.tgId, steamUser.steamid);
             const arr = getUsers();
             const u   = arr.find(x => x.id === pending.tgId);
             if (!u) return res.status(404).send("Foydalanuvchi topilmadi — botga /start yuboring va qaytadan urinib ko'ring.");
