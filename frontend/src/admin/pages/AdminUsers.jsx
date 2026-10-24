@@ -7,11 +7,18 @@ import BackLink from "../../components/BackLink";
 import Empty from "../../components/Empty";
 import { ListSkeleton } from "../../components/Skeleton";
 
+const SORTS = [
+  { key: "new", label: "Yangilari" },
+  { key: "balance", label: "Eng ko'p balans" },
+  { key: "sold", label: "Eng ko'p skin sotgan" },
+];
+
 export default function AdminUsers() {
   const { navigate } = useApp();
   const [list, setList] = useState(null);
   const [error, setError] = useState(false);
   const [q, setQ] = useState("");
+  const [sort, setSort] = useState("new");
 
   useEffect(() => {
     api("/api/admin/users").then(setList).catch(() => setError(true));
@@ -24,6 +31,8 @@ export default function AdminUsers() {
         return String(u.id).includes(s) || (u.name || "").toLowerCase().includes(s) || (u.username || "").toLowerCase().includes(s);
       })
     : [];
+  if (sort === "balance") filtered.sort((a, b) => (b.balance || 0) - (a.balance || 0));
+  if (sort === "sold") filtered.sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0) || (b.soldSom || 0) - (a.soldSom || 0));
 
   return (
     <div className="space-y-4">
@@ -38,6 +47,24 @@ export default function AdminUsers() {
           placeholder="ID, ism yoki username bo'yicha qidirish..."
           className="w-full bg-transparent text-sm text-foreground outline-none"
         />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {SORTS.map((o) => (
+          <button
+            key={o.key}
+            type="button"
+            onClick={() => setSort(o.key)}
+            className={
+              "border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors " +
+              (sort === o.key
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border bg-secondary text-muted-foreground hover:text-foreground")
+            }
+          >
+            {o.label}
+          </button>
+        ))}
       </div>
 
       {list === null && !error && <ListSkeleton />}
@@ -66,7 +93,12 @@ export default function AdminUsers() {
                       Bloklangan
                     </span>
                   )}
-                  <span className="shrink-0 text-xs text-muted-foreground">{fmtMoney(u.balance || 0)}</span>
+                  {sort === "sold" && (
+                    <span className="shrink-0 text-xs text-muted-foreground">{u.soldCount || 0} ta skin ·</span>
+                  )}
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {fmtMoney(sort === "sold" ? u.soldSom || 0 : u.balance || 0)}
+                  </span>
                 </button>
               </li>
             ))}

@@ -2182,7 +2182,17 @@ app.get("/api/admin/auctions/:id/bids", requireAdminPanel, (req, res) => {
 // ── ADMIN: Foydalanuvchilar ───────────────────────────────────────────────────
 
 // GET /api/admin/users
-app.get("/api/admin/users", requireAdminPanel, (req, res) => {
+app.get("/api/admin/users", requireAdminPanel, async (req, res) => {
+    await instantSellManager.refreshRequests();
+    // Sotilgan skinlar — faqat admin "Oldim" bosgan (credited) so'rovlar.
+    const sold = new Map();
+    for (const r of instantSellManager.getAllRequests()) {
+        if (r.status !== "credited") continue;
+        const s = sold.get(r.userId) || { count: 0, som: 0 };
+        s.count += (r.items || []).length;
+        s.som += r.totalSom || 0;
+        sold.set(r.userId, s);
+    }
     const list = getUsers().map(u => ({
         id:      u.id,
         name:    u.name,
@@ -2190,6 +2200,8 @@ app.get("/api/admin/users", requireAdminPanel, (req, res) => {
         balance: u.balance ?? 0,
         blocked: u.blocked ?? false,
         wins:    (u.wins || []).length,
+        soldCount: sold.get(u.id)?.count || 0,
+        soldSom:   sold.get(u.id)?.som || 0,
         joined:  u.joined,
     })).sort((a, b) => new Date(b.joined || 0) - new Date(a.joined || 0));
     res.json(list);
