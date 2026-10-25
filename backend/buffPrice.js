@@ -49,11 +49,12 @@ async function loadFeed(fetchImpl = fetch) {
 }
 
 // names[] (priceKey) → Map(key -> usd) faqat BUFF buy order bor kalitlar uchun.
-async function getBuffPricesUsd(names, fetchImpl = fetch) {
+// `feedPromise` — oldindan boshlangan loadFeed() (inventar bilan parallel yuklash uchun).
+async function getBuffPricesUsd(names, fetchImpl = fetch, feedPromise = null) {
     let feed;
-    try { feed = await loadFeed(fetchImpl); }
+    try { feed = await (feedPromise || loadFeed(fetchImpl)); }
     catch (err) { console.log("BUFF FEED XATO:", err.message); return new Map(); }
     return usdFromFeed(feed, [...new Set(names.filter(Boolean))]);
 }
 
-module.exports = { FEED_URL, priceKey, usdFromFeed, getBuffPricesUsd };
+module.exports = { FEED_URL, priceKey, usdFromFeed, loadFeed, getBuffPricesUsd };

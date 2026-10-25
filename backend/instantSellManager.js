@@ -14,10 +14,15 @@
 // tranzaksiyasida bajariladi, va faqat "awaiting_admin" holatidagi so'rovga
 // tegiladi. Shu sabab admin tugmani ikki marta bossa ham (yoki ikki joydan)
 // pul ikki marta tushmaydi.
-const { read, refresh, withTransaction, readTx, writeTx } = require("./database/db");
+// Tranzaksiyalar butun massivlarni emas, faqat kerakli elementlarni o'qiydi
+// (readTxWhere) va faqat o'zgargan maydonlarni yozadi (updateTx) — sekin
+// Atlas'da to'liq massiv (340 KB + users 270 KB) har amalga 8–15 s qo'shardi.
+const { read, refresh, withTransaction, readTxWhere, updateTx, patchCache } = require("./database/db");
 const { getInstantSellQuotesSom, minSellSom, bulkSellSom, isLisConfigured } = require("./lisSkinsPrice");
 
 const SELL_HOLD_MS = (8 * 24 + 12) * 60 * 60 * 1000; // 8 kun 12 soat
+const REQ = "instantSellRequests";
+const eq = (field, value) => ({ $eq: [`$$e.${field}`, value] });
 const MAX_ITEMS_PER_REQUEST = 30;
 const MAX_OPEN_REQUESTS_PER_USER = 3;
 
@@ -100,14 +105,16 @@ async function createSellRequest(userId, items, { priceByAsset = null } = {}) {
     }));
 
     const result = await withTransaction(async (session) => {
-        const requests = asArray(await readTx(session, "instantSellRequests"));
-        const check = validateNewRequest(requests, userId, priced.map(i => i.assetId));
+        const open = await readTxWhere(session, REQ, { $and: [eq("userId", userId), eq("status", "awaiting_admin")] });
+        const check = validateNewRequest(open, userId, priced.map(i => i.assetId));
         if (check.error) return check;
 
+        // id = Date.now() (+1 band bo'lsa) — shu paytdan keyingi id'larni tekshirish yetarli.
+        const taken = await readTxWhere(session, REQ, { $gte: ["$$e.id", Date.now()] });
         const createdAt = new Date().toISOString();
         let groupId = null;
         const created = priced.map(item => {
-            const id = nextId(requests);
+            const id = nextId(taken);
             groupId ??= id;
             const request = {
                 id, groupId, userId,
@@ -116,12 +123,13 @@ async function createSellRequest(userId, items, { priceByAsset = null } = {}) {
                 createdAt, sentAt: null, // sentAt — user "Skinni yubordim"ni bosgan vaqt
                 resolvedAt: null, rejectReason: null,
             };
-            requests.push(request);
+            taken.push(request);
             return request;
         });
-        await writeTx(session, "instantSellRequests", requests);
-        return { requests: created, cacheUpdates: { instantSellRequests: requests } };
+        await updateTx(session, REQ, {}, { $push: { data: { $each: created } } }, { upsert: true });
+        return { requests: created };
     });
+    if (result.requests) patchCache(REQ, (arr) => arr.push(...structuredClone(result.requests)));
     return result;
 }
 
@@ -130,78 +138,128 @@ async function createSellRequest(userId, items, { priceByAsset = null } = {}) {
 // ikki marta bosilsa xabar takrorlanmaydi.
 async function markSent(userId, ids) {
     const want = new Set(ids.map(Number));
-    return withTransaction(async (session) => {
-        const requests = asArray(await readTx(session, "instantSellRequests"));
-        const now = new Date().toISOString();
-        const marked = requests.filter(r => want.has(r.id) && r.userId === userId && r.status === "awaiting_admin" && !r.sentAt);
+    const result = await withTransaction(async (session) => {
+        const marked = await readTxWhere(session, REQ, { $and: [
+            { $in: ["$$e.id", [...want]] }, eq("userId", userId), eq("status", "awaiting_admin"),
+            { $not: [{ $ifNull: ["$$e.sentAt", false] }] },
+        ] });
         if (!marked.length) return { requests: [] };
+        const now = new Date().toISOString();
+        await updateTx(session, REQ, {}, { $set: { "data.$[r].sentAt": now } }, { arrayFilters: [{ "r.id": { $in: marked.map(r => r.id) } }] });
         for (const r of marked) r.sentAt = now;
-        await writeTx(session, "instantSellRequests", requests);
-        return { requests: marked, cacheUpdates: { instantSellRequests: requests } };
+        return { requests: marked };
     });
+    const done = new Set(result.requests.map(r => r.id));
+    const at = result.requests[0]?.sentAt;
+    if (done.size) patchCache(REQ, (arr) => { for (const r of arr) if (done.has(r.id)) r.sentAt = at; });
+    return result;
 }
 
 // Sof funksiya (testlanadi) — tranzaksiya ichida users/ledgers massivlarini
 // o'zgartiradi. Ledger yozuvi balanceManager.creditTradeProceeds bilan bir
 // xil shaklda (admin paneldagi "bekor qilish" va "Balans" sahifasi ham
 // shu yozuvlarni oddiy tushum kabi ko'radi), faqat `holdMs` bilan.
-function creditRequestInTx(users, ledgers, request, now = new Date()) {
+function creditEntries(request, now = new Date()) {
+    return {
+        history: {
+            amount: request.totalSom,
+            reason: `Skin sotildi (#${request.id}, ${request.items.length} ta)`,
+            date: now.toISOString(),
+        },
+        ledger: {
+            id: now.getTime() + "-" + Math.random().toString(36).slice(2, 6),
+            amount: request.totalSom, source: "instant_sell", tradeId: request.id, fee: 0,
+            receivedAt: now.toISOString(),
+            holdMs: SELL_HOLD_MS,
+            withdrawalStatus: null,
+        },
+    };
+}
+
+// Massivlarga kreditni qo'llaydi (testlar va approve'dan keyingi lokal kesh uchun).
+// `entries` berilsa — aynan shu yozuvlarning nusxasi qo'shiladi.
+function creditRequestInTx(users, ledgers, request, now = new Date(), entries = creditEntries(request, now)) {
     const user = users.find(u => u.id === request.userId);
     if (!user) return false;
     user.balance = (user.balance ?? 0) + request.totalSom;
     if (!Array.isArray(user.balanceHistory)) user.balanceHistory = [];
-    user.balanceHistory.push({
-        amount: request.totalSom,
-        reason: `Skin sotildi (#${request.id}, ${request.items.length} ta)`,
-        date: now.toISOString(),
-    });
+    user.balanceHistory.push({ ...entries.history });
 
     let ledger = ledgers.find(l => l.userId === request.userId);
     if (!ledger) { ledger = { userId: request.userId, entries: [] }; ledgers.push(ledger); }
     if (!Array.isArray(ledger.entries)) ledger.entries = [];
-    ledger.entries.push({
-        id: now.getTime() + "-" + Math.random().toString(36).slice(2, 6),
-        amount: request.totalSom, source: "instant_sell", tradeId: request.id, fee: 0,
-        receivedAt: now.toISOString(),
-        holdMs: SELL_HOLD_MS,
-        withdrawalStatus: null,
-    });
+    ledger.entries.push({ ...entries.ledger });
     return true;
 }
 
+// So'rov holatini faqat "awaiting_admin"dan o'zgartiradi (filtrda ham).
+function setResolvedTx(session, id, fields) {
+    const $set = {};
+    for (const [k, v] of Object.entries(fields)) $set[`data.$.${k}`] = v;
+    return updateTx(session, REQ, { data: { $elemMatch: { id, status: "awaiting_admin" } } }, { $set });
+}
+function patchRequest(id, fields) {
+    patchCache(REQ, (arr) => { const r = arr.find(x => x.id === id); if (r) Object.assign(r, fields); });
+}
+
 async function approveSellRequest(id) {
-    return withTransaction(async (session) => {
-        const requests = asArray(await readTx(session, "instantSellRequests"));
-        const request = requests.find(r => r.id === id);
+    const result = await withTransaction(async (session) => {
+        const [request] = await readTxWhere(session, REQ, eq("id", id));
         if (!request) return { error: "not_found" };
         if (request.status !== "awaiting_admin") return { error: "wrong_state", request };
 
-        const users = asArray(await readTx(session, "users"));
-        const ledgers = asArray(await readTx(session, "tradeBalances"));
-        if (!creditRequestInTx(users, ledgers, request)) return { error: "user_not_found" };
+        const uid = request.userId;
+        const [user] = await readTxWhere(session, "users", eq("id", uid));
+        if (!user) return { error: "user_not_found" };
+        const [ledger] = await readTxWhere(session, "tradeBalances", eq("userId", uid));
 
-        request.status = "credited";
-        request.resolvedAt = new Date().toISOString();
+        const now = new Date();
+        const entries = creditEntries(request, now);
+        const amount = request.totalSom;
+        // Balans — $inc (parallel boshqa o'zgarishni bosib yubormaydi); raqam
+        // bo'lmagan qiymatda eski mantiq: (balance ?? 0) + amount.
+        const userUpdate = Number.isFinite(user.balance)
+            ? { $inc: { "data.$.balance": amount } }
+            : { $set: { "data.$.balance": (user.balance ?? 0) + amount } };
+        if (Array.isArray(user.balanceHistory)) userUpdate.$push = { "data.$.balanceHistory": entries.history };
+        else userUpdate.$set = { ...userUpdate.$set, "data.$.balanceHistory": [entries.history] };
+        await updateTx(session, "users", { "data.id": uid }, userUpdate);
 
-        await writeTx(session, "users", users);
-        await writeTx(session, "tradeBalances", ledgers);
-        await writeTx(session, "instantSellRequests", requests);
-        return { request, cacheUpdates: { users, tradeBalances: ledgers, instantSellRequests: requests } };
+        if (!ledger) {
+            await updateTx(session, "tradeBalances", {}, { $push: { data: { userId: uid, entries: [entries.ledger] } } }, { upsert: true });
+        } else if (Array.isArray(ledger.entries)) {
+            await updateTx(session, "tradeBalances", { "data.userId": uid }, { $push: { "data.$.entries": entries.ledger } });
+        } else {
+            await updateTx(session, "tradeBalances", { "data.userId": uid }, { $set: { "data.$.entries": [entries.ledger] } });
+        }
+
+        const fields = { status: "credited", resolvedAt: now.toISOString() };
+        await setResolvedTx(session, id, fields);
+        Object.assign(request, fields);
+        return { request, now, entries };
     });
+    if (!result.entries) return result;
+    const { request, now, entries } = result;
+    // users — patchCache diff bazasiga ham qo'llaydi (balans ikki marta yozilmasin).
+    patchCache("users", (users) => creditRequestInTx(users, [], request, now, entries));
+    patchCache("tradeBalances", (ledgers) => creditRequestInTx([{ id: request.userId }], ledgers, request, now, entries));
+    patchRequest(request.id, { status: request.status, resolvedAt: request.resolvedAt });
+    return { request };
 }
 
 async function rejectSellRequest(id, reason) {
-    return withTransaction(async (session) => {
-        const requests = asArray(await readTx(session, "instantSellRequests"));
-        const request = requests.find(r => r.id === id);
+    const result = await withTransaction(async (session) => {
+        const [request] = await readTxWhere(session, REQ, eq("id", id));
         if (!request) return { error: "not_found" };
         if (request.status !== "awaiting_admin") return { error: "wrong_state", request };
-        request.status = "rejected";
-        request.resolvedAt = new Date().toISOString();
-        request.rejectReason = reason || null;
-        await writeTx(session, "instantSellRequests", requests);
-        return { request, cacheUpdates: { instantSellRequests: requests } };
+        const fields = { status: "rejected", resolvedAt: new Date().toISOString(), rejectReason: reason || null };
+        await setResolvedTx(session, id, fields);
+        Object.assign(request, fields);
+        return { request, fields };
     });
+    if (!result.fields) return result;
+    patchRequest(id, result.fields);
+    return { request: result.request };
 }
 
 // Userga yuboriladigan xabarlar (bot ham, admin panel ham bir xil matn ishlatadi).

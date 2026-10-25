@@ -214,6 +214,39 @@ function writeTx(session, file, data) {
   return Store.updateOne({ _id: file }, { $set: { data, v: newV() } }, { session, upsert: true });
 }
 
+// ── Massiv hujjatning faqat kerakli elementlari bilan ishlash (tranzaksiya ichida) ──
+// Butun massivni (users ~270 KB, instantSellRequests ~340 KB) o'qib/qayta yozish
+// sekin Atlas tarmog'ida har amalga bir necha soniya qo'shardi.
+// `cond` — aggregation ifodasi, element `$$e` (masalan { $eq: ["$$e.id", 5] }).
+async function readTxWhere(session, file, cond) {
+  const doc = await Store.collection.findOne(
+    { _id: file },
+    { session, projection: { data: { $filter: { input: { $ifNull: ["$data", []] }, as: "e", cond } } } }
+  );
+  return doc?.data || [];
+}
+
+// `update` — `data.$.x` / `data.$[f].x` yo'llari bilan; `v` avtomatik yangilanadi.
+function updateTx(session, file, filter, update, options = {}) {
+  return Store.collection.updateOne(
+    { _id: file, ...filter },
+    { ...update, $set: { ...update.$set, v: newV() } },
+    { session, ...options }
+  );
+}
+
+// readTxWhere/updateTx commit'idan KEYIN lokal keshni tuzatadi. `fn` har chaqiruvda
+// YANGI obyektlar yaratsin — u keshga ham, diff bazasiga ham (users) alohida
+// qo'llanadi; bazaga qo'llanmasa keyingi write() shu o'zgarishni yana bir marta
+// yozardi (masalan balansni ikki marta $inc).
+function patchCache(file, fn) {
+  const data = cache[file];
+  if (!Array.isArray(data)) return;
+  fn(data);
+  const base = baseOf.get(data);
+  if (base) fn(base);
+}
+
 // ── Keshsiz, to'g'ridan-to'g'ri bitta hujjat bilan ishlash ──────────────────
 // Jarayonlar o'rtasida qisqa xabar almashish uchun (inventoryBridge.js: sayt
 // so'rov qoldiradi, bot javob yozadi). Keshga tegilmaydi — har chaqiruv
@@ -239,4 +272,4 @@ async function listIds(prefix) {
   return docs.map(d => d._id);
 }
 
-module.exports = { read, write, connect, refresh, withTransaction, readTx, writeTx, readDoc, writeDoc, removeDoc, takeDoc, listIds, diffArrayOps };
+module.exports = { read, write, connect, refresh, withTransaction, readTx, writeTx, readTxWhere, updateTx, patchCache, readDoc, writeDoc, removeDoc, takeDoc, listIds, diffArrayOps };

@@ -182,11 +182,11 @@ function bulkSellSom(rate = getUsdToSomRate()) { return Math.ceil(BULK_SELL_USD 
 // Faqat BUFF buy order bor nomlar — buy order yo'q skinga narx berilmaydi
 // (sotib bo'lmaydi), Lis'ga qaytilmaydi. MIN_SELL_USD dan arzoniga ham —
 // ularning narxi tooCheap'da (faqat katta sotuv ichida ishlatiladi).
-async function getInstantSellQuotesSom(names) {
+async function getInstantSellQuotesSom(names, { feedPromise } = {}) {
     const rate = getUsdToSomRate();
     const tiers = getMarginTiers();
     let buff = new Map();
-    try { buff = await require("./buffPrice").getBuffPricesUsd(names); }
+    try { buff = await require("./buffPrice").getBuffPricesUsd(names, undefined, feedPromise); }
     catch (err) { console.log("BUFF NARX XATO:", err.message); }
     const prices = new Map();
     const tooCheap = new Map();

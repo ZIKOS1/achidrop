@@ -1335,10 +1335,13 @@ async function getSellInventory(steamId64, force, token, { maxAgeMs } = {}) {
     // collectible'larni (medal, graffiti, coin) BERMAYDI — ularni ko'rsatish
     // uchun community (SteamApis) inventaridan qo'shib qo'yamiz (best-effort).
     if (process.env.STEAMWEBAPI_KEY) {
+        // Ikkala manba parallel so'raladi (ketma-ket emas).
+        const commPromise = process.env.STEAMAPIS_KEY ? fetchCommunityInventory(steamId64, force, steamApisGet) : null;
+        commPromise?.catch(() => {}); // xato pastda ushlanadi; steamwebapi xato bersa "unhandled" bo'lmasin
         const items = await steamWebApiInventory(steamId64, force);
-        if (process.env.STEAMAPIS_KEY) {
+        if (commPromise) {
             try {
-                const comm = await fetchCommunityInventory(steamId64, force, steamApisGet);
+                const comm = await commPromise;
                 const have = new Set(items.map(i => String(i.assetId)));
                 for (const it of comm) if (it.sellable === false && !have.has(String(it.assetId))) items.push(it);
             } catch (err) { console.log("SELL INVENTORY merge (community) ERROR:", err.message); }
@@ -1396,6 +1399,12 @@ app.get("/api/instant-sell/quote", auth, inventoryLimiter, async (req, res) => {
     };
     if (!u.steamId64) return res.json({ ...base, steamConnected: false, items: [] });
 
+    // BUFF narx fayli va Lis egasi narxlari inventar bilan PARALLEL yuklanadi
+    // (har biri baribir har so'rovda yangidan — faqat bir-birini kutmaydi).
+    const feedPromise = base.lisConfigured ? buffPrice.loadFeed() : null;
+    feedPromise?.catch(() => {}); // xato getBuffPricesUsd'da ushlanadi
+    const ownerPromise = lisAutosell.getOwnerPricesSom(u.steamId64, lisSkinsPrice.getUsdToSomRate()).catch(() => null);
+
     let items;
     // Har ochilish/yangilashda Steam'dan YANGI inventar (user talabi, 2026-10-22) —
     // keshdagi eski holat (qulf ochilmagan, yangi skin yo'q) ko'rsatilmaydi.
@@ -1407,11 +1416,11 @@ app.get("/api/instant-sell/quote", auth, inventoryLimiter, async (req, res) => {
     if (base.lisConfigured) {
         // Qulfdagi skinlarning ham narxi ko'rsatiladi (tanlab bo'lmaydi, lekin qiymati ko'rinadi).
         const names = [...new Set(items.filter(it => it.sellable !== false).map(it => sellItemView(it, null).priceKey))];
-        try { ({ prices, tooCheap } = await lisSkinsPrice.getInstantSellQuotesSom(names)); }
+        try { ({ prices, tooCheap } = await lisSkinsPrice.getInstantSellQuotesSom(names, { feedPromise })); }
         catch (err) { console.log("LIS PRICE ERROR:", err.message); }
     }
     // Lis cookie egasi — Lis avtosell narxining o'zi (lisAutosell.ownerPricesSom).
-    const ownerPrices = await lisAutosell.getOwnerPricesSom(u.steamId64, lisSkinsPrice.getUsdToSomRate());
+    const ownerPrices = await ownerPromise;
     const minSom = lisSkinsPrice.minSellSom();
     res.json({
         ...base, steamConnected: true, lisAutosellPrices: !!ownerPrices, minSellUsd: lisSkinsPrice.MIN_SELL_USD,
