@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const StoreSchema = new mongoose.Schema(
-  { _id: String, data: mongoose.Schema.Types.Mixed },
+  { _id: String, data: mongoose.Schema.Types.Mixed, v: String },
   { versionKey: false }
 );
 const Store = mongoose.models.Store || mongoose.model("Store", StoreSchema);
@@ -10,6 +10,16 @@ const Store = mongoose.models.Store || mongoose.model("Store", StoreSchema);
 // MongoDB is just the persistence layer behind them.
 const cache = {};
 let connectPromise = null;
+
+// Har yozuvda hujjatning `v` maydoni yangi tasodifiy qiymatga o'zgaradi.
+// refresh() shu orqali hujjat o'zgarmagan bo'lsa uni qayta yuklamaydi —
+// Atlas tarmog'i sekin (~85 KB/s), 270 KB'lik `users`ni har /api so'rovida
+// qayta yuklash har so'rovga ~3 soniya qo'shardi.
+// MUHIM: Mongo'ga yozadigan BARCHA jarayonlar (sayt, VPS bot) shu faylning
+// yangi versiyasini ishlatishi shart — `v`ni o'zgartirmay yozgan eski kod
+// yozuvini refresh() ko'rmay qoladi.
+const knownV = {}; // file -> keshdagi ma'lumot qaysi `v`ga mos (noma'lum bo'lsa yo'q)
+const newV = () => new mongoose.Types.ObjectId().toHexString();
 
 async function connect() {
   if (connectPromise) return connectPromise;
@@ -21,9 +31,13 @@ async function connect() {
     await mongoose.connect(uri);
     console.log("✅ MongoDB ulandi");
 
-    const docs = await Store.find({}).lean();
-    // inv_/invReq_ (inventoryBridge), steamAuth_ (auth-steam), sess_/admsess_ (tokenStore), lisAuto_ (lisAutosell) — keshga kerak emas.
-    for (const doc of docs) if (!/^(inv(Req)?|steamAuth|sess|admsess|lisAuto)_/.test(doc._id)) setCache(doc._id, doc.data);
+    // inv_/invReq_ (inventoryBridge), steamAuth_ (auth-steam), sess_/admsess_ (tokenStore), lisAuto_ (lisAutosell) — keshga kerak emas,
+    // Mongo'dan umuman olinmaydi (sovuq start tezroq).
+    const docs = await Store.find({ _id: { $not: /^(inv(Req)?|steamAuth|sess|admsess|lisAuto)_/ } }).lean();
+    for (const doc of docs) {
+      setCache(doc._id, doc.data);
+      if (doc.v) knownV[doc._id] = doc.v;
+    }
     console.log("✅ Ma'lumotlar keshga yuklandi:", Object.keys(cache).join(", ") || "(bo'sh)");
 
     // Websaytdan Steam orqali (Telegramsiz) kiruvchi foydalanuvchilar qo'shilishi
@@ -36,7 +50,7 @@ async function connect() {
         if (u.telegramId === undefined) { u.telegramId = u.id; changed = true; }
       }
       if (changed) {
-        await Store.updateOne({ _id: "users" }, { $set: { data: users } }, { upsert: true });
+        await Store.updateOne({ _id: "users" }, { $set: { data: users, v: newV() } }, { upsert: true });
         console.log("✅ telegramId backfill bajarildi");
       }
     }
@@ -65,8 +79,13 @@ const DIFF_FILES = new Set(["users"]);
 const baseOf = new WeakMap(); // massiv -> oxirgi sinxron nusxasi
 const fileBase = {};          // file -> oxirgi sinxron nusxasi (kuzatilmagan massiv uchun)
 
+// Keshga yangi ma'lumot qo'yiladi; uning Mongo'dagi `v`si noma'lum deb
+// belgilanadi (keyingi refresh() to'liq yuklaydi) — refresh() o'zi `v`ni
+// qayta yozadi. Lokal yozuvdan keyin ham shunday: boshqa jarayonning parallel
+// yozuvi Mongo'da bizning diff yozuvimiz bilan birlashgan bo'lishi mumkin.
 function setCache(file, data) {
   cache[file] = data;
+  delete knownV[file];
   if (DIFF_FILES.has(file) && Array.isArray(data)) {
     const snap = structuredClone(data);
     baseOf.set(data, snap);
@@ -120,13 +139,15 @@ function write(file, data) {
     const ops = diffArrayOps(file, base, data);
     setCache(file, data);
     if (!ops.length) return;
+    const v = newV();
+    for (const op of ops) op.updateOne.update.$set = { ...op.updateOne.update.$set, v };
     Store.bulkWrite(ops, { ordered: true }).catch((err) => {
       console.log("MONGODB WRITE ERROR:", err.message);
     });
     return;
   }
   setCache(file, data);
-  Store.updateOne({ _id: file }, { $set: { data } }, { upsert: true }).catch((err) => {
+  Store.updateOne({ _id: file }, { $set: { data, v: newV() } }, { upsert: true }).catch((err) => {
     console.log("MONGODB WRITE ERROR:", err.message);
   });
 }
@@ -136,8 +157,11 @@ function write(file, data) {
 // o'zi) yozgan yangi ma'lumot bu yerda ko'rinmay qolishi mumkin. Shu sabab
 // muhim qidiruvlar (masalan, user topilmasa) uchun Mongo'dan qayta o'qiymiz.
 async function refresh(file) {
-  const doc = await Store.findOne({ _id: file }).lean();
+  const known = knownV[file];
+  const doc = await Store.findOne(known ? { _id: file, v: { $ne: known } } : { _id: file }).lean();
+  if (known && !doc) return cache[file]; // o'zgarmagan (yoki o'chirilgan — kamdan-kam, keyingi yozuvda tiklanadi)
   setCache(file, doc ? doc.data : []);
+  if (doc?.v) knownV[file] = doc.v;
   return cache[file];
 }
 
@@ -187,7 +211,7 @@ async function readTx(session, file) {
 // Tranzaksiya ICHIDA yozish (hali commit qilinmagan, faqat shu tranzaksiya
 // muvaffaqiyatli tugasa kuchga kiradi).
 function writeTx(session, file, data) {
-  return Store.updateOne({ _id: file }, { $set: { data } }, { session, upsert: true });
+  return Store.updateOne({ _id: file }, { $set: { data, v: newV() } }, { session, upsert: true });
 }
 
 // ── Keshsiz, to'g'ridan-to'g'ri bitta hujjat bilan ishlash ──────────────────
@@ -199,7 +223,7 @@ async function readDoc(id) {
   return doc ? doc.data : null;
 }
 async function writeDoc(id, data) {
-  await Store.updateOne({ _id: id }, { $set: { data } }, { upsert: true });
+  await Store.updateOne({ _id: id }, { $set: { data, v: newV() } }, { upsert: true });
 }
 async function removeDoc(id) {
   await Store.deleteOne({ _id: id });
