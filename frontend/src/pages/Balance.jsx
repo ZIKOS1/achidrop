@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, Check, Copy, Gem, Snowflake, Wallet } from "lucide-react";
+import { ArrowRight, Check, Copy, Gem, Snowflake, Ticket, Wallet } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
-import { fmtUnlockLeft, hap, openWithdrawModal } from "../utils";
+import { fmtUnlockLeft, hap, openWithdrawModal, openWithdrawPromoModal } from "../utils";
 import { t } from "../i18n";
 import { cn } from "../lib/cn";
 import Empty from "../components/Empty";
@@ -81,6 +81,9 @@ function BalanceView() {
   function withdraw() {
     openWithdrawModal({ openModal, closeModal, showToast, refreshMe: () => { refreshMe(); loadHold(); } });
   }
+  function promo() {
+    openWithdrawPromoModal({ openModal, closeModal, showToast, onDone: (h) => { if (h) setHold(h); else loadHold(); } });
+  }
   function copyRef() {
     if (!refLink) return;
     navigator.clipboard?.writeText(refLink);
@@ -88,6 +91,13 @@ function BalanceView() {
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
+
+  // Muzlatilgan mablag' bo'lsa — "Pul yechish" promokodi bilan ochish.
+  const promoBtn = frozen > 0 ? (
+    <button type="button" onClick={promo} className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-border px-[26px] py-3 text-[13px] font-semibold text-foreground transition-colors hover:border-ring/60 lg:w-auto">
+      <Ticket className="size-4" /> {t("wpromo.button")}
+    </button>
+  ) : null;
 
   const withdrawBtn = available > 0 ? (
     <button type="button" onClick={withdraw} className="btn-grad flex w-full items-center justify-center gap-2 rounded-[14px] px-[26px] py-3.5 text-sm font-semibold lg:w-auto">
@@ -129,7 +139,7 @@ function BalanceView() {
                     <span className="font-heading text-lg text-primary lg:text-[22px]">{t("common.somWithAmount")}</span>
                   </p>
                 </div>
-                <div className="hidden lg:block">{withdrawBtn}</div>
+                <div className="hidden lg:flex lg:flex-col lg:items-end lg:gap-2">{withdrawBtn}{promoBtn}</div>
               </div>
               {parts > 0 && (
                 <div className="relative mt-4 flex h-2 overflow-hidden rounded-full bg-secondary lg:mt-6 lg:h-2.5">
@@ -143,7 +153,7 @@ function BalanceView() {
                 <Part color="rgba(143,195,232,.6)" label={t("pb.frozen")} value={frozen} tone="text-[var(--heading)]" />
                 <Part color="var(--input)" label={t("trade.pending")} value={pending} tone="text-muted-foreground" />
               </div>
-              <div className="relative mt-4 lg:hidden">{withdrawBtn}</div>
+              <div className="relative mt-4 space-y-2 lg:hidden">{withdrawBtn}{promoBtn}</div>
             </div>
           </div>
 

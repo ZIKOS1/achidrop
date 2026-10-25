@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Pause, Play, Trash2, Ticket, Wallet, Repeat } from "lucide-react";
+import { Plus, Pause, Play, Trash2, Ticket, Wallet, Repeat, Banknote } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
 import { hap, confirmTg } from "../../utils";
@@ -18,6 +18,7 @@ export default function AdminPromos() {
   const [type, setType] = useState("balance");
   const [bonusPercent, setBonusPercent] = useState("15");
   const [perUserLimit, setPerUserLimit] = useState("1");
+  const [unlockSom, setUnlockSom] = useState("");
 
   function load() {
     api("/api/admin/promos").then(setList).catch(() => setError(true));
@@ -36,6 +37,7 @@ export default function AdminPromos() {
           type,
           maxUse: maxUse ? Number(maxUse) : null,
           bonusPercent: type === "balance" ? Number(bonusPercent) : undefined,
+          unlockSom: type === "withdraw" ? Number(unlockSom) : undefined,
           perUserLimit: perUserLimit.trim() ? Number(perUserLimit) : 0,
         }),
       });
@@ -45,6 +47,7 @@ export default function AdminPromos() {
       setMaxUse("");
       setBonusPercent("15");
       setPerUserLimit("1");
+      setUnlockSom("");
       load();
     } catch (e) {
       showToast(e.error || "Xato", "err");
@@ -106,6 +109,14 @@ export default function AdminPromos() {
             <Repeat className="size-3.5" />
             Obmen (tekin)
           </button>
+          <button
+            type="button"
+            onClick={() => setType("withdraw")}
+            className={"flex flex-1 items-center justify-center gap-1.5 py-2 text-xs font-semibold uppercase tracking-wide transition-colors " + (type === "withdraw" ? "bg-primary text-primary-foreground" : "text-muted-foreground")}
+          >
+            <Banknote className="size-3.5" />
+            Pul yechish
+          </button>
         </div>
 
         <input
@@ -125,6 +136,20 @@ export default function AdminPromos() {
             placeholder="Bonus foizi (masalan 15)"
             className="w-full border border-border bg-secondary px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary"
           />
+        ) : null}
+
+        {type === "withdraw" ? (
+          <div>
+            <input
+              type="number"
+              inputMode="numeric"
+              value={unlockSom}
+              onChange={(e) => setUnlockSom(e.target.value)}
+              placeholder="Holdsiz ochiladigan summa, so'm (masalan 2000000)"
+              className="w-full border border-border bg-secondary px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">Kod kiritilsa, muzlatilgan puldan shu summagacha darhol yechib olsa bo'ladigan bo'ladi.</p>
+          </div>
         ) : null}
 
         <input
@@ -166,7 +191,7 @@ export default function AdminPromos() {
             <div key={p.code} className="border border-border bg-card p-4">
               <div className="flex items-start justify-between gap-2">
                 <p className="flex items-center gap-1.5 font-heading text-base font-bold text-foreground">
-                  {p.type === "trade" ? <Repeat className="size-3.5 shrink-0" /> : <Wallet className="size-3.5 shrink-0" />}
+                  {p.type === "trade" ? <Repeat className="size-3.5 shrink-0" /> : p.type === "withdraw" ? <Banknote className="size-3.5 shrink-0" /> : <Wallet className="size-3.5 shrink-0" />}
                   {p.code}
                 </p>
                 <span className={"shrink-0 border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide " + (p.active ? "border-success/40 bg-success/10 text-success" : "border-border text-muted-foreground")}>
@@ -176,6 +201,8 @@ export default function AdminPromos() {
               <p className="mt-1 text-xs text-muted-foreground">
                 {p.type === "trade"
                   ? `Tekin obmenlar: ${p.usedCount ?? 0}/${p.maxUse} ishlatilgan`
+                  : p.type === "withdraw"
+                  ? `Pul yechish: ${(p.unlockSom ?? 0).toLocaleString()} so'mgacha holdsiz · Ishlatilgan: ${p.usedCount ?? 0} marta · Limit: ${p.maxUse ? `${p.maxUse} ta` : "Cheksiz"}`
                   : `Bonus: ${p.bonus}% · Ishlatilgan: ${(p.usedBy || []).length} marta · Limit: ${p.maxUse ? `${p.maxUse} ta` : "Cheksiz"}`}
                 {" · "}Bir kishi: {p.perUserLimit > 0 ? `${p.perUserLimit} marta` : "cheksiz"}
               </p>

@@ -925,10 +925,10 @@ module.exports = (bot) => {
         if (topup?.step === "promo") {
             const code = text.toUpperCase().trim();
             const promo = checkPromo(code);
-            // "trade" turidagi promo kodlar Obmen uchun (fee waiver), bu yerda
+            // "trade" (Obmen) va "withdraw" (pul yechish) turidagi kodlar bu yerda
             // (balans depoziti) qabul qilinmaydi — eski (type maydonisiz)
             // kodlar "balance" deb hisoblanadi (backward-compat).
-            if (!promo || promo.type === "trade") return ctx.reply(`❌ *Promo kod topilmadi!*`,
+            if (!promo || (promo.type && promo.type !== "balance")) return ctx.reply(`❌ *Promo kod topilmadi!*`,
                 { parse_mode:"Markdown", ...Markup.inlineKeyboard([
                     [Markup.button.callback("🔄 Qayta","enter_promo")],
                     [Markup.button.callback("⏭ Promocodsiz","skip_promo")],
@@ -944,7 +944,7 @@ module.exports = (bot) => {
             await refresh("promos").catch(() => {});
             const promos = read("promos") || [];
             const p = promos.find(x => x.code === code);
-            if (!p || p.type === "trade" || !p.active || promoLimitReached(p, userId)) {
+            if (!p || (p.type && p.type !== "balance") || !p.active || promoLimitReached(p, userId)) {
                 return ctx.reply(`❌ *Bu promo kod endi amal qilmaydi!*`,
                     { parse_mode:"Markdown", ...Markup.inlineKeyboard([[Markup.button.callback("⏭ Promocodsiz","skip_promo")]])}
                 );

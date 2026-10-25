@@ -19,6 +19,7 @@ const inventoryPage      = {}; // userId -> page
 const pendingTradePrice  = {}; // userId -> tradeId
 const pendingTradeChat   = {}; // userId -> tradeId
 const pendingWithdrawCard = {}; // userId -> true
+const pendingWithdrawPromo = {}; // userId -> true ("Pul yechish" promokodi kutilmoqda)
 
 function readUsers() { const d = read("users"); return Array.isArray(d) ? d : Object.values(d); }
 function getUser(id) { return readUsers().find(u => u.id === id) || null; }
@@ -369,6 +370,7 @@ module.exports = (bot) => {
         if (pending) text += `\n⏳ So'rov jarayonida: *${fmt(pending)} so'm*`;
         const rows = [];
         if (available > 0) rows.push([Markup.button.callback("💸 Pul yechish", "wd_request")]);
+        if (frozen > 0) rows.push([Markup.button.callback("🎟 Promokod (muzlatilganni ochish)", "wd_promo")]);
         rows.push([Markup.button.callback("⬅️ Balansga", "go_to_balance")]);
         await ctx.editMessageText(text, { parse_mode: "Markdown", ...Markup.inlineKeyboard(rows) }).catch(() => {});
     });
@@ -383,12 +385,43 @@ module.exports = (bot) => {
         ).catch(() => {});
     });
 
+    bot.action("wd_promo", async (ctx) => {
+        await ctx.answerCbQuery();
+        delete pendingWithdrawCard[ctx.from.id];
+        pendingWithdrawPromo[ctx.from.id] = true;
+        await ctx.editMessageText("🎟 *Pul yechish promokodini kiriting:*
+
+Promokod muzlatilgan mablag'ning bir qismini darhol yechib olsa bo'ladigan qiladi.",
+            { parse_mode: "Markdown", ...Markup.inlineKeyboard([[Markup.button.callback("❌ Bekor", "wd_summary")]]) }
+        ).catch(() => {});
+    });
+
     // ── TEXT handler (matn kiritish kutilgan holatlar) ──────────────────────
     bot.on("text", async (ctx, next) => {
         if (isAdmin(ctx)) return next();
         if (ctx.message.text.startsWith("/")) return next();
         const userId = ctx.from.id;
         const text   = ctx.message.text.trim();
+
+        if (pendingWithdrawPromo[userId]) {
+            delete pendingWithdrawPromo[userId];
+            let result;
+            try { result = await balanceManager.unlockWithPromo(userId, text); }
+            catch (err) { return ctx.reply("❌ Xatolik: " + err.message); }
+            const back = Markup.inlineKeyboard([[Markup.button.callback("💸 Pul yechish", "wd_summary")]]);
+            if (result.error) {
+                const msg = {
+                    already_used: "❌ Bu promokodni allaqachon ishlatgansiz.",
+                    exhausted: "❌ Bu promokodning limiti tugagan.",
+                    nothing_frozen: "❌ Muzlatilgan mablag'ingiz yo'q.",
+                }[result.error] || "❌ Promokod topilmadi.";
+                return ctx.reply(msg, back);
+            }
+            return ctx.reply(`✅ *${fmt(result.unlocked)} so'm* yechib olish uchun ochildi!
+
+Endi "💸 Pul yechish" orqali kartaga so'rov yuborishingiz mumkin.`,
+                { parse_mode: "Markdown", ...back });
+        }
 
         if (pendingWithdrawCard[userId]) {
             delete pendingWithdrawCard[userId];

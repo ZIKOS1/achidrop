@@ -159,3 +159,54 @@ test("pul yechish: so'rov → tasdiq balansdan bir marta ayiradi; bekor qilish",
     await new Promise(r => setTimeout(r, 300));
     assert.equal((await doc("users")).find(x => x.id === UID).balance, start - 800);
 });
+
+test("unlockFrozenEntries: eng uzoq kutiladiganidan ochadi, katta yozuvni bo'ladi", () => {
+    const bm = require("../backend/balanceManager");
+    const now = Date.parse("2026-10-25T00:00:00Z");
+    const day = 24 * 3600 * 1000;
+    const entries = [
+        { id: "old", amount: 1000, receivedAt: new Date(now - 6 * day).toISOString(), withdrawalStatus: null },  // 1 kun qoldi
+        { id: "new", amount: 3000, receivedAt: new Date(now - 1 * day).toISOString(), withdrawalStatus: null },  // 6 kun qoldi
+        { id: "pend", amount: 500, receivedAt: new Date(now - 1 * day).toISOString(), withdrawalStatus: "pending" },
+        { id: "ripe", amount: 700, receivedAt: new Date(now - 9 * day).toISOString(), withdrawalStatus: null },
+    ];
+    assert.equal(bm.unlockFrozenEntries(entries, 3500, "X", now), 3500);
+    const s = bm.summarizeHoldEntries(entries, now);
+    assert.equal(s.available, 700 + 3500);
+    assert.equal(s.frozen, 500, "old'dan 500 qoldi");
+    assert.equal(s.pending, 500);
+    assert.equal(entries.find(e => e.id === "new").promoUnlock, "X");
+    assert.equal(entries.reduce((n, e) => n + e.amount, 0), 1000 + 3000 + 500 + 700, "jami summa o'zgarmadi");
+});
+
+test("unlockWithPromo: muzlatilganni ochadi, limitlar, faqat withdraw turi", async () => {
+    const bm = require("../backend/balanceManager");
+    const recent = new Date(Date.now() - 3600 * 1000).toISOString();
+    await stores.updateOne({ _id: "users" }, { $set: { "data.$[u].balance": 5_000_000 } }, { arrayFilters: [{ "u.id": UID }] });
+    await stores.updateOne({ _id: "tradeBalances" }, { $set: { data: [{ userId: UID, entries: [
+        { id: "f1", amount: 3_000_000, receivedAt: recent, withdrawalStatus: null },
+    ] }] } });
+    await stores.updateOne({ _id: "promos" }, { $set: { data: [
+        { code: "WD2M", type: "withdraw", unlockSom: 2_000_000, active: true, maxUse: 2, perUserLimit: 1, usedBy: [], usedCount: 0 },
+        { code: "BAL", type: "balance", bonus: 15, active: true, usedBy: [], usedCount: 0 },
+    ] } }, { upsert: true });
+    await db.refresh("tradeBalances");
+    await db.refresh("users");
+
+    assert.equal((await bm.unlockWithPromo(UID, "BAL")).error, "not_found", "boshqa turdagi kod ishlamaydi");
+    assert.equal((await bm.unlockWithPromo(OTHER, "wd2m")).error, "nothing_frozen", "muzlatilgani yo'q");
+    let p = (await doc("promos")).find(x => x.code === "WD2M");
+    assert.equal(p.usedCount, 0, "muzlatilgani yo'q bo'lsa kod sarflanmaydi");
+
+    const r = await bm.unlockWithPromo(UID, " wd2m ");
+    assert.equal(r.unlocked, 2_000_000);
+    const h = bm.getHoldSummary(UID);
+    assert.equal(h.available, 2_000_000);
+    assert.equal(h.frozen, 1_000_000);
+    assert.equal((await bm.unlockWithPromo(UID, "WD2M")).error, "already_used");
+    p = (await doc("promos")).find(x => x.code === "WD2M");
+    assert.equal(p.usedCount, 1);
+
+    const { request } = await bm.requestWithdrawal(UID, "8600000000000000");
+    assert.equal(request.amount, 2_000_000, "ochilgan summa yechiladi");
+});

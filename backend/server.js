@@ -32,6 +32,7 @@ const { trySendAutoOffer, maybeCheckPendingWithdrawals } = require("./withdrawDe
 const supportManager = require("./supportManager");
 const instantSellManager = require("./instantSellManager");
 const buffPrice = require("./buffPrice");
+const { checkPromoForUser, markPromoUsed } = require("./promoCheck");
 const lisSkinsPrice = require("./lisSkinsPrice");
 const lisAutosell = require("./lisAutosell");
 
@@ -919,22 +920,6 @@ function isFromTelegram(req) {
 
 const MIN_TRADE_PRICE = 999;
 
-// Promo kodni (istalgan turda) userId'ga nisbatan tekshiradi — `perUserLimit`
-// (default 1, ya'ni eski "bir kishi — bir marta" xatti-harakati saqlanadi;
-// admin uni oshirishi yoki 0/bo'sh qoldirib cheksiz qilishi mumkin). `usedBy`
-// endi userId'larni TAKRORLAB saqlaydi (har safar ishlatganda push qilinadi) —
-// shu orqali "shu userda nechta marta ishlatilgan" ni sanash mumkin.
-function checkPromoForUser(p, userId) {
-    if (!p.active) return { error: "exhausted" };
-    if (p.maxUse && (p.usedCount ?? 0) >= p.maxUse) return { error: "exhausted" };
-    const limit = p.perUserLimit || 1;
-    if (limit > 0) {
-        const usedByThisUser = (p.usedBy || []).filter(id => id === userId).length;
-        if (usedByThisUser >= limit) return { error: "already_used" };
-    }
-    return { ok: true };
-}
-
 // "Obmen" turidagi promo kodni bir marta "sarflaydi" — faqat aktiv, mos
 // turdagi, hali global limitidan oshmagan va shu foydalanuvchi uchun
 // perUserLimit'dan oshmagan kodlarga ruxsat beradi.
@@ -944,10 +929,7 @@ function redeemTradePromo(code, userId) {
     if (!p || p.type !== "trade") return { error: "not_found" };
     const check = checkPromoForUser(p, userId);
     if (check.error) return check;
-    p.usedCount = (p.usedCount ?? 0) + 1;
-    if (!Array.isArray(p.usedBy)) p.usedBy = [];
-    p.usedBy.push(userId);
-    if (p.maxUse && p.usedCount >= p.maxUse) p.active = false;
+    markPromoUsed(p, userId);
     write("promos", promos);
     return { ok: true };
 }
@@ -1611,6 +1593,21 @@ app.post("/api/trade-withdraw", auth, sensitiveLimiter, async (req, res) => {
         ));
     }
     res.json({ request });
+});
+
+// POST /api/withdraw-promo — { code } — "Pul yechish" promo kodi muzlatilgan
+// mablag'ning bir qismini darhol yechib olsa bo'ladigan qiladi (balanceManager.unlockWithPromo).
+app.post("/api/withdraw-promo", auth, promoCheckLimiter, async (req, res) => {
+    const u = req.user;
+    if (!u) return res.status(404).json({ error: "User not found" });
+    let result;
+    try { result = await balanceManager.unlockWithPromo(u.id, req.body.code); }
+    catch (err) { return res.status(500).json({ error: err.message }); }
+    if (result.error) {
+        const map = { already_used: "promo_already_used", exhausted: "promo_exhausted", nothing_frozen: "promo_nothing_frozen" };
+        return res.status(400).json({ error: map[result.error] || "promo_not_found" });
+    }
+    res.json({ unlocked: result.unlocked, hold: balanceManager.getHoldSummary(u.id) });
 });
 
 // GET /api/leaderboard
@@ -2319,14 +2316,19 @@ app.post("/api/admin/promos", requireAdminPanel, (req, res) => {
     const promos = read("promos") || [];
     if (promos.some(p => p.code === code)) return res.status(400).json({ error: `"${code}" kodi allaqachon mavjud` });
 
-    const type = req.body.type === "trade" ? "trade" : "balance";
+    const type = ["trade", "withdraw"].includes(req.body.type) ? req.body.type : "balance";
     const maxUseNum = Number(req.body.maxUse);
     let maxUse = (!isNaN(maxUseNum) && maxUseNum > 0) ? maxUseNum : null;
 
     let bonus = null;
+    let unlockSom = null;
     if (type === "balance") {
         const bp = Number(req.body.bonusPercent);
         bonus = (!isNaN(bp) && bp > 0 && bp <= 100) ? bp : DEFAULT_PROMO_BONUS_PERCENT;
+    } else if (type === "withdraw") {
+        // Muzlatilgan mablag'ning qanchasi (so'm) holdsiz ochiladi.
+        unlockSom = Math.floor(Number(req.body.unlockSom));
+        if (!(unlockSom > 0)) return res.status(400).json({ error: "Pul yechish promosi uchun summa (so'm) musbat son bo'lishi shart" });
     } else {
         if (!maxUse) return res.status(400).json({ error: "Obmen promosi uchun \"nechta obmen tekin bo'ladi\" musbat son bo'lishi shart" });
     }
@@ -2340,6 +2342,7 @@ app.post("/api/admin/promos", requireAdminPanel, (req, res) => {
         code,
         type,
         bonus,
+        ...(unlockSom ? { unlockSom } : {}),
         perUserLimit,
         active:    true,
         maxUse,

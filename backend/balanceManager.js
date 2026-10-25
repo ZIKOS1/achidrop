@@ -285,7 +285,63 @@ async function reverseTradeCreditEntry(userId, entryId, reason) {
     return result;
 }
 
+// ── "Pul yechish" promo kodi — muzlatilgan mablag'ning `unlockSom`gacha
+// qismini darhol "available" qiladi (kartaga yechish odatdagidek: so'rov →
+// admin tasdig'i). Eng uzoq kutiladigan yozuvlar birinchi ochiladi.
+//
+// Sof funksiya (testlanadi): `entries`ni joyida o'zgartiradi, ochilgan summani
+// qaytaradi. Ochilgan yozuvga holdMs = 0 (receivedAt'dan darhol "matured");
+// yozuv summadan katta bo'lsa — bo'linadi: qolgani muzlatilgan holda alohida
+// yozuv bo'lib qoladi.
+function unlockFrozenEntries(entries, maxSom, code, now = Date.now()) {
+    const frozen = entries
+        .filter(e => !e.withdrawalStatus && !isMatured(e, now))
+        .sort((a, b) => unlockAtMs(b) - unlockAtMs(a));
+    let left = maxSom, unlocked = 0;
+    for (const e of frozen) {
+        if (left <= 0) break;
+        if (e.amount > left) {
+            entries.push({ ...e, id: `${e.id}-r${now}`, amount: e.amount - left });
+            e.amount = left;
+        }
+        e.holdMs = 0;
+        e.promoUnlock = code;
+        left -= e.amount;
+        unlocked += e.amount;
+    }
+    return unlocked;
+}
+
+// { unlocked } yoki { error: not_found | exhausted | already_used | nothing_frozen }.
+// Muzlatilgan mablag' yo'q bo'lsa kod SARFLANMAYDI.
+async function unlockWithPromo(userId, rawCode) {
+    const { checkPromoForUser, markPromoUsed } = require("./promoCheck");
+    const code = String(rawCode || "").toUpperCase().trim();
+    return withTransaction(async (session) => {
+        const promos = asArr(await readTx(session, "promos"));
+        const p = promos.find(x => x.code === code);
+        if (!p || p.type !== "withdraw") return { error: "not_found" };
+        const check = checkPromoForUser(p, userId);
+        if (check.error) return check;
+
+        const ledgers = asArr(await readTx(session, "tradeBalances"));
+        const ledger = ledgers.find(l => l.userId === userId);
+        const user = await readUserTx(session, userId);
+        // Balansdan oshmaydigan muzlatilgan qism (getHoldSummary bilan bir xil hisob).
+        const frozen = capHoldToBalance(summarizeHoldEntries(ledger?.entries || []), user?.balance).frozen;
+        const max = Math.min(p.unlockSom || 0, frozen);
+        if (!(max > 0)) return { error: "nothing_frozen" };
+
+        const unlocked = unlockFrozenEntries(ledger.entries, max, code);
+        markPromoUsed(p, userId);
+        await writeTx(session, "tradeBalances", ledgers);
+        await writeTx(session, "promos", promos);
+        return { unlocked, cacheUpdates: { tradeBalances: ledgers, promos } };
+    });
+}
+
 module.exports = {
+    unlockFrozenEntries, unlockWithPromo,
     creditTradeProceeds, getHoldSummary, summarizeHoldEntries, capHoldToBalance, isMatured, HOLD_MS,
     requestWithdrawal, getWithdrawalById, approveWithdrawal, rejectWithdrawal,
     getAllHoldsForAdmin, reverseTradeCreditEntry,

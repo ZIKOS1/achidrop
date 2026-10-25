@@ -272,6 +272,33 @@ export async function openWithdrawModal({ openModal, closeModal, showToast, refr
   });
 }
 
+// "Pul yechish" promokodi — muzlatilgan mablag'ning bir qismini darhol ochadi
+// (POST /api/withdraw-promo). Muvaffaqiyatda `onDone(hold)` — yangi hold xulosasi.
+const WPROMO_ERRORS = ["promo_not_found", "promo_exhausted", "promo_already_used", "promo_nothing_frozen"];
+export function openWithdrawPromoModal({ openModal, closeModal, showToast, onDone }) {
+  openModal({
+    title: t("wpromo.title"),
+    icon: Banknote,
+    inputType: "text",
+    placeholder: t("wpromo.placeholder"),
+    okLabel: t("wpromo.apply"),
+    info: t("wpromo.info"),
+    onSubmit: async (code) => {
+      if (!code.trim()) return;
+      try {
+        const r = await api("/api/withdraw-promo", { method: "POST", body: JSON.stringify({ code: code.trim() }) });
+        closeModal();
+        hap("notif", "success");
+        showToast(t("wpromo.done", { n: Math.round(r.unlocked).toLocaleString("ru-RU").replace(/,/g, " ") }), "ok");
+        onDone?.(r.hold);
+      } catch (e) {
+        hap("notif", "error");
+        showToast(WPROMO_ERRORS.includes(e?.error) ? t(`wpromo.err.${e.error}`) : t("common.genericError"), "err");
+      }
+    },
+  });
+}
+
 export function hap(t, sub) {
   try {
     const tgWebApp = window.Telegram?.WebApp;
