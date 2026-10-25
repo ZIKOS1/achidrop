@@ -21,7 +21,9 @@ let connectPromise = null;
 const knownV = {}; // file -> keshdagi ma'lumot qaysi `v`ga mos (noma'lum bo'lsa yo'q)
 const newV = () => new mongoose.Types.ObjectId().toHexString();
 
-async function connect() {
+// `lazy` — sovuq startda yuklanmaydigan fayllar (sayt: instantSellRequests ~340 KB,
+// uni o'qiydigan har endpoint avval refresh() qiladi). Bot hammasini yuklaydi.
+async function connect({ lazy = [] } = {}) {
   if (connectPromise) return connectPromise;
 
   connectPromise = (async () => {
@@ -33,7 +35,7 @@ async function connect() {
 
     // inv_/invReq_ (inventoryBridge), steamAuth_ (auth-steam), sess_/admsess_ (tokenStore), lisAuto_ (lisAutosell) — keshga kerak emas,
     // Mongo'dan umuman olinmaydi (sovuq start tezroq).
-    const docs = await Store.find({ _id: { $not: /^(inv(Req)?|steamAuth|sess|admsess|lisAuto)_/ } }).lean();
+    const docs = await Store.find({ _id: { $not: /^(inv(Req)?|steamAuth|sess|admsess|lisAuto)_/, $nin: lazy } }).lean();
     for (const doc of docs) {
       setCache(doc._id, doc.data);
       if (doc.v) knownV[doc._id] = doc.v;
