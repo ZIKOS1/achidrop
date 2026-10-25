@@ -389,9 +389,7 @@ module.exports = (bot) => {
         await ctx.answerCbQuery();
         delete pendingWithdrawCard[ctx.from.id];
         pendingWithdrawPromo[ctx.from.id] = true;
-        await ctx.editMessageText("🎟 *Pul yechish promokodini kiriting:*
-
-Promokod muzlatilgan mablag'ning bir qismini darhol yechib olsa bo'ladigan qiladi.",
+        await ctx.editMessageText("🎟 *Pul yechish promokodini kiriting:*\n\nPromokod muzlatilgan mablag'ning bir qismini darhol yechib olsa bo'ladigan qiladi.",
             { parse_mode: "Markdown", ...Markup.inlineKeyboard([[Markup.button.callback("❌ Bekor", "wd_summary")]]) }
         ).catch(() => {});
     });
