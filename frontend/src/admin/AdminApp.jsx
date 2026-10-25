@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Gavel, Package, Plus, Users, Ticket, Image as ImageIcon, LogOut, Crosshair, Crown, BookOpen, LifeBuoy, ShoppingCart, Banknote, CircleDollarSign } from "lucide-react";
+import { Gavel, Package, Plus, Users, Ticket, Image as ImageIcon, LogOut, Crosshair, Crown, BookOpen, LifeBuoy, ShoppingCart, Banknote, CircleDollarSign, ChartColumn } from "lucide-react";
 import { api } from "./api";
 import { AdminContext } from "./context";
 import Modal from "../components/Modal";
@@ -18,11 +18,13 @@ import AdminSupport from "./pages/AdminSupport";
 import CeoAccounts from "./pages/CeoAccounts";
 import AdminSell from "./pages/AdminSell";
 import AdminLisAutosell from "./pages/AdminLisAutosell";
+import AdminFinance from "./pages/AdminFinance";
 
 const PAGES = {
   home: () => <AdminHome />,
   "admin-sell": () => <AdminSell />,
   "admin-lis": () => <AdminLisAutosell />,
+  "admin-finance": () => <AdminFinance />,
   "admin-auctions": () => <AdminAuctions />,
   "admin-auction-form": (data) => <AdminAuctionForm id={data} />,
   "admin-market": () => <AdminMarket />,
@@ -42,6 +44,7 @@ const PAGE_ALIAS = { admin: "home" };
 
 const NAV_ITEMS = [
   { key: "home", label: "Bosh sahifa", icon: Gavel },
+  { key: "admin-finance", label: "Moliya", icon: ChartColumn },
   { key: "admin-sell", label: "Skin sotish", icon: Banknote },
   { key: "admin-lis", label: "Lis avtosell", icon: CircleDollarSign },
   { key: "admin-auctions", label: "Auksionlar", icon: Package },

@@ -35,6 +35,7 @@ const buffPrice = require("./buffPrice");
 const { checkPromoForUser, markPromoUsed } = require("./promoCheck");
 const lisSkinsPrice = require("./lisSkinsPrice");
 const lisAutosell = require("./lisAutosell");
+const financeStats = require("./financeStats");
 
 const app  = express();
 const PORT = process.env.WEBAPP_PORT || 3000;
@@ -2292,6 +2293,27 @@ app.get("/api/admin/stats", requireAdminPanel, (req, res) => {
         totalRevenue:    deposits.reduce((sum, d) => sum + (d.amount || 0), 0),
         totalTradeFees:  tradeFees.reduce((sum, f) => sum + (f.amount || 0), 0),
     });
+});
+
+// GET /api/admin/finance — Moliya dashboard (Skin sotish foydasi + to'lanishi kerak)
+app.get("/api/admin/finance", requireAdminPanel, async (req, res) => {
+    try {
+        await instantSellManager.refreshRequests();
+        const raw = read("instantSellRequests");
+        const requests = Array.isArray(raw) ? raw : [];
+        const names = requests.filter(r => r.status === "credited").flatMap(r => (r.items || []).map(i => i.marketHashName));
+        const lisUsd = await lisSkinsPrice.fetchLisPricesUsd(names);
+        res.json({
+            lisConfigured: lisSkinsPrice.isLisConfigured(),
+            ...financeStats.buildFinance({
+                requests, lisUsd, rate: lisSkinsPrice.getUsdToSomRate(),
+                holds: balanceManager.getAllHoldsForAdmin(), users: getUsers(),
+            }),
+        });
+    } catch (err) {
+        console.log("FINANCE XATO:", err.message);
+        res.status(500).json({ error: "finance_failed" });
+    }
 });
 
 // ── ADMIN: Promo kodlar ────────────────────────────────────────────────────────
