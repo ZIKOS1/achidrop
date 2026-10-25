@@ -238,3 +238,11 @@ test("publicStats: faqat tasdiqlangan (credited) so'rovlar; so'nggi sotuvlarda u
     assert.deepEqual(Object.keys(s.recent[0]).sort(), ["at", "imageUrl", "name", "priceSom"]);
     assert.equal(s.recent.length, 3);
 });
+
+test("capHoldToBalance: admin balansni ayirsa, yechish summasi joriy balansdan oshmaydi", () => {
+    const s = { frozen: 300, available: 1000, pending: 200, nextUnlockAt: "2026-11-01T00:00:00.000Z" };
+    assert.deepEqual(bm.capHoldToBalance(s, 0), { frozen: 0, available: 0, pending: 0, nextUnlockAt: null });
+    assert.deepEqual(bm.capHoldToBalance(s, 700), { frozen: 0, available: 500, pending: 200, nextUnlockAt: null });
+    assert.deepEqual(bm.capHoldToBalance(s, 1300), { frozen: 100, available: 1000, pending: 200, nextUnlockAt: s.nextUnlockAt });
+    assert.deepEqual(bm.capHoldToBalance(s, 5000), s);
+});

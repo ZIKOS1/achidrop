@@ -90,9 +90,24 @@ function summarizeHoldEntries(entries, now = Date.now()) {
 // { frozen, available, pending, nextUnlockAt } — "available" faqat
 // withdrawalStatus:null va hold muddati o'tgan yozuvlar (allaqachon so'rov
 // yuborilgan yoki chiqarilgan summalar bu yerga kirmaydi).
+// Ledger faqat "qancha pul tushgan"ni biladi — admin balansdan ayirsa yoki
+// pul bidlashda sarflansa, ledger o'zgarmaydi. Shu sabab ko'rsatiladigan
+// summalar joriy balansdan oshmasligi uchun cheklanadi (tartib: avval
+// pending — u allaqachon so'ralgan, keyin available, keyin frozen).
+function capHoldToBalance(summary, balance) {
+    let left = Math.max(0, balance ?? 0);
+    const take = (v) => { const x = Math.min(v, left); left -= x; return x; };
+    const pending = take(summary.pending);
+    const available = take(summary.available);
+    const frozen = take(summary.frozen);
+    return { ...summary, pending, available, frozen, nextUnlockAt: frozen > 0 ? summary.nextUnlockAt : null };
+}
+
 function getHoldSummary(userId) {
     const ledger = getLedger(userId);
-    return summarizeHoldEntries(ledger?.entries || []);
+    const summary = summarizeHoldEntries(ledger?.entries || []);
+    const user = asArr(read("users")).find(u => u.id === userId);
+    return capHoldToBalance(summary, user?.balance);
 }
 
 // Foydalanuvchi "Pul yechish" so'ragan payt — FIFO tartibda "available"
@@ -251,7 +266,7 @@ async function reverseTradeCreditEntry(userId, entryId, reason) {
 }
 
 module.exports = {
-    creditTradeProceeds, getHoldSummary, summarizeHoldEntries, isMatured, HOLD_MS,
+    creditTradeProceeds, getHoldSummary, summarizeHoldEntries, capHoldToBalance, isMatured, HOLD_MS,
     requestWithdrawal, getWithdrawalById, approveWithdrawal, rejectWithdrawal,
     getAllHoldsForAdmin, reverseTradeCreditEntry,
 };
