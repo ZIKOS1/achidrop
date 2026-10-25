@@ -124,3 +124,38 @@ test("refresh(): v o'zgarmasa qayta yuklamaydi, boshqa jarayon yozsa yuklaydi", 
     await db.refresh("users");
     assert.equal(db.read("users")[0].name, "tashqi");
 });
+
+test("pul yechish: so'rov → tasdiq balansdan bir marta ayiradi; bekor qilish", async () => {
+    const bm = require("../backend/balanceManager");
+    const old = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+    await stores.updateOne({ _id: "tradeBalances" }, { $set: { data: [{ userId: UID, entries: [
+        { id: "e1", amount: 500, receivedAt: old, withdrawalStatus: null },
+        { id: "e2", amount: 300, receivedAt: old, withdrawalStatus: null },
+    ] }] } });
+    await db.refresh("tradeBalances");
+    await db.refresh("users");
+    const start = (await doc("users")).find(u => u.id === UID).balance;
+
+    const rev = await bm.reverseTradeCreditEntry(UID, "e2", "test");
+    assert.equal(rev.deducted, 300);
+    assert.equal((await doc("users")).find(u => u.id === UID).balance, start - 300);
+    assert.equal((await bm.reverseTradeCreditEntry(UID, "e2", "test")).error, "already_reversed");
+
+    const { request } = await bm.requestWithdrawal(UID, "8600000000000000");
+    assert.equal(request.amount, 500);
+    assert.equal((await bm.requestWithdrawal(UID, "8600000000000000")).error, "nothing_available", "ikkinchi so'rov yo'q");
+
+    await bm.approveWithdrawal(request.id);
+    assert.equal((await bm.approveWithdrawal(request.id)).error, "not_found", "ikki marta tasdiqlanmaydi");
+    const u = (await doc("users")).find(x => x.id === UID);
+    assert.equal(u.balance, start - 300 - 500);
+    assert.equal(u.balanceHistory.at(-1).amount, -500);
+    assert.equal(db.read("users").find(x => x.id === UID).balance, start - 800, "lokal kesh");
+
+    // Diff bazasi: boshqa maydon yozilsa balans qayta ayirilmaydi
+    const arr = db.read("users");
+    arr.find(x => x.id === UID).name = "A3";
+    db.write("users", arr);
+    await new Promise(r => setTimeout(r, 300));
+    assert.equal((await doc("users")).find(x => x.id === UID).balance, start - 800);
+});

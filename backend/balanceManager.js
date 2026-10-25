@@ -4,7 +4,33 @@
 // ledger faqat "qachon kartaga yechib olsa bo'ladi" degan alohida hisobni
 // yuritadi, pulning o'zini emas. Ya'ni "hold" faqat KARTAGA YECHISHni
 // cheklaydi, balansning o'zini emas.
-const { read, write, withTransaction, readTx, writeTx } = require("./database/db");
+const { read, write, withTransaction, readTx, writeTx, readTxWhere, updateTx, patchCache } = require("./database/db");
+
+// users (~270 KB) tranzaksiyada butunlay o'qilib/yozilmaydi — faqat shu user
+// elementi o'qiladi va balans $inc / tarix $push bilan yoziladi (sekin Atlas).
+async function readUserTx(session, userId) {
+    const [user] = await readTxWhere(session, "users", { $eq: ["$$e.id", userId] });
+    return user || null;
+}
+// Balansga `delta` (manfiy ham) va tarixga `entry` — Mongo'da va (commit'dan
+// keyin chaqirilsa) lokal keshda; `user` — readUserTx natijasi.
+function userDeltaUpdate(user, delta, entry) {
+    const update = Number.isFinite(user.balance)
+        ? { $inc: { "data.$.balance": delta } }
+        : { $set: { "data.$.balance": (user.balance ?? 0) + delta } };
+    if (Array.isArray(user.balanceHistory)) update.$push = { "data.$.balanceHistory": entry };
+    else update.$set = { ...update.$set, "data.$.balanceHistory": [entry] };
+    return update;
+}
+function patchUserCache(userId, delta, entry) {
+    patchCache("users", (users) => {
+        const u = users.find(x => x.id === userId);
+        if (!u) return;
+        u.balance = (u.balance ?? 0) + delta;
+        if (!Array.isArray(u.balanceHistory)) u.balanceHistory = [];
+        u.balanceHistory.push({ ...entry });
+    });
+}
 
 const HOLD_MS = 7 * 24 * 60 * 60 * 1000; // 7 kun
 
@@ -133,8 +159,7 @@ async function requestWithdrawal(userId, cardNumber) {
             .sort((a, b) => new Date(a.receivedAt) - new Date(b.receivedAt));
         if (!eligible.length) return { error: "nothing_available" };
 
-        const users = asArr(await readTx(session, "users"));
-        const currentBalance = users.find(u => u.id === userId)?.balance ?? 0;
+        const currentBalance = (await readUserTx(session, userId))?.balance ?? 0;
         if (currentBalance <= 0) return { error: "nothing_available" };
 
         const total = Math.min(eligible.reduce((s, e) => s + e.amount, 0), currentBalance);
@@ -165,7 +190,7 @@ function getWithdrawalById(id) {
 // sarflangan bo'lishi mumkin — shu sabab bu yerda ham joriy balans bilan
 // qayta cheklanadi) va balans tarixiga yozuv qo'shiladi.
 async function approveWithdrawal(id) {
-    return withTransaction(async (session) => {
+    const result = await withTransaction(async (session) => {
         const withdrawals = asArr(await readTx(session, "withdrawals"));
         const request = withdrawals.find(w => w.id === id);
         if (!request || request.status !== "pending") return { error: "not_found" };
@@ -178,19 +203,19 @@ async function approveWithdrawal(id) {
         request.status = "approved";
         request.resolvedAt = new Date().toISOString();
 
-        const users = asArr(await readTx(session, "users"));
-        const user = users.find(u => u.id === request.userId);
+        const user = await readUserTx(session, request.userId);
+        let change = null;
         if (user) {
             const deduct = Math.min(request.amount, user.balance ?? 0);
-            user.balance = (user.balance ?? 0) - deduct;
-            if (!Array.isArray(user.balanceHistory)) user.balanceHistory = [];
-            user.balanceHistory.push({ amount: -deduct, reason: "Obmen — pul chiqarish (karta)", date: new Date().toISOString() });
+            change = { userId: user.id, delta: -deduct, entry: { amount: -deduct, reason: "Obmen — pul chiqarish (karta)", date: new Date().toISOString() } };
+            await updateTx(session, "users", { "data.id": user.id }, userDeltaUpdate(user, change.delta, change.entry));
         }
         await writeTx(session, "tradeBalances", ledgers);
         await writeTx(session, "withdrawals", withdrawals);
-        await writeTx(session, "users", users);
-        return { request, user, cacheUpdates: { tradeBalances: ledgers, withdrawals, users } };
+        return { request, change, cacheUpdates: { tradeBalances: ledgers, withdrawals } };
     });
+    if (result.change) patchUserCache(result.change.userId, result.change.delta, result.change.entry);
+    return result;
 }
 
 // Rad etilsa — band qilingan yozuvlar yana "available" holatiga qaytadi.
@@ -232,7 +257,7 @@ function getAllHoldsForAdmin() {
 // (bid/withdraw) balansini o'zgartirsa ham, ikkalasi bir-birini
 // "ko'rmay qolib" pulni noto'g'ri hisoblab qo'ymasligi uchun.
 async function reverseTradeCreditEntry(userId, entryId, reason) {
-    return withTransaction(async (session) => {
+    const result = await withTransaction(async (session) => {
         const ledgers = await readTx(session, "tradeBalances");
         const ledgersArr = Array.isArray(ledgers) ? ledgers : [];
         const ledger = ledgersArr.find(l => l.userId === userId);
@@ -241,28 +266,23 @@ async function reverseTradeCreditEntry(userId, entryId, reason) {
         if (entry.withdrawalStatus === "withdrawn") return { error: "already_withdrawn" };
         if (entry.withdrawalStatus === "reversed") return { error: "already_reversed" };
 
-        const rawUsers = await readTx(session, "users");
-        const users = Array.isArray(rawUsers) ? rawUsers : Object.values(rawUsers);
-        const user = users.find(u => u.id === userId);
+        const user = await readUserTx(session, userId);
         const deducted = Math.min(entry.amount, user?.balance ?? 0);
 
+        let change = null;
         if (user) {
-            user.balance = (user.balance ?? 0) - deducted;
-            if (!Array.isArray(user.balanceHistory)) user.balanceHistory = [];
-            user.balanceHistory.push({
-                amount: -deducted,
-                reason: `Bekor qilindi (#${entry.tradeId}): ${reason}`,
-                date: new Date().toISOString(),
-            });
+            change = { userId, delta: -deducted, entry: { amount: -deducted, reason: `Bekor qilindi (#${entry.tradeId}): ${reason}`, date: new Date().toISOString() } };
+            await updateTx(session, "users", { "data.id": userId }, userDeltaUpdate(user, change.delta, change.entry));
         }
         entry.withdrawalStatus = "reversed";
         entry.reversedAt = new Date().toISOString();
         entry.reverseReason = reason;
 
-        await writeTx(session, "users", users);
         await writeTx(session, "tradeBalances", ledgersArr);
-        return { entry, deducted, cacheUpdates: { users, tradeBalances: ledgersArr } };
+        return { entry, deducted, change, cacheUpdates: { tradeBalances: ledgersArr } };
     });
+    if (result.change) patchUserCache(result.change.userId, result.change.delta, result.change.entry);
+    return result;
 }
 
 module.exports = {
