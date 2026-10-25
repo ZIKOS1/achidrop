@@ -19,6 +19,7 @@ const inventoryPage      = {}; // userId -> page
 const pendingTradePrice  = {}; // userId -> tradeId
 const pendingTradeChat   = {}; // userId -> tradeId
 const pendingWithdrawCard = {}; // userId -> true
+const pendingWithdrawConfirm = {}; // userId -> kiritilgan karta ("Bu sizning kartangizmi?" kutilmoqda)
 const pendingWithdrawPromo = {}; // userId -> true ("Pul yechish" promokodi kutilmoqda)
 
 function readUsers() { const d = read("users"); return Array.isArray(d) ? d : Object.values(d); }
@@ -365,6 +366,7 @@ module.exports = (bot) => {
     // ── 🧊 Muzlatilgan mablag'lar / Pul yechish (Balans bo'limidan chaqiriladi) ──
     bot.action("wd_summary", async (ctx) => {
         await ctx.answerCbQuery();
+        delete pendingWithdrawConfirm[ctx.from.id];
         const { frozen, available, pending } = balanceManager.getHoldSummary(ctx.from.id);
         let text = `🧊 *Obmen orqali tushgan mablag'lar*\n\n🧊 Muzlatilgan: *${fmt(frozen)} so'm* (7 kun to'lmagan)\n✅ Yechib olish mumkin: *${fmt(available)} so'm*`;
         if (pending) text += `\n⏳ So'rov jarayonida: *${fmt(pending)} so'm*`;
@@ -379,10 +381,35 @@ module.exports = (bot) => {
         await ctx.answerCbQuery();
         const { available } = balanceManager.getHoldSummary(ctx.from.id);
         if (available <= 0) return ctx.answerCbQuery("❌ Hozircha yechib olinadigan mablag' yo'q.", true);
+        delete pendingWithdrawConfirm[ctx.from.id];
         pendingWithdrawCard[ctx.from.id] = true;
         await ctx.editMessageText(`💳 *Karta raqamingizni kiriting:*\n\n💰 Yechiladigan summa: *${fmt(available)} so'm*`,
             { parse_mode: "Markdown", ...Markup.inlineKeyboard([[Markup.button.callback("❌ Bekor", "wd_summary")]]) }
         ).catch(() => {});
+    });
+
+    bot.action("wd_card_ok", async (ctx) => {
+        await ctx.answerCbQuery();
+        const userId = ctx.from.id;
+        const card = pendingWithdrawConfirm[userId];
+        if (!card) return ctx.editMessageText("❌ So'rov eskirgan. \"💸 Pul yechish\" ni qaytadan bosing.").catch(() => {});
+        delete pendingWithdrawConfirm[userId];
+        const user = getUser(userId);
+        let result;
+        try { result = await balanceManager.requestWithdrawal(userId, card); }
+        catch (err) { return ctx.reply("❌ Xatolik: " + err.message); }
+        if (result.error) return ctx.editMessageText("❌ Hozircha yechib olish mumkin bo'lgan mablag' yo'q.").catch(() => {});
+        const { request } = result;
+        await ctx.editMessageText(
+            `✅ *So'rov yuborildi!*\n\n💰 ${fmt(request.amount)} so'm\n💳 Karta: \`${request.cardNumber}\`\n\n⏳ Admin tekshirib, tez orada o'tkazadi.`,
+            { parse_mode: "Markdown" }
+        ).catch(() => {});
+        toAdmins((adminId) => bot.telegram.sendMessage(adminId, `💸 *Pul chiqarish so'rovi!*\n\n👤 ${user?.name ?? userId}\n🪪 \`${userId}\`\n💰 *${fmt(request.amount)} so'm*\n💳 \`${request.cardNumber}\``,
+            { parse_mode: "Markdown", ...Markup.inlineKeyboard([[
+                Markup.button.callback("✅ Tasdiqlash", `wd_approve_${request.id}`),
+                Markup.button.callback("❌ Rad etish",  `wd_reject_${request.id}`),
+            ]])}
+        )).catch(() => {});
     });
 
     bot.action("wd_promo", async (ctx) => {
@@ -421,25 +448,21 @@ Endi "💸 Pul yechish" orqali kartaga so'rov yuborishingiz mumkin.`,
                 { parse_mode: "Markdown", ...back });
         }
 
+        // Karta kiritildi — yuborishdan oldin "Bu sizning kartangizmi?" (wd_card_ok).
         if (pendingWithdrawCard[userId]) {
             delete pendingWithdrawCard[userId];
-            const user = getUser(userId);
-            let result;
-            try { result = await balanceManager.requestWithdrawal(userId, text); }
-            catch (err) { return ctx.reply("❌ Xatolik: " + err.message); }
-            if (result.error) return ctx.reply("❌ Hozircha yechib olish mumkin bo'lgan mablag' yo'q.");
-            const { request } = result;
-            await ctx.reply(
-                `✅ *So'rov yuborildi!*\n\n💰 ${fmt(request.amount)} so'm\n💳 Karta: \`${request.cardNumber}\`\n\n⏳ Admin tekshirib, tez orada o'tkazadi.`,
-                { parse_mode: "Markdown" }
+            const { available } = balanceManager.getHoldSummary(userId);
+            if (available <= 0) return ctx.reply("❌ Hozircha yechib olish mumkin bo'lgan mablag' yo'q.");
+            pendingWithdrawConfirm[userId] = text;
+            const shown = text.replace(/\s/g, "").replace(/(.{4})(?=.)/g, "$1 ");
+            return ctx.reply(
+                `❓ *Bu sizning kartangizmi?*\n\n💳 Karta: \`${shown}\`\n💰 Summa: *${fmt(available)} so'm*\n\nRaqamni diqqat bilan tekshiring — pul shu kartaga o'tkaziladi.`,
+                { parse_mode: "Markdown", ...Markup.inlineKeyboard([
+                    [Markup.button.callback("✅ Ha, so'rov yuborish", "wd_card_ok")],
+                    [Markup.button.callback("✏️ Yo'q, qayta kiritish", "wd_request")],
+                    [Markup.button.callback("❌ Bekor", "wd_summary")],
+                ]) }
             );
-            toAdmins((adminId) => bot.telegram.sendMessage(adminId, `💸 *Pul chiqarish so'rovi!*\n\n👤 ${user?.name ?? userId}\n🪪 \`${userId}\`\n💰 *${fmt(request.amount)} so'm*\n💳 \`${request.cardNumber}\``,
-                { parse_mode: "Markdown", ...Markup.inlineKeyboard([[
-                    Markup.button.callback("✅ Tasdiqlash", `wd_approve_${request.id}`),
-                    Markup.button.callback("❌ Rad etish",  `wd_reject_${request.id}`),
-                ]])}
-            )).catch(() => {});
-            return;
         }
 
         if (pendingTradePrice[userId]) {

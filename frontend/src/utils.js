@@ -250,17 +250,33 @@ export async function openWithdrawModal({ openModal, closeModal, showToast, refr
     return openModal({ title: t("trade.withdraw"), icon: Banknote, viewOnly: true, info });
   }
 
-  openModal({
+  // Karta kiritilgach — yuborishdan oldin "Bu sizning kartangizmi?" deb
+  // so'raladi; "Yo'q" kiritilgan raqam bilan birinchi oynaga qaytaradi.
+  const askCard = (value) => openModal({
     title: t("trade.withdraw"),
     icon: Banknote,
     inputType: "text",
     placeholder: t("trade.withdrawCardLabel"),
-    okLabel: t("trade.withdrawSend"),
+    okLabel: t("trade.withdrawNext"),
+    value,
     info,
     onSubmit: async (cardNumber) => {
       if (!cardNumber.trim()) return showToast(t("trade.err.invalid_price"), "err");
+      confirmCard(cardNumber.trim());
+    },
+  });
+
+  const confirmCard = (cardNumber) => openModal({
+    title: t("trade.cardConfirmTitle"),
+    icon: Banknote,
+    noInput: true,
+    info: `${t("trade.cardConfirmCard")}: ${cardNumber.replace(/\s/g, "").replace(/(.{4})(?=.)/g, "$1 ")}\n${t("trade.cardConfirmAmount")}: ${fmtMoney(hold.available)}`,
+    okLabel: t("trade.cardConfirmYes"),
+    cancelLabel: t("trade.cardConfirmNo"),
+    onCancel: () => askCard(cardNumber),
+    onSubmit: async () => {
       try {
-        await api("/api/trade-withdraw", { method: "POST", body: JSON.stringify({ cardNumber: cardNumber.trim() }) });
+        await api("/api/trade-withdraw", { method: "POST", body: JSON.stringify({ cardNumber }) });
         closeModal();
         hap("notif", "success");
         showToast(t("trade.withdrawSent"), "ok");
@@ -270,6 +286,8 @@ export async function openWithdrawModal({ openModal, closeModal, showToast, refr
       }
     },
   });
+
+  askCard("");
 }
 
 // "Pul yechish" promokodi — muzlatilgan mablag'ning bir qismini darhol ochadi

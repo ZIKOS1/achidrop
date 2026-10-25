@@ -88,10 +88,10 @@ export default function Modal({ modal, onClose }) {
             </button>
             <button
               type="button"
-              onClick={onClose}
+              onClick={modal.onCancel || onClose}
               className="flex w-full items-center justify-center gap-2 border border-border bg-secondary py-3 font-heading text-sm font-bold uppercase tracking-wide text-foreground"
             >
-              Bekor qilish
+              {modal.cancelLabel || "Bekor qilish"}
             </button>
           </>
         )}
