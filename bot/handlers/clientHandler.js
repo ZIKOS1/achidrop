@@ -86,7 +86,7 @@ function checkPromo(code) { return getPromoCodes().find(p => p.code === code && 
 // `usedBy` endi userId'larni TAKRORLAB saqlaydi (har ishlatishda push), shu
 // orqali shu userda nechta marta ishlatilganini sanaymiz.
 function promoLimitReached(promo, userId) {
-    const limit = promo.perUserLimit || 1;
+    const limit = promo.perUserLimit ?? 1;
     if (limit <= 0) return false; // 0/bo'sh = cheksiz
     return (promo.usedBy || []).filter(id => id === userId).length >= limit;
 }

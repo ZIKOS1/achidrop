@@ -6,7 +6,8 @@
 function checkPromoForUser(p, userId) {
     if (!p.active) return { error: "exhausted" };
     if (p.maxUse && (p.usedCount ?? 0) >= p.maxUse) return { error: "exhausted" };
-    const limit = p.perUserLimit || 1;
+    // `??` — 0 (admin "cheksiz" tanlagan) 1 ga aylanib qolmasligi uchun.
+    const limit = p.perUserLimit ?? 1;
     if (limit > 0) {
         const usedByThisUser = (p.usedBy || []).filter(id => id === userId).length;
         if (usedByThisUser >= limit) return { error: "already_used" };
