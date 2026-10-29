@@ -62,6 +62,9 @@ async function main() {
             .catch((err) => console.log("KESH YANGILASH XATO:", err.message));
     }, 4_000);
 
+    // ── Skin sotish: avtomatik trade offer (admin paneldan ulangan trade akkaunt) ──
+    require("./tradeOfferWorker").startTradeOfferLoop(bot);
+
     // Skin sotish inventar so'rovlarini (inventoryBridge.js) faqat inventory-worker.js
     // bajaradi — bot ham bajarsa Steam'ga har so'rov ikki marta ketib, IP 429 olardi.
 

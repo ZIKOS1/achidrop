@@ -155,4 +155,76 @@ function createSteamAdapter(session, { onSessionError } = {}) {
     };
 }
 
-module.exports = { createWorker, createSteamAdapter, OFFER_TTL_MS };
+// ── Bot jarayonidagi tsikl (bot/index.js chaqiradi) ──────────────────────────
+// Admin panel login so'rovlari (3 s), offer yuborish (10 s), holat kuzatish (30 s).
+// Trade akkaunt almashtirilsa (accountName/connectedAt o'zgarsa) sessiya qayta quriladi.
+function startTradeOfferLoop(bot) {
+    const bridge = require("../backend/tradeAccountBridge");
+    const ism = require("../backend/instantSellManager");
+    const { toAdmins } = require("../backend/adminIds");
+    const { notifyUser } = require("../backend/notify");
+    const deps = bridge.mongoDeps();
+    const send = bot.telegram.sendMessage.bind(bot.telegram);
+
+    let adapter = null, accountKey = null, sessionBroken = false;
+    const steam = {
+        ready: () => !!adapter?.ready(),
+        send: (o) => adapter.send(o),
+        getState: (id) => adapter ? adapter.getState(id) : Promise.reject(new Error("Trade akkaunt ulanmagan")),
+        cancel: (id) => adapter ? adapter.cancel(id) : Promise.reject(new Error("Trade akkaunt ulanmagan")),
+    };
+
+    async function syncAccount() {
+        const s = await bridge.loadSession(deps).catch((err) => { console.log("TRADE AKKAUNT O'QISH XATO:", err.message); return null; });
+        const key = s ? `${s.accountName}|${s.connectedAt}` : null;
+        if (key === accountKey) {
+            // Sessiya tiklangan bo'lsa (cookie yangilandi) — eski xatoni tozalaymiz.
+            if (sessionBroken && adapter?.ready()) { sessionBroken = false; await bridge.setLastError(null, deps).catch(() => {}); }
+            return;
+        }
+        adapter?.stop();
+        adapter = null; accountKey = key; sessionBroken = false;
+        if (!s) return;
+        adapter = createSteamAdapter(s, {
+            onSessionError: async () => {
+                if (sessionBroken) return;
+                sessionBroken = true;
+                await bridge.setLastError("Trade akkaunt sessiyasi tugadi — admin panelda qayta ulang", deps).catch(() => {});
+                toAdmins((id) => send(id, "⚠️ Trade akkaunt sessiyasi tugadi. Admin panel → Skin sotish → Trade akkaunt'da qayta ulang (login, parol, Steam Guard kodi)."));
+            },
+        });
+        await adapter.start();
+        console.log(`✅ Trade akkaunt: ${s.accountName} (${adapter.ready() ? "tayyor" : "sessiya xato"})`);
+    }
+
+    const worker = createWorker({
+        now: () => Date.now(),
+        steam,
+        store: ism,
+        notifyAdmins: (text, requests) => toAdmins((id) => send(id, text, {
+            reply_markup: { inline_keyboard: requests.map((r) => [
+                { text: `✅ Oldim #${r.id}`, callback_data: `isell_ok_${r.id}` },
+                { text: `❌ Rad #${r.id}`, callback_data: `isell_no_${r.id}` },
+            ]) },
+        })),
+        notifyUser: async (userId, text) => notifyUser(userId, text, send, { parse_mode: "Markdown" }),
+    });
+
+    // Bir vaqtda bitta nusxa ishlasin (oldingisi tugamaguncha keyingisi o'tkazib yuboriladi).
+    const every = (ms, name, fn) => {
+        let running = false;
+        setInterval(async () => {
+            if (running) return;
+            running = true;
+            try { await fn(); } catch (err) { console.log(`TRADE OFFER XATO (${name}):`, err.message); }
+            finally { running = false; }
+        }, ms);
+    };
+
+    every(3_000, "login", () => bridge.processLoginRequests({ ...deps, login: bridge.steamLogin }));
+    every(10_000, "send", async () => { await syncAccount(); await worker.sendQueued(); });
+    every(30_000, "poll", () => worker.pollSent());
+    syncAccount().then(() => worker.recoverStale()).catch((err) => console.log("TRADE OFFER START XATO:", err.message));
+}
+
+module.exports = { createWorker, createSteamAdapter, startTradeOfferLoop, OFFER_TTL_MS };
