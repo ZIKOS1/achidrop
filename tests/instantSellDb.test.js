@@ -210,3 +210,45 @@ test("unlockWithPromo: muzlatilganni ochadi, limitlar, faqat withdraw turi", asy
     const { request } = await bm.requestWithdrawal(UID, "8600000000000000");
     assert.equal(request.amount, 2_000_000, "ochilgan summa yechiladi");
 });
+
+// ── Avtomatik trade offer holati (tradeOffer) ────────────────────────────────
+const TURL = "https://steamcommunity.com/tradeoffer/new/?partner=1&token=abcd";
+const TO_UID = 333;
+
+test("createSellRequest tradeOffer bilan → har request queued, bir xil tradeUrl", async () => {
+    const price = new Map([["t1", 2_000_000], ["t2", 3_000_000]]);
+    const c = await ism.createSellRequest(TO_UID, [item("t1"), item("t2")], { priceByAsset: price, tradeOffer: { tradeUrl: TURL } });
+    for (const r of c.requests) {
+        assert.deepEqual(r.tradeOffer, { state: "queued", tradeUrl: TURL, offerId: null, sentAt: null, error: null });
+    }
+    const stored = (await doc("instantSellRequests")).filter(r => r.userId === TO_UID);
+    assert.equal(stored.length, 2);
+    assert.equal(stored[0].tradeOffer.state, "queued");
+});
+
+test("setTradeOfferState: faqat fromStates'dan, idempotent, boshqasiga tegmaydi", async () => {
+    const [g] = ism.getTradeOfferGroups(["queued"]).filter(x => x.userId === TO_UID);
+    assert.equal(g.requests.length, 2);
+    assert.equal(await ism.setTradeOfferState(g.groupId, ["queued"], { state: "sending" }), 2);
+    assert.equal(await ism.setTradeOfferState(g.groupId, ["queued"], { state: "sending" }), 0);
+    assert.equal(await ism.setTradeOfferState(g.groupId, ["sending"], { state: "sent", offerId: "555", sentAt: "2026-10-29T00:00:00.000Z" }), 2);
+    const stored = (await doc("instantSellRequests")).filter(r => r.userId === TO_UID);
+    for (const r of stored) {
+        assert.equal(r.tradeOffer.state, "sent");
+        assert.equal(r.tradeOffer.offerId, "555");
+        assert.equal(r.tradeOffer.tradeUrl, TURL, "boshqa maydonlar saqlanadi");
+        assert.equal(r.status, "awaiting_admin");
+    }
+    // boshqa so'rovlarda tradeOffer paydo bo'lmagan
+    assert.ok((await doc("instantSellRequests")).filter(r => r.userId !== TO_UID).every(r => !r.tradeOffer));
+    // kesh ham yangilangan
+    assert.equal(ism.getAllRequests().filter(r => r.userId === TO_UID)[0].tradeOffer.state, "sent");
+});
+
+test("getTradeOfferGroups: holat bo'yicha guruhlab qaytaradi", async () => {
+    assert.equal(ism.getTradeOfferGroups(["queued"]).filter(x => x.userId === TO_UID).length, 0);
+    const sent = ism.getTradeOfferGroups(["sent"]).filter(x => x.userId === TO_UID);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].tradeOffer.offerId, "555");
+    assert.equal(sent[0].requests.length, 2);
+});

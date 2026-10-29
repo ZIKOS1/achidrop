@@ -71,7 +71,7 @@ function nextId(existing) {
 // egasi uchun, lisAutosell.ownerPricesSom); bor bo'lsa formula o'rniga shu.
 // Har skin uchun ALOHIDA so'rov yaratiladi (admin har birini alohida
 // "Oldim"/"Rad etadi"), hammasi bitta groupId bilan. Natija: { requests }.
-async function createSellRequest(userId, items, { priceByAsset = null } = {}) {
+async function createSellRequest(userId, items, { priceByAsset = null, tradeOffer = null } = {}) {
     if (!isLisConfigured()) return { error: "no_key" };
     if (!Array.isArray(items) || !items.length) return { error: "empty" };
     if (items.length > MAX_ITEMS_PER_REQUEST) return { error: "too_many" };
@@ -122,6 +122,8 @@ async function createSellRequest(userId, items, { priceByAsset = null } = {}) {
                 status: "awaiting_admin", // awaiting_admin | credited | rejected
                 createdAt, sentAt: null, // sentAt — user "Skinni yubordim"ni bosgan vaqt
                 resolvedAt: null, rejectReason: null,
+                // Bot avtomatik trade offer yuboradi (bot/tradeOfferWorker.js); null — qo'lda oqim.
+                ...(tradeOffer ? { tradeOffer: { state: "queued", tradeUrl: tradeOffer.tradeUrl, offerId: null, sentAt: null, error: null } } : {}),
             };
             taken.push(request);
             return request;
@@ -294,6 +296,39 @@ function publicStats(requests, recentLimit = 12) {
     };
 }
 
+// ── Avtomatik trade offer holati ────────────────────────────────────────────
+// queued → sending → sent → accepted | declined | expired | canceled | invalid;
+// queued|sending → failed (qo'lda oqimga qaytadi). Bitta groupId = bitta offer.
+// Faqat holati `fromStates` ichidagi elementlar o'zgaradi — ikki jarayon bir
+// guruhni bir vaqtda "sending" qila olmaydi (o'zgargan soni qaytadi).
+async function setTradeOfferState(groupId, fromStates, fields) {
+    const $set = {};
+    for (const [k, v] of Object.entries(fields)) $set[`data.$[e].tradeOffer.${k}`] = v;
+    const changed = await withTransaction(async (session) => {
+        const hit = await readTxWhere(session, REQ, { $and: [eq("groupId", groupId), { $in: ["$$e.tradeOffer.state", fromStates] }] });
+        if (!hit.length) return 0;
+        await updateTx(session, REQ, {}, { $set }, { arrayFilters: [{ "e.groupId": groupId, "e.tradeOffer.state": { $in: fromStates } }] });
+        return hit.length;
+    });
+    if (changed) {
+        patchCache(REQ, (arr) => {
+            for (const r of arr) if (r.groupId === groupId && fromStates.includes(r.tradeOffer?.state)) Object.assign(r.tradeOffer, fields);
+        });
+    }
+    return changed;
+}
+
+function getTradeOfferGroups(states) {
+    const groups = new Map();
+    for (const r of getAllRequests()) {
+        if (!r.tradeOffer || !states.includes(r.tradeOffer.state)) continue;
+        const g = groups.get(r.groupId) || { groupId: r.groupId, userId: r.userId, tradeOffer: r.tradeOffer, requests: [] };
+        g.requests.push(r);
+        groups.set(r.groupId, g);
+    }
+    return [...groups.values()];
+}
+
 async function refreshRequests() {
     await refresh("instantSellRequests").catch(() => {});
 }
@@ -303,5 +338,5 @@ module.exports = {
     createSellRequest, markSent, approveSellRequest, rejectSellRequest,
     getInstantSellRequest, getMyInstantSellRequests, getRequestsForAdmin, refreshRequests,
     validateNewRequest, creditRequestInTx, approvedText, rejectedText, publicStats,
-    getAllRequests,
+    getAllRequests, setTradeOfferState, getTradeOfferGroups,
 };
