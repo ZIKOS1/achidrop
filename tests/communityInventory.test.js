@@ -159,6 +159,16 @@ test("parseWebApiInventory: maydonlar to'g'ri, medal sotilmaydi deб belgilanadi
     assert.equal(coin.tradable, false);
 });
 
+test("parseWebApiInventory: rasmsiz qulfdagi narsa (Steam'da yo'q) tashlanadi", () => {
+    const out = steam.parseWebApiInventory([
+        { assetid: "1", markethashname: "Sticker | Natus Vincere | Austin 2025", rarity: "High", tradable: false, marketable: true, tradeprotectedmaxdays: 7 },
+        { assetid: "2", markethashname: "AK-47 | Redline (Field-Tested)", image: "https://img/x", tradable: false, marketable: true, tradeprotectedmaxdays: 5 },
+        { assetid: "3", markethashname: "M249 | Sage Camo (Field-Tested)", tradable: true, marketable: true },
+    ]);
+    assert.deepEqual(out.map(i => i.assetId), ["2", "3"]);
+    assert.ok(out[0].lockMaxUntil);   // rasmli qulfdagi skin qoladi
+});
+
 test("parseWebApiInventory: massiv bo'lmasa bo'sh", () => {
     assert.deepEqual(steam.parseWebApiInventory({ error: "limit" }), []);
     assert.deepEqual(steam.parseWebApiInventory(null), []);

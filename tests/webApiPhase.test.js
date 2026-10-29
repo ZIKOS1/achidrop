@@ -26,7 +26,7 @@ test("parseWebApiInventory: faza faqat Doppler nomli skinlarga", () => {
 });
 
 test("parseWebApiInventory: trade-himoya — ko'pi bilan N kun (lockMaxUntil)", () => {
-    const base = { assetid: "2", markethashname: "AWP | Phobos (Minimal Wear)", marketable: true };
+    const base = { assetid: "2", markethashname: "AWP | Phobos (Minimal Wear)", marketable: true, image: "https://img/x" };
     const before = Date.now();
     const [locked] = parseWebApiInventory([{ ...base, tradable: false, tradeprotected: true, tradeprotectedmaxdays: 3 }]);
     const ms = Date.parse(locked.lockMaxUntil) - before;

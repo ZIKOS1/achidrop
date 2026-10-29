@@ -293,6 +293,9 @@ function parseWebApiInventory(arr) {
         if (!it.assetid || !mhn) continue;
         const marketable = it.marketable !== false && it.marketable !== 0;
         const tradable = it.tradable !== false && it.tradable !== 0;
+        // Rasmsiz qulfdagi narsa — steamwebapi'ning "7 kunlik himoya" taxmini,
+        // Steam inventarida aslida yo'q (2026-10-29 shikoyat: Austin 2025 stiker).
+        if (!tradable && !it.image) continue;
         // tradeprotectedmaxdays — aniq ochilish vaqti EMAS, steamwebapi hujjati
         // bo'yicha "ko'pi bilan N kun qoldi" (0–7, ularning birinchi kuzatuvidan).
         const maxDays = Number(it.tradeprotectedmaxdays);
