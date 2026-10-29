@@ -1,5 +1,6 @@
 const { Markup } = require("telegraf");
 const { isAdminId, toAdmins } = require("../../backend/adminIds");
+const { FEATURES } = require("../../backend/features");
 const { read, write, refresh } = require("../../backend/database/db");
 const { notifyUser } = require("../../backend/notify");
 const bidManager = require("../../backend/bidManager");
