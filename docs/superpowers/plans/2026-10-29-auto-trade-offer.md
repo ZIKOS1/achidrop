@@ -19,6 +19,7 @@
 - Steam paroli faqat AES-256-GCM shifrlangan `tradeLoginReq_<id>` hujjatida, ≤60 s, bot o'qishi bilan o'chiriladi; log'larga parol/token yozilmaydi.
 - Shifrlash kaliti: env `TRADE_ACCOUNT_KEY` (64 hex = 32 bayt), Vercel prod va VPS `/opt/auction-bot-v2/.env` da bir xil.
 - Trade havola: `partner + 76561197960265728 === BigInt(user.steamId64)` bo'lmasa rad.
+- Bitta Steam akkauntning trade havolasi faqat BITTA AchiDrop akkauntida bo'ladi (foydalanuvchi talabi): boshqa userda shu partner bo'lsa — rad (409).
 - Trade akkaunt ulanmagan / offer `failed` → eski qo'lda oqim (botTradeUrl + "Skinni yubordim") o'zgarishsiz ishlaydi.
 - Barcha Mongo yozuvlari `backend/database/db.js` orqali; `instantSellRequests` elementlari pozitsion `updateTx` bilan (butun massiv yozilmaydi).
 - UI matnlari o'zbekcha; mavjud i18n (`frontend/src/i18n.js`) uz/ru/en kalitlari bilan.
@@ -64,6 +65,7 @@
   - `open: boshqa kalit → throw`, `open: buzilgan tag → throw`.
   - `parseTradeUrl` qabul: `https://steamcommunity.com/tradeoffer/new/?partner=1086892331&token=AbC-d_12` → `steamId64 === "76561199047158059"`; `http://` ham, `&amp;` ham normallashadi; boshqa domen, token yo'q, partner raqam emas → `null`.
   - `validateTradeUrlFor(url, "76561199047158059").ok === true`; boshqa steamId → `{ ok:false, error:"Bu trade havola saytga ulangan Steam akkauntingizga tegishli emas" }`; format xato → `error:"Trade havola formati noto'g'ri"`.
+  - `tradeUrlOwner(users, steamId64, exceptUserId) -> userId | null` — `steamTradeUrl` si parse qilinganda shu `steamId64` chiqadigan, `id !== exceptUserId` birinchi user (tokeni boshqa bo'lsa ham — partner bo'yicha). Testlar: boshqa userda shu partner → uning id; faqat o'zida → null; boshqa partner → null.
 - [ ] **Step 2:** `node --test tests/secretBox.test.js tests/tradeUrl.test.js` → FAIL (module topilmadi).
 - [ ] **Step 3:** Implementatsiya (`crypto.createCipheriv("aes-256-gcm")`, 12 bayt iv; URL `new URL()` + `BigInt`). Saqlanadigan `url` — kanonik `https://steamcommunity.com/tradeoffer/new/?partner=<p>&token=<t>`.
 - [ ] **Step 4:** Testlar PASS.
@@ -155,7 +157,7 @@
 
 **Interfaces:**
 - Consumes: Tasks 1–3.
-- `POST /api/steam-trade-url` (auth, sensitiveLimiter) `{ url }` — `""` o'chiradi; aks holda `validateTradeUrlFor(url, user.steamId64)`; `user.steamTradeUrl` saqlanadi (`saveUsers`), javob `{ success, steamTradeUrl }` yoki 400 `{ error }`.
+- `POST /api/steam-trade-url` (auth, sensitiveLimiter) `{ url }` — `""` o'chiradi; aks holda `validateTradeUrlFor(url, user.steamId64)`; `tradeUrlOwner(getUsers(), user.steamId64, user.id)` topsa → 409 `{ error:"Bu Steam akkauntning trade havolasi boshqa AchiDrop akkauntiga ulangan. Qo'llab-quvvatlashga yozing." }` (refresh("users") dan keyin); `user.steamTradeUrl` saqlanadi (`saveUsers`), javob `{ success, steamTradeUrl }` yoki 400 `{ error }`. `POST /api/instant-sell` da ham offer navbatga qo'yishdan oldin shu tekshiruv (topilsa → `tradeOffer` yo'q, qo'lda oqim).
 - `GET /api/instant-sell/quote` javobiga: `tradeOfferReady: boolean` (= `getAccount()` mavjud va `lastError` yo'q), `steamTradeUrl: user.steamTradeUrl || null`.
 - `POST /api/instant-sell`: `tradeOfferReady && user.steamTradeUrl` (validatsiyadan qayta o'tgan) bo'lsa `createSellRequest(..., { priceByAsset, tradeOffer: { tradeUrl } })`; javobga `tradeOffer: "queued" | null`.
 - `GET /api/instant-sell-mine` va admin ro'yxati — requestdagi `tradeOffer` (tradeUrl'siz) qaytadi.

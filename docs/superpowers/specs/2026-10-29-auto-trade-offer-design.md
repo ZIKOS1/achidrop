@@ -120,6 +120,7 @@ foydalanuvchiga tayyor trade offer yuborsin — foydalanuvchi faqat Steam'da
    ko'rsatilsin.
 
 ### C. Foydalanuvchi trade havolasi
+- Bitta Steam akkauntning trade havolasi faqat BITTA AchiDrop akkauntiga ulanadi (foydalanuvchi qarori, 2026-10-29) — boshqasida bo'lsa rad.
 - `user.steamTradeUrl`. Saqlashda tekshiriladi: format
   `https://steamcommunity.com/tradeoffer/new/?partner=<n>&token=<t>`,
   `partner + 76561197960265728 === user.steamId64` bo'lmasa rad.
