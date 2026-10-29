@@ -23,14 +23,25 @@
     },
     "redirects": [
         {
-            "source": "/:path*",
+            "source": "/",
             "has": [
                 {
                     "type": "host",
                     "value": "www.achidrop.com"
                 }
             ],
-            "destination": "https://achidrop.com/:path*",
+            "destination": "https://achidrop.com/",
+            "permanent": true
+        },
+        {
+            "source": "/:path+",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "www.achidrop.com"
+                }
+            ],
+            "destination": "https://achidrop.com/:path+",
             "permanent": true
         }
     ]
