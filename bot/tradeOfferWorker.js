@@ -49,10 +49,15 @@ function createWorker({ now, steam, store, notifyAdmins, notifyUser }) {
             }
             if (!await store.setTradeOfferState(g.groupId, ["queued"], { state: "sending" })) continue;
             const offer = { tradeUrl: g.tradeOffer.tradeUrl, assetIds: g.requests.flatMap(r => r.items.map(i => String(i.assetId))), message: `AchiDrop #${g.groupId}` };
+            // Steam ba'zan offerni yaratib, baribir xato (timeout/5xx) qaytaradi — qayta
+            // urinishdan OLDIN shu izohli faol offer bor-yo'qligi tekshiriladi (ikki offer ketmasin).
             let offerId = null, error = null;
             for (let attempt = 0; attempt < 2 && !offerId; attempt++) {
                 try { offerId = await steam.send(offer); }
-                catch (err) { error = err.message; }
+                catch (err) {
+                    error = err.message;
+                    offerId = await steam.findSentOffer(offer.message).catch(() => null);
+                }
             }
             if (offerId) {
                 await store.setTradeOfferState(g.groupId, ["sending"], { state: "sent", offerId: String(offerId), sentAt: iso(), error: null });
@@ -69,31 +74,58 @@ function createWorker({ now, steam, store, notifyAdmins, notifyUser }) {
         for (const g of store.getTradeOfferGroups(["sent", "escrow"])) {
             const from = [g.tradeOffer.state];
             const { offerId } = g.tradeOffer;
-            // Admin allaqachon "Oldim"/"Rad etish" qilgan — offer endi kerak emas.
-            if (g.requests.some(r => r.status !== "awaiting_admin")) {
-                await steam.cancel(offerId).catch(() => {});
-                await store.setTradeOfferState(g.groupId, from, { state: "canceled" });
-                continue;
-            }
-            let state = null;
-            try { state = await steam.getState(offerId); } catch {}
+            const open = g.requests.filter(r => r.status === "awaiting_admin");
+            const readState = () => steam.getState(offerId).catch(() => null);
+            // Holat AVVAL o'qiladi: user allaqachon qabul qilgan bo'lsa, admin bir skinni
+            // ko'rib chiqqan bo'lsa ham bu "accepted" (bekor qilinmaydi).
+            let state = await readState();
 
             if (state === "Accepted") {
-                if (await store.setTradeOfferState(g.groupId, from, { state: "accepted" })) {
-                    await notifyAdmins(`✅ Trade qabul qilindi: AchiDrop #${g.groupId} — skin botda, Steam'da tekshirib "Oldim"ni bosing.`, g.requests);
-                }
-            } else if (state === "InEscrow") {
+                await markAccepted(g, from);
+                continue;
+            }
+            if (state === "InEscrow") {
                 if (from[0] !== "escrow" && await store.setTradeOfferState(g.groupId, from, { state: "escrow" })) {
                     await notifyAdmins(`⏳ AchiDrop #${g.groupId}: trade qabul qilindi, lekin Steam uni HOLD (escrow)ga qo'ydi — skin hali botga kelmagan.`, g.requests);
                 }
-            } else if (REJECT_BY_STATE[state]) {
-                const [next, reason] = REJECT_BY_STATE[state];
-                if (await store.setTradeOfferState(g.groupId, from, { state: next })) await rejectGroup(g, reason);
-            } else if (from[0] === "sent" && now() - Date.parse(g.tradeOffer.sentAt) > OFFER_TTL_MS) {
-                // Active (yoki holatini bilib bo'lmadi) va 1 soat o'tdi.
-                await steam.cancel(offerId).catch(() => {});
-                if (await store.setTradeOfferState(g.groupId, from, { state: "expired" })) await rejectGroup(g, "Trade 1 soat ichida qabul qilinmadi");
+                continue;
             }
+            if (REJECT_BY_STATE[state]) {
+                const [next, reason] = REJECT_BY_STATE[state];
+                if (await store.setTradeOfferState(g.groupId, from, { state: next }) && open.length) await rejectGroup({ ...g, requests: open }, reason);
+                continue;
+            }
+            // Admin guruhni (to'liq yoki qisman) ko'rib chiqqan — offer endi kerak emas.
+            // Qisman bo'lsa qolganlari qo'lda oqimga ("failed") o'tadi.
+            if (open.length < g.requests.length) {
+                await steam.cancel(offerId).catch(() => {});
+                await store.setTradeOfferState(g.groupId, from, open.length
+                    ? { state: "failed", error: "Admin so'rovning bir qismini ko'rib chiqdi — qolganini qo'lda yuboring" }
+                    : { state: "canceled" });
+                continue;
+            }
+            if (from[0] !== "sent" || now() - Date.parse(g.tradeOffer.sentAt) <= OFFER_TTL_MS) continue;
+
+            // 1 soat o'tdi: bekor qilamiz. Rad etish faqat Steam bekor bo'lganini
+            // tasdiqlasa — aks holda user aynan shu payt qabul qilgan bo'lishi mumkin.
+            let canceled = false;
+            try { await steam.cancel(offerId); canceled = true; } catch {}
+            if (!canceled) state = await readState();
+            if (state === "Accepted") { await markAccepted(g, from); continue; }
+            if (canceled || ["Canceled", "Expired", "Declined", "CanceledBySecondFactor"].includes(state)) {
+                if (await store.setTradeOfferState(g.groupId, from, { state: "expired" })) await rejectGroup(g, "Trade 1 soat ichida qabul qilinmadi");
+                continue;
+            }
+            // Holatni bilib bo'lmadi (sessiya yo'q / Steam xato) — so'rov ochiq qoladi, admin hal qiladi.
+            if (await store.setTradeOfferState(g.groupId, from, { state: "unknown", error: "Trade holatini aniqlab bo'lmadi" })) {
+                await notifyAdmins(`⚠️ AchiDrop #${g.groupId}: 1 soat o'tdi, lekin trade holatini aniqlab bo'lmadi (Steam/sessiya xato). Bot akkauntida skin kelgan-kelmaganini tekshirib, "Oldim" yoki "Rad"ni bosing.`, g.requests);
+            }
+        }
+    }
+
+    async function markAccepted(g, from) {
+        if (await store.setTradeOfferState(g.groupId, from, { state: "accepted" })) {
+            await notifyAdmins(`✅ Trade qabul qilindi: AchiDrop #${g.groupId} — skin botda, Steam'da tekshirib "Oldim"ni bosing.`, g.requests);
         }
     }
 
@@ -143,6 +175,12 @@ function createSteamAdapter(session, { onSessionError } = {}) {
             offer.setMessage(message);
             await call((cb) => offer.send(cb));
             return offer.id;
+        },
+        // Shu izohli faol (yuborilgan) offer — send xato bergan, lekin Steam yaratgan bo'lsa.
+        async findSentOffer(message) {
+            const sent = await new Promise((resolve, reject) =>
+                manager.getOffers(TradeOfferManager.EOfferFilter.ActiveOnly, (err, s) => err ? reject(err) : resolve(s || [])));
+            return sent.find((o) => o.message === message)?.id || null;
         },
         async getState(offerId) {
             const offer = await call((cb) => manager.getOffer(offerId, cb));
@@ -221,10 +259,27 @@ function startTradeOfferLoop(bot) {
         }, ms);
     };
 
-    every(3_000, "login", () => bridge.processLoginRequests({ ...deps, login: bridge.steamLogin }));
-    every(10_000, "send", async () => { await syncAccount(); await worker.sendQueued(); });
-    every(30_000, "poll", () => worker.pollSent());
-    syncAccount().then(() => worker.recoverStale()).catch((err) => console.log("TRADE OFFER START XATO:", err.message));
+    const { HEARTBEAT_ID } = require("../backend/tradeOfferView");
+    scheduleTradeOfferLoop({
+        every, syncAccount, worker,
+        processLogin: () => bridge.processLoginRequests({ ...deps, login: bridge.steamLogin }),
+        heartbeat: () => deps.writeDoc(HEARTBEAT_ID, { at: Date.now() }),
+    }).catch((err) => console.log("TRADE OFFER START XATO:", err.message));
 }
 
-module.exports = { createWorker, createSteamAdapter, startTradeOfferLoop, OFFER_TTL_MS };
+// Tartib muhim: yuborish/kuzatish faqat recoverStale TUGAGACH boshlanadi — aks holda
+// ishga tushishda yangi "sending" guruhni recoverStale "failed" qilib yuborardi
+// (offer Steam'da ketgan bo'lsa ham). Heartbeat — sayt bot tirikligini biladi.
+async function scheduleTradeOfferLoop({ every, syncAccount, worker, processLogin, heartbeat }) {
+    every(3_000, "login", processLogin);
+    await syncAccount();
+    await worker.recoverStale();
+    every(10_000, "send", async () => {
+        await heartbeat().catch(() => {});
+        await syncAccount();
+        await worker.sendQueued();
+    });
+    every(30_000, "poll", () => worker.pollSent());
+}
+
+module.exports = { createWorker, createSteamAdapter, startTradeOfferLoop, scheduleTradeOfferLoop, OFFER_TTL_MS };

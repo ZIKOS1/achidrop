@@ -106,6 +106,9 @@ function AutoOfferBlock({ requestId, offer, onOpen }) {
           {t("sellx.tradeAccepted")}
         </p>
       )}
+      {offer.state === "unknown" && (
+        <p className="rounded-2xl bg-secondary p-3 text-sm text-foreground">{t("sellx.tradeUnknown")}</p>
+      )}
       {OFFER_LIVE.includes(offer.state) && (
         <p className="rounded-2xl border border-[rgba(227,20,31,.5)] bg-[rgba(227,20,31,.08)] p-3 text-xs text-foreground">
           {t("sellx.tradeWarn", { code: `AchiDrop #${requestId}` })}

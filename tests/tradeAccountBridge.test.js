@@ -94,3 +94,17 @@ test("loginErrorText: EResult → o'zbekcha", () => {
     assert.equal(bridge.loginErrorText(EResult.RateLimitExceeded), "Steam juda ko'p urinish deb blokladi, 30 daqiqadan keyin urining");
     assert.equal(bridge.loginErrorText(EResult.Busy), "Steam'ga kirib bo'lmadi: Busy");
 });
+
+test("steamLogin: Steam javob bermasa timeout bilan tugaydi (osilib qolmaydi)", async () => {
+    const { EventEmitter } = require("events");
+    class HangingSession extends EventEmitter {
+        async startWithCredentials() { return { actionRequired: false }; }
+        cancelLoginAttempt() { /* steam-session 1.9.4: hech qanday voqea chiqarmaydi */ }
+    }
+    const started = Date.now();
+    await assert.rejects(
+        bridge.steamLogin(CREDS, { LoginSessionClass: HangingSession, timeoutMs: 50 }),
+        /Steam javob bermadi \(timeout\)/
+    );
+    assert.ok(Date.now() - started < 2000);
+});

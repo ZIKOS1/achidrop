@@ -161,6 +161,8 @@ const DICT = {
   "sellx.tradeState.declined": { uz: "Trade rad etildi", ru: "Трейд отклонён", en: "Trade declined" },
   "sellx.tradeState.expired": { uz: "Trade muddati o'tdi", ru: "Трейд истёк", en: "Trade expired" },
   "sellx.tradeState.invalid": { uz: "Skin topilmadi", ru: "Скин не найден", en: "Skin not found" },
+  "sellx.tradeState.unknown": { uz: "Admin tekshirmoqda", ru: "Проверяет админ", en: "Admin is checking" },
+  "sellx.tradeUnknown": { uz: "Trade holatini aniqlab bo'lmadi — admin Steam'da tekshirib, hal qiladi.", ru: "Не удалось определить статус трейда — админ проверит в Steam.", en: "Couldn't determine the trade status — an admin will check in Steam." },
   "sellx.tradeState.canceled": { uz: "Trade bekor qilindi", ru: "Трейд отменён", en: "Trade cancelled" },
   "sellx.lockUntil": { uz: "Trade lock {date} da tugaydi ({n} kun qoldi)", ru: "Трейд-лок закончится {date} (осталось {n} дн.)", en: "Trade lock ends {date} ({n}d left)" },
   "sellx.lockUntilMax": { uz: "Trade lock ko'pi bilan {n} kunda tugaydi (~{date} gacha). Keyin «Yangilash»ni bosing", ru: "Трейд-лок закончится максимум через {n} дн. (~до {date}). Потом нажмите «Обновить»", en: "Trade lock ends in at most {n}d (~by {date}). Then tap Refresh" },

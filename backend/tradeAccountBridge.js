@@ -97,16 +97,21 @@ function jwtExpiry(token) {
     catch { return null; }
 }
 
-async function steamLogin({ accountName, password, guardCode }) {
+// timeoutMs — sayt 25 s kutadi (requestLogin), bot so'rovni ≤3 s da oladi: 20 s.
+// cancelLoginAttempt() steam-session 1.9.4 da hech qanday voqea chiqarmaydi —
+// shu sabab timeout o'zi ham reject qiladi (aks holda login tsikli osilib qolardi).
+async function steamLogin({ accountName, password, guardCode }, { LoginSessionClass, timeoutMs = 20_000 } = {}) {
     const { LoginSession, EAuthTokenPlatformType } = require("steam-session");
-    const session = new LoginSession(EAuthTokenPlatformType.WebBrowser);
+    const session = new (LoginSessionClass || LoginSession)(EAuthTokenPlatformType.WebBrowser);
+    let fail;
     const done = new Promise((resolve, reject) => {
+        fail = reject;
         session.once("authenticated", resolve);
         session.once("error", reject);
         session.once("timeout", () => reject(new Error("Steam javob bermadi (timeout)")));
     });
     done.catch(() => {}); // start xato bersa — "unhandled rejection" bo'lmasin
-    const timer = setTimeout(() => session.cancelLoginAttempt(), 30_000);
+    const timer = setTimeout(() => { session.cancelLoginAttempt(); fail(new Error("Steam javob bermadi (timeout)")); }, timeoutMs);
     try {
         const start = await session.startWithCredentials({ accountName, password, steamGuardCode: guardCode });
         if (start.actionRequired) { session.cancelLoginAttempt(); throw new Error("Steam Guard kodi noto'g'ri yoki eskirgan"); }

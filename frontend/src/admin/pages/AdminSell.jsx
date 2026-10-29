@@ -165,7 +165,7 @@ function SettingsCard() {
 const OFFER_LABEL = {
   queued: "⏳ trade navbatda", sending: "⏳ trade yuborilmoqda", sent: "📤 trade yuborildi",
   accepted: "✅ trade qabul qilindi", escrow: "⏳ trade hold'da", failed: "⚠️ trade yuborilmadi",
-  declined: "trade rad etildi", expired: "trade muddati o'tdi", invalid: "skin topilmadi", canceled: "trade bekor",
+  declined: "trade rad etildi", expired: "trade muddati o'tdi", invalid: "skin topilmadi", canceled: "trade bekor", unknown: "❓ trade holati noma'lum — Steam'da tekshiring",
 };
 
 function TradeAccountCard() {

@@ -38,6 +38,7 @@ const lisAutosell = require("./lisAutosell");
 const financeStats = require("./financeStats");
 const tradeAccountBridge = require("./tradeAccountBridge");
 const { validateTradeUrlFor, tradeUrlOwner } = require("./tradeUrl");
+const tradeOfferView = require("./tradeOfferView");
 
 const app  = express();
 const PORT = process.env.WEBAPP_PORT || 3000;
@@ -1435,9 +1436,16 @@ app.get("/api/instant-sell/quote", auth, inventoryLimiter, async (req, res) => {
 });
 
 // Trade akkaunt ulangan va sessiyasi xatosiz bo'lsa — bot offer yubora oladi.
+// Bot tirikligi ham shart (tradeBotHeartbeat): bot o'chiq bo'lsa offer navbatda
+// osilib qolardi — u holda sotuv eski qo'lda oqim bilan yaratiladi.
 async function isTradeOfferReady() {
-    try { const acc = await tradeAccountBridge.getAccount(tradeAccountBridge.mongoDeps()); return !!acc && !acc.lastError; }
-    catch { return false; }
+    try {
+        const [acc, hb] = await Promise.all([
+            tradeAccountBridge.getAccount(tradeAccountBridge.mongoDeps()),
+            readDoc(tradeOfferView.HEARTBEAT_ID),
+        ]);
+        return !!acc && !acc.lastError && tradeOfferView.isBotAlive(hb);
+    } catch { return false; }
 }
 
 // Userning saqlangan trade havolasi offer uchun yaroqlimi: o'z Steam akkaunti
@@ -1550,8 +1558,7 @@ app.post("/api/instant-sell", auth, sensitiveLimiter, async (req, res) => {
 // Userga/adminga qaytariladigan so'rov: tradeOffer ichidagi trade havola (token) chiqmaydi.
 function publicRequest(r) {
     if (!r.tradeOffer) return r;
-    const { tradeUrl, ...tradeOffer } = r.tradeOffer;
-    return { ...r, tradeOffer };
+    return { ...r, tradeOffer: tradeOfferView.viewTradeOffer(r.tradeOffer, r.createdAt) };
 }
 
 // Bir sotuvdagi (bitta groupId) skin so'rovlarini UI uchun bitta ko'rinishga yig'adi.

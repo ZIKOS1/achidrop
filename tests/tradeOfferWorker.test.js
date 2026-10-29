@@ -43,13 +43,21 @@ function group(state, extra = {}, status = "awaiting_admin") {
     ];
 }
 
-function fakeSteam({ ready = true, sendFails = 0, state = "Active", stateThrows = false } = {}) {
-    const s = { sent: [], canceled: [], sendFails, state };
+function fakeSteam({ ready = true, sendFails = 0, state = "Active", stateThrows = false, createdDespiteError = false, cancelFails = false } = {}) {
+    const s = { sent: [], canceled: [], sendFails, state, created: [] };
     Object.assign(s, {
         ready: () => ready,
-        async send(o) { if (s.sendFails-- > 0) throw new Error("Steam xato 26"); s.sent.push(o); return "9001"; },
+        async send(o) {
+            if (s.sendFails-- > 0) {
+                // Steam ba'zan offerni yaratib, baribir xato (timeout/5xx) qaytaradi.
+                if (createdDespiteError) s.created.push({ id: "7777", message: o.message });
+                throw new Error("Steam xato 26");
+            }
+            s.sent.push(o); s.created.push({ id: "9001", message: o.message }); return "9001";
+        },
+        async findSentOffer(message) { return s.created.find((c) => c.message === message)?.id || null; },
         async getState() { if (stateThrows) throw new Error("sessiya yo'q"); return s.state; },
-        async cancel(id) { s.canceled.push(id); if (stateThrows) throw new Error("sessiya yo'q"); },
+        async cancel(id) { s.canceled.push(id); if (stateThrows || cancelFails) throw new Error("sessiya yo'q"); },
     });
     return s;
 }
@@ -164,15 +172,55 @@ test("admin allaqachon credited qilgan → cancel, state canceled, reject yo'q",
     assert.equal(store.rejected.length, 0);
 });
 
-test("getState xato (eski akkaunt): 30 daqiqa — hech narsa; 61 daqiqa — cancel urinish + rejected", async () => {
+test("getState xato (eski akkaunt): 30 daqiqa — hech narsa; 61 daqiqa — unknown, rad ETILMAYDI, admin ogohlantiriladi", async () => {
     const a = setup(group("sent", { offerId: "9001", sentAt }), { stateThrows: true }, T0 + 30 * MIN);
     await a.w.pollSent();
     assert.equal(a.store.requests[0].tradeOffer.state, "sent");
     const b = setup(group("sent", { offerId: "9001", sentAt }), { stateThrows: true }, T0 + 61 * MIN);
     await b.w.pollSent();
+    await b.w.pollSent();
     assert.deepEqual(b.steam.canceled, ["9001"]);
-    assert.equal(b.store.requests[0].tradeOffer.state, "expired");
-    assert.equal(b.store.rejected.length, 2);
+    assert.equal(b.store.requests[0].tradeOffer.state, "unknown");
+    assert.equal(b.store.requests[0].status, "awaiting_admin");
+    assert.equal(b.store.rejected.length, 0);
+    assert.equal(b.admin.length, 1, "admin bir marta ogohlantiriladi");
+});
+
+test("1 soat: cancel muvaffaqiyatsiz (user o'sha zahoti qabul qilgan) → qayta o'qiladi, Accepted → accepted", async () => {
+    const b = setup(group("sent", { offerId: "9001", sentAt }), { state: "Active", cancelFails: true }, T0 + 61 * MIN);
+    const origCancel = b.steam.cancel;
+    b.steam.cancel = async (id) => { b.steam.state = "Accepted"; return origCancel(id); };
+    await b.w.pollSent();
+    assert.equal(b.store.requests[0].tradeOffer.state, "accepted");
+    assert.equal(b.store.rejected.length, 0);
+});
+
+test("send xato, lekin Steam offerni yaratgan → ikkinchi offer YUBORILMAYDI, mavjudi olinadi", async () => {
+    const { w, store, steam } = setup(group("queued"), { sendFails: 1, createdDespiteError: true });
+    await w.sendQueued();
+    assert.equal(steam.sent.length, 0, "qayta send chaqirilmagan");
+    assert.equal(store.requests[0].tradeOffer.state, "sent");
+    assert.equal(store.requests[0].tradeOffer.offerId, "7777");
+});
+
+test("admin guruhning BIR qismini rad etdi → offer bekor, qolgani failed (qo'lda oqim)", async () => {
+    const reqs = group("sent", { offerId: "9001", sentAt });
+    reqs[1].status = "rejected";
+    const { w, store, steam } = setup(reqs, { state: "Active" }, T0 + 5 * MIN);
+    await w.pollSent();
+    assert.deepEqual(steam.canceled, ["9001"]);
+    assert.equal(store.requests[0].tradeOffer.state, "failed");
+    assert.equal(store.requests[0].status, "awaiting_admin");
+});
+
+test("user qabul qilgan, admin bir skinni allaqachon 'Oldim' qilgan → accepted (bekor emas)", async () => {
+    const reqs = group("sent", { offerId: "9001", sentAt });
+    reqs[0].status = "credited";
+    const { w, store, steam, admin } = setup(reqs, { state: "Accepted" }, T0 + 5 * MIN);
+    await w.pollSent();
+    assert.equal(steam.canceled.length, 0);
+    assert.equal(store.requests[1].tradeOffer.state, "accepted");
+    assert.equal(admin.length, 1);
 });
 
 test("InEscrow → escrow, adminga xabar (hold), keyin Accepted → accepted", async () => {
@@ -184,4 +232,32 @@ test("InEscrow → escrow, adminga xabar (hold), keyin Accepted → accepted", a
     await w.pollSent();
     assert.equal(store.requests[0].tradeOffer.state, "accepted");
     assert.equal(admin.length, 2);
+});
+
+test("scheduleTradeOfferLoop: send/poll recoverStale TUGAGANDAN keyin boshlanadi; heartbeat yoziladi", async () => {
+    const { scheduleTradeOfferLoop } = require("../bot/tradeOfferWorker");
+    const registered = [];
+    let releaseRecover;
+    const order = [];
+    const worker = {
+        recoverStale: () => new Promise((r) => { releaseRecover = () => { order.push("recover"); r(); }; }),
+        sendQueued: async () => order.push("send"),
+        pollSent: async () => order.push("poll"),
+    };
+    const beats = [];
+    const started = scheduleTradeOfferLoop({
+        every: (ms, name, fn) => registered.push({ ms, name, fn }),
+        syncAccount: async () => order.push("sync"),
+        processLogin: async () => order.push("login"),
+        heartbeat: async () => beats.push(1),
+        worker,
+    });
+    await new Promise((r) => setImmediate(r));
+    assert.deepEqual(registered.map((x) => x.name), ["login"], "recover tugamaguncha faqat login");
+    releaseRecover();
+    await started;
+    assert.deepEqual(registered.map((x) => x.name), ["login", "send", "poll"]);
+    await registered[1].fn();
+    assert.deepEqual(order.slice(-2), ["sync", "send"]);
+    assert.ok(beats.length >= 1, "send tsiklida heartbeat");
 });
