@@ -69,7 +69,103 @@ function groupOf(mine, r) {
     items: list.flatMap((x) => x.items || []),
     totalSom: list.reduce((n, x) => n + (x.totalSom || 0), 0),
     sentAt: r.groupId == null ? r.createdAt : list.every((x) => x.sentAt) ? list[0]?.sentAt : null,
+    tradeOffer: list[0]?.tradeOffer || null,
   };
+}
+
+// Avtomatik trade offer holati (bot/tradeOfferWorker.js) — "failed" yoki yo'q
+// bo'lsa qo'lda oqim (bizning trade link + "Skinni yubordim") ko'rsatiladi.
+const OFFER_LIVE = ["queued", "sending", "sent"];
+const isAutoOffer = (o) => !!o && o.state !== "failed";
+
+function AutoOfferBlock({ requestId, offer, onOpen }) {
+  const url = offer.offerId ? `https://steamcommunity.com/tradeoffer/${offer.offerId}/` : null;
+  const busy = offer.state === "queued" || offer.state === "sending";
+  return (
+    <div className="space-y-3">
+      {busy && (
+        <p className="flex items-center gap-2 rounded-2xl bg-secondary p-3 text-sm text-foreground">
+          <span className="size-4 shrink-0 rounded-full border-2 border-primary/30 border-t-primary spin" />
+          {t("sellx.tradePreparing")}
+        </p>
+      )}
+      {offer.state === "sent" && (
+        <>
+          <p className="text-sm text-foreground">{t("sellx.tradeSent")}</p>
+          {url && (
+            <button type="button" onClick={() => onOpen(url)} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gold-grad py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.97]">
+              <ExternalLink className="size-4" />
+              {t("sellx.tradeOpen")}
+            </button>
+          )}
+        </>
+      )}
+      {(offer.state === "accepted" || offer.state === "escrow") && (
+        <p className="flex items-center gap-2 rounded-2xl bg-success/12 p-3 text-sm font-medium text-success">
+          <CheckCircle2 className="size-4 shrink-0" />
+          {t("sellx.tradeAccepted")}
+        </p>
+      )}
+      {OFFER_LIVE.includes(offer.state) && (
+        <p className="rounded-2xl border border-[rgba(227,20,31,.5)] bg-[rgba(227,20,31,.08)] p-3 text-xs text-foreground">
+          {t("sellx.tradeWarn", { code: `AchiDrop #${requestId}` })}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Userning Steam trade havolasi — bot shu havolaga avtomatik trade yuboradi.
+function TradeUrlCard({ value, onSaved, onOpen }) {
+  const { showToast } = useApp();
+  const [url, setUrl] = useState(value || "");
+  const [editing, setEditing] = useState(!value);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { setUrl(value || ""); setEditing(!value); }, [value]);
+  async function save() {
+    setSaving(true);
+    try {
+      const r = await api("/api/steam-trade-url", { method: "POST", body: JSON.stringify({ url: url.trim() }) });
+      hap("notif", "success");
+      showToast(t("sellx.tradeUrlSaved"), "ok");
+      onSaved?.(r.steamTradeUrl);
+    } catch (e) {
+      hap("notif", "error");
+      showToast(e?.error || t("common.genericError"), "err");
+    } finally {
+      setSaving(false);
+    }
+  }
+  if (!editing) {
+    return (
+      <div className="ad-panel flex flex-wrap items-center gap-2 rounded-2xl p-3 text-xs">
+        <CheckCircle2 className="size-4 shrink-0 text-success" />
+        <span className="text-foreground">{t("sellx.tradeUrlSet")}</span>
+        <button type="button" onClick={() => setEditing(true)} className="ml-auto text-primary underline-offset-2 hover:underline">{t("sellx.tradeUrlChange")}</button>
+      </div>
+    );
+  }
+  return (
+    <div className="ad-panel space-y-2.5 rounded-2xl p-4">
+      <p className="text-sm font-semibold text-foreground">{t("sellx.tradeUrlTitle")}</p>
+      <p className="text-xs text-muted-foreground">{t("sellx.tradeUrlDesc")}</p>
+      <div className="flex flex-wrap gap-2">
+        <input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://steamcommunity.com/tradeoffer/new/?partner=...&token=..."
+          className="ad-field h-11 min-w-0 flex-[1_1_260px] rounded-xl px-3 font-mono text-[12px] text-foreground outline-none focus:!border-ring"
+        />
+        <button type="button" onClick={save} disabled={saving || !url.trim()} className="h-11 shrink-0 rounded-xl bg-gold-grad px-4 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50">
+          {saving ? <span className="inline-block size-4 rounded-full border-2 border-white/30 border-t-white spin" /> : t("sellx.tradeUrlSave")}
+        </button>
+      </div>
+      <button type="button" onClick={() => onOpen("https://steamcommunity.com/my/tradeoffers/privacy#trade_offer_access_url")} className="flex items-center gap-1.5 text-xs text-primary underline-offset-2 hover:underline">
+        <ExternalLink className="size-3.5" />
+        {t("sellx.tradeUrlWhere")}
+      </button>
+    </div>
+  );
 }
 
 // Trade lock qachon tugashi: lockedUntil — Steam'ning aniq sanasi,
@@ -205,7 +301,7 @@ function SellButton({ count, submitting, onClick, className }) {
 }
 
 // So'rov yuborilgandan keyin: bizning trade link, "Steam'da ochish" va "Nusxalash" (07, 10).
-function TradeLinkPanel({ request, botTradeUrl, onDone, onSent }) {
+function TradeLinkPanel({ request, botTradeUrl, onDone, onSent, offer }) {
   const { tg, showToast } = useApp();
   const [copied, setCopied] = useState(false);
   const [sentAt, setSentAt] = useState(request.sentAt || null);
@@ -231,10 +327,11 @@ function TradeLinkPanel({ request, botTradeUrl, onDone, onSent }) {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
-  function openSteam() {
-    if (tg?.openLink) tg.openLink(botTradeUrl);
-    else window.open(botTradeUrl, "_blank", "noopener");
+  function openUrl(url) {
+    if (tg?.openLink) tg.openLink(url);
+    else window.open(url, "_blank", "noopener");
   }
+  const openSteam = () => openUrl(botTradeUrl);
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -252,6 +349,10 @@ function TradeLinkPanel({ request, botTradeUrl, onDone, onSent }) {
         </div>
       </div>
 
+      {isAutoOffer(offer) ? (
+        <AutoOfferBlock requestId={request.id} offer={offer} onOpen={openUrl} />
+      ) : (<>
+      {offer?.state === "failed" && <p className="text-xs text-destructive">{t("sellx.tradeFailed")}</p>}
       <p className="text-sm text-foreground">{t("sell.sendInstr")}</p>
 
       <div className="space-y-2">
@@ -295,9 +396,10 @@ function TradeLinkPanel({ request, botTradeUrl, onDone, onSent }) {
       </ul>
 
       <p className="text-xs text-primary">{t("sell.warnOnly")}</p>
+      </>)}
       <p className="text-xs text-muted-foreground">{t("sell.afterAccept")}</p>
 
-      {sentAt ? (
+      {isAutoOffer(offer) ? null : sentAt ? (
         <p className="flex items-center gap-2 rounded-2xl bg-success/12 p-3 text-sm font-medium text-success">
           <CheckCircle2 className="size-4 shrink-0" />
           {t("sell.sentDone")}
@@ -398,6 +500,18 @@ export default function Sell() {
     load(true); // har kirganda inventar Steam'dan yangidan olinadi (keshsiz)
     loadMine();
   }, [user?.id, user?.steamId64, load, loadMine]);
+
+  // Ochiq panel uchun avtomatik trade holati (har 4 s yangilanadi, offer jarayonda ekan).
+  const resultOffer = result
+    ? (mine.find((r) => (r.groupId ?? r.id) === result.request.id)?.tradeOffer
+      || result.request.tradeOffer
+      || (result.tradeOffer ? { state: result.tradeOffer } : null))
+    : null;
+  useEffect(() => {
+    if (!OFFER_LIVE.includes(resultOffer?.state)) return;
+    const id = setInterval(loadMine, 4000);
+    return () => clearInterval(id);
+  }, [resultOffer?.state, loadMine]);
 
   // Admin "Oldim"ni bosganini sahifa ochiq turganda ham sezish uchun
   useEffect(() => {
@@ -522,7 +636,7 @@ export default function Sell() {
   if (result) {
     return (
       <div className="mx-auto max-w-xl">
-        <TradeLinkPanel request={result.request} botTradeUrl={result.botTradeUrl} onSent={loadMine} onDone={() => { setResult(null); load(true); }} />
+        <TradeLinkPanel request={result.request} botTradeUrl={result.botTradeUrl} offer={resultOffer} onSent={loadMine} onDone={() => { setResult(null); load(true); }} />
       </div>
     );
   }
@@ -568,6 +682,9 @@ export default function Sell() {
       ) : (
         <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
           <section className="min-w-0 space-y-[18px]">
+            {quote?.tradeOfferReady && (
+              <TradeUrlCard value={quote.steamTradeUrl} onOpen={openLink} onSaved={(v) => setQuote((q) => ({ ...q, steamTradeUrl: v }))} />
+            )}
             {/* Qidiruv + saralash + Top-5 + yangilash */}
             <div className="flex flex-wrap items-center gap-2.5">
               <label className="ad-field group flex h-[46px] min-w-0 flex-[1_1_220px] max-xl:order-1 items-center gap-2.5 rounded-[14px] px-3.5 transition-[border-color,box-shadow] duration-200 focus-within:!border-ring sm:max-w-[320px]">
@@ -732,6 +849,9 @@ export default function Sell() {
                 <div className="flex items-center gap-2">
                   <span className="font-heading text-sm font-semibold tabular-nums text-foreground">{fmtMoney(r.totalSom ?? r.priceSom)}</span>
                   <StatusBadge status={r.status} />
+                  {r.status === "awaiting_admin" && isAutoOffer(r.tradeOffer) && (
+                    <span className="text-[11px] text-muted-foreground">{t(`sellx.tradeState.${r.tradeOffer.state}`)}</span>
+                  )}
                   {r.status === "awaiting_admin" && (
                     <button type="button" onClick={() => setResult({ request: groupOf(mine, r), botTradeUrl: quote?.botTradeUrl })} className="text-xs text-primary underline-offset-2 hover:underline">
                       {t("sell.tradeLink")}

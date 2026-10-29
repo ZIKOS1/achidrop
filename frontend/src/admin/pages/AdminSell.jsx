@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Banknote, CheckCircle2, Clock, Package, Plus, RefreshCw, Settings2, Trash2, XCircle } from "lucide-react";
+import { Banknote, CheckCircle2, Clock, KeyRound, Package, Plus, RefreshCw, Settings2, Trash2, XCircle } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
 import { fmtMoney, hap, imgSrc } from "../../utils";
@@ -159,6 +159,105 @@ function SettingsCard() {
   );
 }
 
+// Trade akkaunt — bot shu Steam akkauntdan userlarga avtomatik trade offer
+// yuboradi. Login VPS'dagi bot orqali (server: tradeAccountBridge.js); parol
+// saqlanmaydi, Steam'ning refresh tokeni shifrlangan holda saqlanadi.
+const OFFER_LABEL = {
+  queued: "⏳ trade navbatda", sending: "⏳ trade yuborilmoqda", sent: "📤 trade yuborildi",
+  accepted: "✅ trade qabul qilindi", escrow: "⏳ trade hold'da", failed: "⚠️ trade yuborilmadi",
+  declined: "trade rad etildi", expired: "trade muddati o'tdi", invalid: "skin topilmadi", canceled: "trade bekor",
+};
+
+function TradeAccountCard() {
+  const { showToast } = useApp();
+  const [acc, setAcc] = useState(undefined);
+  const [form, setForm] = useState({ accountName: "", password: "", guardCode: "" });
+  const [busy, setBusy] = useState(false);
+  const [confirmOff, setConfirmOff] = useState(false);
+
+  const load = useCallback(() => {
+    api("/api/admin/trade-account").then((r) => setAcc(r.account)).catch(() => setAcc(null));
+  }, []);
+  useEffect(load, [load]);
+
+  async function login() {
+    if (!form.accountName.trim() || !form.password || !/^[A-Za-z0-9]{5}$/.test(form.guardCode.trim())) {
+      return showToast("Login, parol va 5 belgili Steam Guard kodini kiriting", "err");
+    }
+    setBusy(true);
+    try {
+      const r = await api("/api/admin/trade-account/login", { method: "POST", body: JSON.stringify(form) });
+      setAcc(r.account);
+      setForm({ accountName: "", password: "", guardCode: "" });
+      hap("notif", "success");
+      showToast("Trade akkaunt ulandi", "ok");
+    } catch (e) {
+      setForm((f) => ({ ...f, guardCode: "" }));
+      showToast(e.error || "Xato", "err");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function disconnect() {
+    setBusy(true);
+    try {
+      await api("/api/admin/trade-account/disconnect", { method: "POST", body: JSON.stringify({}) });
+      setAcc(null);
+      setConfirmOff(false);
+      showToast("Trade akkaunt uzildi", "ok");
+    } catch (e) {
+      showToast(e.error || "Xato", "err");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (acc === undefined) return <div className="skeleton h-28 w-full" />;
+  const input = "w-full border border-border bg-secondary px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary";
+  return (
+    <div className="space-y-3 border border-border bg-card p-5">
+      <p className="flex items-center gap-2 font-heading text-sm font-bold text-foreground">
+        <KeyRound className="size-4 text-accent" />
+        Trade akkaunt (avtomatik trade)
+      </p>
+      {acc ? (
+        <div className="space-y-1 text-xs">
+          <p className={acc.lastError ? "text-destructive" : "text-success"}>
+            {acc.lastError ? `⚠️ ${acc.lastError}` : "✅ Ulangan — bot userlarga trade'ni o'zi yuboradi"}
+          </p>
+          <p className="text-foreground">Akkaunt: <b>{acc.accountName}</b> · Steam {acc.steamId64}</p>
+          <p className="text-muted-foreground">
+            Ulangan: {new Date(acc.connectedAt).toLocaleString()}
+            {acc.tokenExpiresAt ? ` · Qayta kirish kerak: ${new Date(acc.tokenExpiresAt).toLocaleDateString()} gacha` : ""}
+          </p>
+        </div>
+      ) : (
+        <p className="text-xs text-warning">Ulanmagan — userlar skinni botga o'zlari yuboradi (eski usul).</p>
+      )}
+      <div className="grid gap-2 sm:grid-cols-3">
+        <input value={form.accountName} onChange={(e) => setForm({ ...form, accountName: e.target.value })} placeholder="Steam login" autoComplete="off" className={input} />
+        <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Parol" autoComplete="new-password" className={input} />
+        <input value={form.guardCode} onChange={(e) => setForm({ ...form, guardCode: e.target.value.toUpperCase() })} placeholder="Steam Guard kodi" maxLength={5} autoComplete="one-time-code" className={input + " font-mono uppercase"} />
+      </div>
+      <p className="text-[11px] text-muted-foreground">Kod telefoningizdagi Steam ilovasida chiqadi va 30 soniyada yangilanadi — kiritgach darhol bosing. Ulash 25 soniyagacha davom etishi mumkin.</p>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={busy} onClick={login} className="flex-1 bg-primary py-2.5 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground disabled:opacity-50">
+          {busy ? "Ulanmoqda..." : acc ? "Boshqa akkauntga almashtirish" : "Ulash"}
+        </button>
+        {acc && (confirmOff ? (
+          <>
+            <button type="button" disabled={busy} onClick={disconnect} className="border border-destructive bg-destructive/10 px-4 text-xs font-bold text-destructive disabled:opacity-50">Ha, uzish</button>
+            <button type="button" onClick={() => setConfirmOff(false)} className="border border-border px-4 text-xs text-muted-foreground">Yo'q</button>
+          </>
+        ) : (
+          <button type="button" disabled={busy} onClick={() => setConfirmOff(true)} className="border border-destructive/50 px-4 text-xs font-bold text-destructive disabled:opacity-50">Uzish</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminSell() {
   const { showToast } = useApp();
   const [filter, setFilter] = useState("awaiting_admin");
@@ -195,6 +294,7 @@ export default function AdminSell() {
         Skin sotish
       </h1>
 
+      <TradeAccountCard />
       <SettingsCard />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -225,8 +325,13 @@ export default function AdminSell() {
                 <div>
                   <p className="font-heading text-sm font-bold text-foreground">#{r.id} · {r.userName || r.userId}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    ID {r.userId}{r.steamId64 ? ` · Steam ${r.steamId64}` : ""} · {new Date(r.createdAt).toLocaleString()}{r.status === "awaiting_admin" && r.groupId != null ? (r.sentAt ? " · ✉️ yubordim dedi" : " · ⏳ hali yubormagan") : ""}
+                    ID {r.userId}{r.steamId64 ? ` · Steam ${r.steamId64}` : ""} · {new Date(r.createdAt).toLocaleString()}{r.status === "awaiting_admin" && r.groupId != null && (!r.tradeOffer || r.tradeOffer.state === "failed") ? (r.sentAt ? " · ✉️ yubordim dedi" : " · ⏳ hali yubormagan") : ""}
                   </p>
+                  {r.tradeOffer && (
+                    <p className="text-[11px] text-foreground">
+                      {OFFER_LABEL[r.tradeOffer.state] || r.tradeOffer.state} (AchiDrop #{r.groupId}){r.tradeOffer.error ? ` — ${r.tradeOffer.error}` : ""}
+                    </p>
+                  )}
                 </div>
                 <span className="flex items-center gap-1 text-xs font-semibold">
                   {r.status === "awaiting_admin" ? <><Clock className="size-3.5 text-warning" /> Kutilmoqda</>
@@ -250,7 +355,10 @@ export default function AdminSell() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-heading text-sm font-bold text-success">Jami: {fmtMoney(r.totalSom ?? r.priceSom)}</span>
                 {r.status === "awaiting_admin" && (
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {r.tradeOffer && r.tradeOffer.state !== "accepted" && r.tradeOffer.state !== "failed" && (
+                      <span className="text-[11px] font-semibold text-warning">⚠️ Trade hali qabul qilinmagan</span>
+                    )}
                     <button type="button" disabled={busyId === r.id} onClick={() => act(r.id, "reject")} className="border border-destructive/50 px-3 py-2 text-xs font-bold text-destructive disabled:opacity-50">
                       ❌ Rad etish
                     </button>
