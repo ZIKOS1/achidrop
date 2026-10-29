@@ -36,6 +36,8 @@ const { checkPromoForUser, markPromoUsed } = require("./promoCheck");
 const lisSkinsPrice = require("./lisSkinsPrice");
 const lisAutosell = require("./lisAutosell");
 const financeStats = require("./financeStats");
+const tradeAccountBridge = require("./tradeAccountBridge");
+const { validateTradeUrlFor, tradeUrlOwner } = require("./tradeUrl");
 
 const app  = express();
 const PORT = process.env.WEBAPP_PORT || 3000;
@@ -98,6 +100,14 @@ function userLimiter(windowMs, limit) {
     });
 }
 const inventoryLimiter = userLimiter(60 * 1000, 6);
+// Admin panel → trade akkaunt login: Steam ko'p xato urinishni bloklaydi.
+const tradeLoginLimiter = rateLimit({
+    windowMs: 10 * 60 * 1000,
+    limit: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Juda ko'p urinish. 10 daqiqadan keyin qayta urinib ko'ring." },
+});
 const sensitiveLimiter = userLimiter(60 * 1000, 10);
 
 const promoCheckLimiter = rateLimit({
@@ -1418,7 +1428,50 @@ app.get("/api/instant-sell/quote", auth, inventoryLimiter, async (req, res) => {
         // Steam yashirgan (trade-himoyasidagi) skinlar soni + token holati.
         hiddenCount: communityInventoryMeta(u.steamId64).hiddenCount,
         hasInvToken: !!u.steamInvToken,
+        // Avtomatik trade offer: bot akkaunti ulangan va userning trade havolasi.
+        tradeOfferReady: await isTradeOfferReady(),
+        steamTradeUrl: u.steamTradeUrl || null,
     });
+});
+
+// Trade akkaunt ulangan va sessiyasi xatosiz bo'lsa — bot offer yubora oladi.
+async function isTradeOfferReady() {
+    try { const acc = await tradeAccountBridge.getAccount(tradeAccountBridge.mongoDeps()); return !!acc && !acc.lastError; }
+    catch { return false; }
+}
+
+// Userning saqlangan trade havolasi offer uchun yaroqlimi: o'z Steam akkaunti
+// va boshqa AchiDrop userida shu Steam akkauntning havolasi yo'q.
+function usableTradeUrl(u) {
+    if (!u.steamTradeUrl || !u.steamId64) return null;
+    const v = validateTradeUrlFor(u.steamTradeUrl, u.steamId64);
+    if (!v.ok || tradeUrlOwner(getUsers(), u.steamId64, u.id) != null) return null;
+    return v.url;
+}
+
+// POST /api/steam-trade-url — { url } — userning Steam trade havolasi (bot
+// shu havolaga avtomatik trade offer yuboradi). "" — o'chiradi.
+app.post("/api/steam-trade-url", auth, sensitiveLimiter, async (req, res) => {
+    const u = req.user;
+    if (!u) return res.status(404).json({ error: "User not found" });
+    if (!u.steamId64) return res.status(400).json({ error: "Avval Steam hisobingizni ulang" });
+    const raw = String(req.body.url ?? "").trim();
+    let url = null;
+    if (raw) {
+        const v = validateTradeUrlFor(raw, u.steamId64);
+        if (!v.ok) return res.status(400).json({ error: v.error });
+        await refresh("users").catch(() => {});
+        if (tradeUrlOwner(getUsers(), u.steamId64, u.id) != null) {
+            return res.status(409).json({ error: "Bu Steam akkauntning trade havolasi boshqa AchiDrop akkauntiga ulangan. Qo'llab-quvvatlashga yozing." });
+        }
+        url = v.url;
+    }
+    const arr = getUsers();
+    const user = arr.find(x => x.id === u.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    user.steamTradeUrl = url;
+    saveUsers(arr);
+    res.json({ success: true, steamTradeUrl: url });
 });
 
 // POST /api/steam-inv-token — { token } — Steam inventar access-token'i.
@@ -1482,15 +1535,24 @@ app.post("/api/instant-sell", auth, sensitiveLimiter, async (req, res) => {
 
     let result;
     const priceByAsset = await lisAutosell.getOwnerPricesSom(u.steamId64, lisSkinsPrice.getUsdToSomRate());
-    try { result = await instantSellManager.createSellRequest(u.id, items, { priceByAsset }); }
+    // Trade akkaunt ulangan va userning trade havolasi yaroqli — bot offer yuboradi.
+    const tradeUrl = (await isTradeOfferReady()) ? usableTradeUrl(u) : null;
+    try { result = await instantSellManager.createSellRequest(u.id, items, { priceByAsset, tradeOffer: tradeUrl ? { tradeUrl } : null }); }
     catch (err) { return res.status(500).json({ error: err.message }); }
     if (result.error) {
         return res.status(400).json({ error: INSTANT_SELL_ERRORS[result.error] || result.error, code: result.error, assetIds: result.assetIds });
     }
     // Adminga xabar hozir EMAS — user "Skinni yubordim"ni bosganda (/api/instant-sell/sent).
     const { requests } = result;
-    res.json({ request: groupView(requests), requests, botTradeUrl: getBotTradeUrl() });
+    res.json({ request: groupView(requests), requests: requests.map(publicRequest), botTradeUrl: getBotTradeUrl(), tradeOffer: tradeUrl ? "queued" : null });
 });
+
+// Userga/adminga qaytariladigan so'rov: tradeOffer ichidagi trade havola (token) chiqmaydi.
+function publicRequest(r) {
+    if (!r.tradeOffer) return r;
+    const { tradeUrl, ...tradeOffer } = r.tradeOffer;
+    return { ...r, tradeOffer };
+}
 
 // Bir sotuvdagi (bitta groupId) skin so'rovlarini UI uchun bitta ko'rinishga yig'adi.
 function groupView(requests) {
@@ -1562,7 +1624,7 @@ app.get("/api/instant-sell-mine", auth, async (req, res) => {
     const u = req.user;
     if (!u) return res.status(404).json({ error: "User not found" });
     await instantSellManager.refreshRequests();
-    res.json(instantSellManager.getMyInstantSellRequests(u.id).slice(0, 20));
+    res.json(instantSellManager.getMyInstantSellRequests(u.id).slice(0, 20).map(publicRequest));
 });
 
 // GET /api/trade-hold-summary — obmendan tushgan (7 kunlik hold) mablag'lar
@@ -2404,9 +2466,33 @@ app.get("/api/admin/instant-sell", requireAdminPanel, async (req, res) => {
     const users = getUsers();
     const list = instantSellManager.getRequestsForAdmin(req.query.status || null).slice(0, 100).map(r => {
         const usr = users.find(x => x.id === r.userId);
-        return { ...r, userName: usr?.name ?? null, steamId64: usr?.steamId64 ?? null };
+        return { ...publicRequest(r), userName: usr?.name ?? null, steamId64: usr?.steamId64 ?? null };
     });
     res.json(list);
+});
+
+// ── Trade akkaunt (bot Steam akkaunti) — avtomatik trade offer uchun ─────────
+app.get("/api/admin/trade-account", requireAdminPanel, async (req, res) => {
+    try { res.json({ account: await tradeAccountBridge.getAccount(tradeAccountBridge.mongoDeps()) }); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/admin/trade-account/login", requireAdminPanel, tradeLoginLimiter, async (req, res) => {
+    const accountName = String(req.body.accountName || "").trim();
+    const password = String(req.body.password || "");
+    const guardCode = String(req.body.guardCode || "").trim().toUpperCase();
+    if (!accountName || !password) return res.status(400).json({ error: "Login va parolni kiriting" });
+    if (!/^[A-Z0-9]{5}$/.test(guardCode)) return res.status(400).json({ error: "Steam Guard kodi 5 belgidan iborat" });
+    let result;
+    try { result = await tradeAccountBridge.requestLogin({ accountName, password, guardCode }, tradeAccountBridge.mongoDeps()); }
+    catch (err) { return res.status(500).json({ error: err.message }); }
+    if (!result.ok) return res.status(400).json({ error: result.error });
+    res.json({ account: result.account });
+});
+
+app.post("/api/admin/trade-account/disconnect", requireAdminPanel, async (req, res) => {
+    try { await tradeAccountBridge.disconnect(tradeAccountBridge.mongoDeps()); res.json({ success: true }); }
+    catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post("/api/admin/instant-sell/:id/approve", requireAdminPanel, async (req, res) => {
