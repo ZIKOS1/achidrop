@@ -96,10 +96,10 @@ test("fetchLisPricesUsd: bitta nom uchun API xatosi boshqalarini buzmaydi", asyn
     } finally { global.fetch = orig; delete process.env.LIS_SKINS_API_KEY; lis._clearCache(); }
 });
 
-test("summarizeHoldEntries: Skin sotish puli 8 kun 12 soat ushlanadi, taymer vaqti beriladi", () => {
+test("summarizeHoldEntries: Skin sotish puli 7 kun 12 soat ushlanadi, taymer vaqti beriladi", () => {
     const received = new Date("2026-10-01T00:00:00Z");
     const entries = [{ amount: 1000, receivedAt: received.toISOString(), holdMs: ism.SELL_HOLD_MS, withdrawalStatus: null }];
-    const unlock = received.getTime() + (8 * 24 + 12) * 3600 * 1000;
+    const unlock = received.getTime() + (7 * 24 + 12) * 3600 * 1000;
 
     const before = bm.summarizeHoldEntries(entries, unlock - 1);
     assert.deepEqual(before, { frozen: 1000, available: 0, pending: 0, nextUnlockAt: new Date(unlock).toISOString() });

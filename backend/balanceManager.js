@@ -87,7 +87,7 @@ function creditTradeProceeds(userId, amount, tradeId, fee = 0) {
     return entry;
 }
 
-// Yozuvning o'z `holdMs` maydoni bo'lsa (masalan Skin sotish — 8 kun 12
+// Yozuvning o'z `holdMs` maydoni bo'lsa (masalan Skin sotish — 7 kun 12
 // soat) shu ishlatiladi, aks holda eski 7 kunlik standart.
 function unlockAtMs(entry) {
     const hold = Number.isFinite(entry.holdMs) ? entry.holdMs : HOLD_MS;

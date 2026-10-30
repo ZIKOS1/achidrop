@@ -11,7 +11,7 @@ import { HistoryRow, LockedHint, Ring, SkeletonRows, fmtNum, useCountUp } from "
 import BalanceLegacy from "./BalanceLegacy";
 
 // Skin sotishdan tushgan pul Steam trade himoyasi tugaguncha qulfda turadi.
-const HOLD_MS = (8 * 24 + 12) * 3600 * 1000;
+const HOLD_MS = (7 * 24 + 12) * 3600 * 1000;
 
 export default function Balance() {
   // To'ldirish yoqilsa — eski sahifa (to'lov usullari, summa, chek).

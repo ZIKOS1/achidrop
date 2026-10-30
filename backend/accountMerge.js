@@ -3,7 +3,7 @@
 // botda Telegram akkauntiga xuddi shu Steam'ni ulasa — ikkita akkaunt va
 // ikkita balans bo'lib qolardi (pul saytdagisiga tushib, botda 0 ko'rinardi).
 // Endi Steam ulanganda Telegramsiz dublikat Telegram akkauntiga qo'shiladi:
-// balans, tarix, ledger (8 kunlik hold), so'rovlar, sessiyalar — hammasi.
+// balans, tarix, ledger (7 kun 12 soatlik hold), so'rovlar, sessiyalar — hammasi.
 //
 // Pul bilan bog'liq — BITTA Mongo tranzaksiyasida (db.withTransaction).
 const { withTransaction, readTx, writeTx, listIds, readDoc, writeDoc, refresh } = require("./database/db");

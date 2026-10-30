@@ -7,7 +7,7 @@
 //   2. Adminga Telegram'da xabar boradi ("✅ Oldim" / "❌ Rad etish").
 //   3. Admin Steam'da skin kelganini tekshirib "Oldim"ni bosadi →
 //      approveSellRequest: pul balansga tushadi, lekin kartaga yechish
-//      SELL_HOLD_MS (8 kun 12 soat) o'tgach ochiladi (balanceManager ledger).
+//      SELL_HOLD_MS (7 kun 12 soat) o'tgach ochiladi (balanceManager ledger).
 //
 // MUHIM (jarayonlararo xavfsizlik): bot (lokal) va mini-app (Vercel) alohida
 // jarayonlar — holat o'zgarishi va pulni kreditlash BITTA MongoDB
@@ -20,7 +20,7 @@
 const { read, refresh, withTransaction, readTxWhere, updateTx, patchCache } = require("./database/db");
 const { getInstantSellQuotesSom, minSellSom, bulkSellSom, isLisConfigured } = require("./lisSkinsPrice");
 
-const SELL_HOLD_MS = (8 * 24 + 12) * 60 * 60 * 1000; // 8 kun 12 soat
+const SELL_HOLD_MS = (7 * 24 + 12) * 60 * 60 * 1000; // 7 kun 12 soat
 const REQ = "instantSellRequests";
 const eq = (field, value) => ({ $eq: [`$$e.${field}`, value] });
 const MAX_ITEMS_PER_REQUEST = 30;
@@ -268,7 +268,7 @@ async function rejectSellRequest(id, reason) {
 function approvedText(request) {
     return `✅ *Skin sotish #${request.id} tasdiqlandi!*\n\n` +
         `💰 *${request.totalSom.toLocaleString()} so'm* balansingizga tushdi.\n\n` +
-        `⏳ Pulni 8 kun 12 soatdan keyin "Balans" bo'limidan kartaga yechib olishingiz mumkin.`;
+        `⏳ Pulni 7 kun 12 soatdan keyin "Balans" bo'limidan kartaga yechib olishingiz mumkin.`;
 }
 function rejectedText(request) {
     return `❌ *Skin sotish #${request.id} rad etildi.*` +

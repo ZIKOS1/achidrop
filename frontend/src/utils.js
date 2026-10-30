@@ -211,7 +211,7 @@ function DICT_HAS_ERR(code) {
   return ["not_found", "self", "not_open", "forbidden", "locked", "no_price", "invalid_price", "insufficient_balance", "wrong_state", "promo_not_found", "promo_exhausted", "promo_already_used", "min_price"].includes(code);
 }
 
-// Muzlatilgan pul ochilishigacha qolgan vaqt: "8 kun 11 soat 42 daqiqa".
+// Muzlatilgan pul ochilishigacha qolgan vaqt: "7 kun 11 soat 42 daqiqa".
 export function fmtUnlockLeft(iso, now = Date.now()) {
   const ms = Math.max(0, new Date(iso).getTime() - now);
   const d = Math.floor(ms / 86400000);

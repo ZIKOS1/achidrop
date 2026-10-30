@@ -60,7 +60,7 @@ module.exports = (bot) => {
             "2. Sotmoqchi bo'lgan skin(lar)ni belgilang va \"Sotish\"ni bosing\n" +
             "3. Ko'rsatilgan trade linkka skinni Steam orqali yuboring\n" +
             "4. Admin qabul qilgach, pul balansingizga tushadi\n\n" +
-            "⏳ Pulni kartaga yechish — 8 kun 12 soatdan keyin.",
+            "⏳ Pulni kartaga yechish — 7 kun 12 soatdan keyin.",
             { parse_mode: "Markdown", ...kb }
         );
     });
