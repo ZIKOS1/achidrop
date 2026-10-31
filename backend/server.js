@@ -1478,6 +1478,7 @@ app.get("/api/instant-sell/quote", auth, inventoryLimiter, async (req, res) => {
         hasInvToken: !!u.steamInvToken,
         // Avtomatik trade offer: bot akkaunti ulangan va userning trade havolasi.
         tradeOfferReady: await isTradeOfferReady(),
+        tradeBot: await getTradeBotProfile(),
         steamTradeUrl: u.steamTradeUrl || null,
     });
 });
@@ -1493,6 +1494,40 @@ async function isTradeOfferReady() {
         ]);
         return !!acc && !acc.lastError && tradeOfferView.isBotAlive(hb);
     } catch { return false; }
+}
+
+// Trade offer yuboradigan bot akkauntining Steam profili (sotuvchiga "offer kimdan
+// keladi" deb ko'rsatiladi — firibgarlarning soxta offeridan ajratish uchun).
+// Steam'da ko'rinadigan nom — login emas, profil nomi; 1 soat keshlanadi.
+const TRADE_BOT_PROFILE_TTL_MS = 60 * 60 * 1000;
+let tradeBotProfileCache = { key: null, at: 0, value: null };
+async function getTradeBotProfile() {
+    // Kesh steamId64 bo'yicha: admin trade akkauntni almashtirsa — yangi profil olinadi,
+    // uzsa — null (yo'riqnoma yashiriladi).
+    let acc = null;
+    try {
+        acc = await tradeAccountBridge.getAccount(tradeAccountBridge.mongoDeps());
+        if (!acc?.steamId64) return null;
+        const c = tradeBotProfileCache;
+        if (c.key === acc.steamId64 && Date.now() - c.at < TRADE_BOT_PROFILE_TTL_MS) return c.value;
+        const r = await fetch(`https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${process.env.STEAM_API_KEY}&steamids=${acc.steamId64}`, { signal: AbortSignal.timeout(4000) });
+        const p = (await r.json())?.response?.players?.[0];
+        const value = {
+            steamId64: acc.steamId64,
+            name: p?.personaname || null,
+            avatar: p?.avatarmedium || null,
+            profileUrl: `https://steamcommunity.com/profiles/${acc.steamId64}/`,
+            joinedAt: p?.timecreated ? new Date(p.timecreated * 1000).toISOString() : null,
+        };
+        tradeBotProfileCache = { key: acc.steamId64, at: Date.now(), value };
+        return value;
+    } catch (err) {
+        console.log("TRADE BOT PROFILE ERROR:", err.message);
+        // Steam javob bermadi — faqat SHU akkauntning eski profili; bo'lmasa nomsiz, lekin to'g'ri havola.
+        if (!acc?.steamId64) return null;
+        if (tradeBotProfileCache.key === acc.steamId64) return tradeBotProfileCache.value;
+        return { steamId64: acc.steamId64, name: null, avatar: null, profileUrl: `https://steamcommunity.com/profiles/${acc.steamId64}/`, joinedAt: null };
+    }
 }
 
 // Userning saqlangan trade havolasi offer uchun yaroqlimi: o'z Steam akkaunti

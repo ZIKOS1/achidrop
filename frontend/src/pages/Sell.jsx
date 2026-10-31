@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
-import { Banknote, Check, CheckCircle2, ChevronDown, Clock, Copy, Crown, ExternalLink, Lock, Package, RefreshCw, Search, X, XCircle } from "lucide-react";
+import { Banknote, Check, CheckCircle2, ChevronDown, Clock, Copy, Crown, ExternalLink, Lock, Package, RefreshCw, Search, ShieldCheck, X, XCircle } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
 import { imgSrc, fmtMoney, hap, rarityColor } from "../utils";
-import { t } from "../i18n";
+import { t, getCurrentLang } from "../i18n";
 import { cn } from "../lib/cn";
 import { SteamLogo } from "../components/BrandIcons";
 import { SELL_CATEGORIES, sellCategory, TrustBadges, TrustStats, RecentSales, HowItWorks, Faq, TelegramBanner, Confetti } from "../components/SellExtras";
@@ -80,7 +80,36 @@ function groupOf(mine, r) {
 const OFFER_LIVE = ["queued", "sending", "sent"];
 const isAutoOffer = (o) => !!o && o.state !== "failed";
 
-function AutoOfferBlock({ requestId, offer, onOpen }) {
+// Offer kimdan keladi — hozir ulangan trade akkaunt (server Steam'dan oladi; admin
+// akkauntni almashtirsa o'zi yangilanadi). Firibgarlarning soxta offeridan himoya.
+function TradeBotGuide({ bot, code, onOpen }) {
+  if (!bot) return null;
+  const joined = bot.joinedAt ? new Date(bot.joinedAt).toLocaleDateString(getCurrentLang() === "en" ? "en-US" : getCurrentLang() === "ru" ? "ru-RU" : "uz-UZ", { year: "numeric", month: "long" }) : null;
+  const rules = [
+    t("sellx.guide.from"),
+    code ? t("sellx.guide.code", { code }) : t("sellx.guide.codeAny"),
+    t("sellx.guide.give"),
+    t("sellx.guide.reject"),
+  ];
+  return (
+    <div className="space-y-3 rounded-2xl border border-[rgba(227,20,31,.45)] bg-[rgba(227,20,31,.06)] p-3.5">
+      <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground"><ShieldCheck className="size-4 text-primary" />{t("sellx.guide.title")}</p>
+      <button type="button" onClick={() => onOpen(bot.profileUrl)} className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-2.5 text-left transition-colors hover:border-ring/60">
+        {bot.avatar ? <img src={bot.avatar} alt="" className="size-11 shrink-0 rounded-lg" /> : <SteamLogo className="size-11 shrink-0 text-muted-foreground" />}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-semibold text-foreground">{bot.name || bot.steamId64}</span>
+          {joined && <span className="block text-xs text-muted-foreground">{t("sellx.guide.joined", { date: joined })}</span>}
+        </span>
+        <ExternalLink className="size-4 shrink-0 text-muted-foreground" />
+      </button>
+      <ul className="space-y-1.5 text-xs leading-relaxed text-foreground">
+        {rules.map((r, i) => <li key={i} className="flex gap-2"><span className="text-primary">•</span><span>{r}</span></li>)}
+      </ul>
+    </div>
+  );
+}
+
+function AutoOfferBlock({ requestId, offer, onOpen, bot }) {
   const url = offer.offerId ? `https://steamcommunity.com/tradeoffer/${offer.offerId}/` : null;
   const busy = offer.state === "queued" || offer.state === "sending";
   return (
@@ -111,11 +140,13 @@ function AutoOfferBlock({ requestId, offer, onOpen }) {
       {offer.state === "unknown" && (
         <p className="rounded-2xl bg-secondary p-3 text-sm text-foreground">{t("sellx.tradeUnknown")}</p>
       )}
-      {OFFER_LIVE.includes(offer.state) && (
+      {OFFER_LIVE.includes(offer.state) && (bot ? (
+        <TradeBotGuide bot={bot} code={`AchiDrop #${requestId}`} onOpen={onOpen} />
+      ) : (
         <p className="rounded-2xl border border-[rgba(227,20,31,.5)] bg-[rgba(227,20,31,.08)] p-3 text-xs text-foreground">
           {t("sellx.tradeWarn", { code: `AchiDrop #${requestId}` })}
         </p>
-      )}
+      ))}
     </div>
   );
 }
@@ -378,7 +409,7 @@ function SellButton({ count, submitting, onClick, className, needTradeUrl }) {
 }
 
 // So'rov yuborilgandan keyin: bizning trade link, "Steam'da ochish" va "Nusxalash" (07, 10).
-function TradeLinkPanel({ request, botTradeUrl, onDone, onSent, offer }) {
+function TradeLinkPanel({ request, botTradeUrl, onDone, onSent, offer, tradeBot }) {
   const { tg, showToast } = useApp();
   const [copied, setCopied] = useState(false);
   const [sentAt, setSentAt] = useState(request.sentAt || null);
@@ -427,7 +458,7 @@ function TradeLinkPanel({ request, botTradeUrl, onDone, onSent, offer }) {
       </div>
 
       {isAutoOffer(offer) ? (
-        <AutoOfferBlock requestId={request.id} offer={offer} onOpen={openUrl} />
+        <AutoOfferBlock requestId={request.id} offer={offer} onOpen={openUrl} bot={tradeBot} />
       ) : (<>
       {offer?.state === "failed" && <p className="text-xs text-destructive">{t("sellx.tradeFailed")}</p>}
       <p className="text-sm text-foreground">{t("sell.sendInstr")}</p>
@@ -718,7 +749,7 @@ export default function Sell() {
   if (result) {
     return (
       <div className="mx-auto max-w-xl">
-        <TradeLinkPanel request={result.request} botTradeUrl={result.botTradeUrl} offer={resultOffer} onSent={loadMine} onDone={() => { setResult(null); load(true); }} />
+        <TradeLinkPanel request={result.request} botTradeUrl={result.botTradeUrl} offer={resultOffer} tradeBot={quote?.tradeBot} onSent={loadMine} onDone={() => { setResult(null); load(true); }} />
       </div>
     );
   }
@@ -767,6 +798,7 @@ export default function Sell() {
             {quote && (
               <TradeUrlCard value={quote.steamTradeUrl} onOpen={openLink} onSaved={(v) => setQuote((q) => ({ ...q, steamTradeUrl: v }))} />
             )}
+            {quote?.tradeOfferReady && <TradeBotGuide bot={quote.tradeBot} onOpen={openLink} />}
             {/* Qidiruv + saralash + Top-5 + yangilash */}
             <div className="flex flex-wrap items-center gap-2.5">
               <label className="ad-field group flex h-[46px] min-w-0 flex-[1_1_220px] max-xl:order-1 items-center gap-2.5 rounded-[14px] px-3.5 transition-[border-color,box-shadow] duration-200 focus-within:!border-ring sm:max-w-[320px]">
