@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import { Banknote, Check, CheckCircle2, ChevronDown, Clock, Copy, Crown, ExternalLink, Lock, Package, RefreshCw, Search, X, XCircle } from "lucide-react";
 import { api } from "../api";
@@ -8,6 +9,7 @@ import { t } from "../i18n";
 import { cn } from "../lib/cn";
 import { SteamLogo } from "../components/BrandIcons";
 import { SELL_CATEGORIES, sellCategory, TrustBadges, TrustStats, RecentSales, HowItWorks, Faq, TelegramBanner, Confetti } from "../components/SellExtras";
+import { GuideViewer } from "../components/TradeOnboardingWizard";
 
 // Skin sotish — Claude Design v2 (tungi) / v3 (yorug') bo'yicha: telefonda ro'yxat +
 // pastda oltin "Sotish" paneli, kompyuterda jadval + o'ngda "Tanlanganlar" paneli.
@@ -126,12 +128,66 @@ function focusTradeUrl() {
   el.focus({ preventScroll: true });
 }
 
+const STEAM_TRADE_URL_PAGE = "https://steamcommunity.com/my/tradeoffers/privacy#trade_offer_access_url";
+
+// "Havolani qayerdan olaman?" — admin paneldagi "Trade Link olish yo'riqnomasi"
+// rasmlari. Yo'riqnoma hali yuklanmagan bo'lsa Steam sahifasi ochiladi.
+function TradeLinkGuideModal({ onClose, onOpen }) {
+  const [images, setImages] = useState(null);
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    api("/api/guides/tradeLink")
+      .then((r) => setImages(r.images || []))
+      .catch(() => setImages([]));
+  }, []);
+  useEffect(() => {
+    if (images && images.length === 0) {
+      onClose();
+      onOpen(STEAM_TRADE_URL_PAGE);
+    }
+  }, [images]);
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[200] flex items-end justify-center bg-background/80 backdrop-blur-sm sm:items-center sm:p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+        className="relative max-h-[90vh] w-full max-w-md space-y-3 overflow-y-auto border-t border-border bg-card p-5 shadow-panel-lg sm:border"
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t("common.close")}
+          className="absolute right-3 top-3 z-10 flex size-8 items-center justify-center border border-border bg-card/90 text-muted-foreground backdrop-blur-sm transition-colors hover:text-foreground"
+        >
+          <X className="size-4" />
+        </button>
+        <h2 className="pr-8 font-heading text-base font-bold text-foreground">{t("tradeWizard.guide1Title")}</h2>
+        <GuideViewer
+          images={images}
+          index={index}
+          setIndex={setIndex}
+          onFinish={() => { onClose(); focusTradeUrl(); }}
+          finishLabel={t("tradeWizard.guide1Done")}
+          onBack={onClose}
+          backLabel={t("common.close")}
+        />
+      </motion.div>
+    </div>,
+    document.body,
+  );
+}
+
 // Userning Steam trade havolasi — bot shu havolaga avtomatik trade yuboradi.
 function TradeUrlCard({ value, onSaved, onOpen }) {
   const { showToast } = useApp();
   const [url, setUrl] = useState(value || "");
   const [editing, setEditing] = useState(!value);
   const [saving, setSaving] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   useEffect(() => { setUrl(value || ""); setEditing(!value); }, [value]);
   async function save() {
     setSaving(true);
@@ -172,10 +228,11 @@ function TradeUrlCard({ value, onSaved, onOpen }) {
           {saving ? <span className="inline-block size-4 rounded-full border-2 border-white/30 border-t-white spin" /> : t("sellx.tradeUrlSave")}
         </button>
       </div>
-      <button type="button" onClick={() => onOpen("https://steamcommunity.com/my/tradeoffers/privacy#trade_offer_access_url")} className="flex items-center gap-1.5 text-xs text-primary underline-offset-2 hover:underline">
+      <button type="button" onClick={() => setGuideOpen(true)} className="flex items-center gap-1.5 text-xs text-primary underline-offset-2 hover:underline">
         <ExternalLink className="size-3.5" />
         {t("sellx.tradeUrlWhere")}
       </button>
+      {guideOpen && <TradeLinkGuideModal onClose={() => setGuideOpen(false)} onOpen={onOpen} />}
     </div>
   );
 }

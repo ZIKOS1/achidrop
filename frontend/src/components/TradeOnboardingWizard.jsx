@@ -11,7 +11,7 @@ const TRADE_LINK_PREFIX = "https://steamcommunity.com/tradeoffer/new/";
 // Bosqichma-bosqich rasmli yo'riqnoma ko'ruvchi — bitta rasmni to'liq
 // ko'rsatadi, prev/next tugmalari va progress ko'rsatkichi bilan. Oxirgi
 // rasmga yetganda "Next" tugmasi berilgan `finishLabel`ga almashadi.
-function GuideViewer({ images, index, setIndex, onFinish, finishLabel, onBack, backLabel }) {
+export function GuideViewer({ images, index, setIndex, onFinish, finishLabel, onBack, backLabel }) {
   if (images === null) {
     return (
       <div className="space-y-3">
