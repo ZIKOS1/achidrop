@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { RefreshCw, TrendingUp, TrendingDown, Wallet, Clock, Package } from "lucide-react";
 import { api } from "../api";
+import { useApp } from "../context";
 import { fmtMoney } from "../../utils";
 import { StatCardsSkeleton, BlockSkeleton } from "../../components/Skeleton";
 
@@ -22,6 +23,7 @@ function signed(n) {
 }
 
 export default function AdminFinance() {
+  const { navigate } = useApp();
   const [data, setData] = useState(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -170,9 +172,9 @@ export default function AdminFinance() {
           <span className={LABEL}>Kimga to'lanadi</span>
           <div className="mt-2 divide-y divide-border">
             {owed.list.map((u) => (
-              <div key={u.userId} className="flex items-center justify-between gap-3 py-2 text-sm">
+              <button key={u.userId} type="button" onClick={() => navigate("admin-user-detail", u.userId)} className="flex w-full items-center justify-between gap-3 py-2 text-left text-sm transition-colors hover:bg-secondary/40">
                 <div className="min-w-0">
-                  <div className="truncate font-medium text-foreground">{u.name || `#${u.userId}`}</div>
+                  <div className="truncate font-medium text-foreground underline-offset-2 hover:underline">{u.name || `#${u.userId}`}</div>
                   <div className="text-xs text-muted-foreground">
                     {u.available > 0 && <span className="text-success">yechsa bo'ladi {fmtMoney(u.available)} · </span>}
                     {u.pending > 0 && <span className="text-warning">so'rovda {fmtMoney(u.pending)} · </span>}
@@ -180,7 +182,7 @@ export default function AdminFinance() {
                   </div>
                 </div>
                 <div className="shrink-0 font-heading font-bold text-foreground">{fmtMoney(u.total)}</div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -222,7 +224,7 @@ export default function AdminFinance() {
                       {it.imageUrl && <img src={it.imageUrl} alt="" className="size-9 shrink-0 rounded-md bg-secondary object-contain" loading="lazy" />}
                       <div className="min-w-0">
                         <div className="truncate text-foreground">{it.name}{it.phase ? ` · ${it.phase}` : ""}</div>
-                        <div className="truncate text-xs text-muted-foreground">{it.userName || `#${it.userId}`}</div>
+                        <button type="button" onClick={() => navigate("admin-user-detail", it.userId)} className="block max-w-full truncate text-left text-xs text-muted-foreground underline-offset-2 hover:text-primary hover:underline">{it.userName || `#${it.userId}`}</button>
                       </div>
                     </div>
                   </td>
