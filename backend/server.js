@@ -2369,20 +2369,35 @@ app.get("/api/admin/users", requireAdminPanel, async (req, res) => {
 });
 
 // GET /api/admin/users/:id
-app.get("/api/admin/users/:id", requireAdminPanel, (req, res) => {
+app.get("/api/admin/users/:id", requireAdminPanel, async (req, res) => {
     const u = getUsers().find(x => x.id === Number(req.params.id));
     if (!u) return res.status(404).json({ error: "User topilmadi" });
+    await Promise.all([instantSellManager.refreshRequests(), refresh("withdrawals")]).catch(() => {});
+    // Faoliyat: qaysi skinni qachon sotgan, pul yechishlar, balans tarixi.
+    const sells = instantSellManager.getMyInstantSellRequests(u.id).map(r => ({
+        id: r.id, groupId: r.groupId ?? r.id, status: r.status, totalSom: r.totalSom,
+        createdAt: r.createdAt, resolvedAt: r.resolvedAt, rejectReason: r.rejectReason ?? null,
+        items: (r.items || []).map(i => ({ name: i.name || i.marketHashName, imageUrl: i.imageUrl || null, priceSom: i.priceSom, float: i.float ?? null })),
+        tradeOffer: r.tradeOffer ? tradeOfferView.viewTradeOffer(r.tradeOffer, r.createdAt) : null,
+    }));
+    const withdrawals = (read("withdrawals") || []).filter(w => w.userId === u.id)
+        .sort((a, b) => String(b.requestedAt).localeCompare(String(a.requestedAt)))
+        .map(w => ({ id: w.id, amount: w.amount, status: w.status, card: w.cardNumber ? `•••• ${String(w.cardNumber).slice(-4)}` : null, requestedAt: w.requestedAt, resolvedAt: w.resolvedAt, rejectComment: w.rejectComment ?? null }));
     res.json({
         id:        u.id,
         name:      u.name,
         username:  u.username || null,
         balance:   u.balance ?? 0,
         blocked:   u.blocked ?? false,
-        tradeLink: u.tradeLink ?? null,
+        tradeLink: u.steamTradeUrl || u.tradeLink || null,
         steamId64: u.steamId64 ?? null,
+        steamUsername: u.steamUsername ?? null,
         wins:      u.wins || [],
         history:   u.history || [],
         joined:    u.joined,
+        sells,
+        withdrawals,
+        balanceHistory: (u.balanceHistory || []).slice(-100).reverse(),
     });
 });
 
