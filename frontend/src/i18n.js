@@ -151,6 +151,7 @@ const DICT = {
   "vpn.title": { uz: "VPN'ni o'chiring", ru: "Отключите VPN", en: "Turn off your VPN" },
   "vpn.desc": { uz: "Saytga VPN yoki proksi orqali kirib bo'lmaydi. VPN'ni o'chirib, «Qayta tekshirish»ni bosing.", ru: "Сайт недоступен через VPN или прокси. Отключите VPN и нажмите «Проверить снова».", en: "The site can't be used through a VPN or proxy. Turn it off and tap “Check again”." },
   "vpn.retry": { uz: "Qayta tekshirish", ru: "Проверить снова", en: "Check again" },
+  "sellx.connectTradeUrl": { uz: "Trade havolani ulash", ru: "Подключить трейд-ссылку", en: "Connect trade URL" },
   "sellx.needTradeUrl": { uz: "Avval trade havolani kiriting", ru: "Сначала укажите трейд-ссылку", en: "Enter your trade URL first" },
   "sellx.tradeUrlSave": { uz: "Saqlash", ru: "Сохранить", en: "Save" },
   "sellx.tradeUrlSaved": { uz: "Trade havola saqlandi", ru: "Трейд-ссылка сохранена", en: "Trade URL saved" },

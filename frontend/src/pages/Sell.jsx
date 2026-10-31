@@ -118,6 +118,14 @@ function AutoOfferBlock({ requestId, offer, onOpen }) {
   );
 }
 
+const TRADE_URL_INPUT_ID = "trade-url-input";
+function focusTradeUrl() {
+  const el = document.getElementById(TRADE_URL_INPUT_ID);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.focus({ preventScroll: true });
+}
+
 // Userning Steam trade havolasi — bot shu havolaga avtomatik trade yuboradi.
 function TradeUrlCard({ value, onSaved, onOpen }) {
   const { showToast } = useApp();
@@ -154,6 +162,7 @@ function TradeUrlCard({ value, onSaved, onOpen }) {
       <p className="text-xs text-muted-foreground">{t("sellx.tradeUrlDesc")}</p>
       <div className="flex flex-wrap gap-2">
         <input
+          id={TRADE_URL_INPUT_ID}
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://steamcommunity.com/tradeoffer/new/?partner=...&token=..."
@@ -289,7 +298,15 @@ function SortMenu({ value, onChange }) {
 
 // Asosiy tugma (dizayn): qizil konturli, nurli. "SOTISH · N TA" / "SKIN TANLANG".
 function SellButton({ count, submitting, onClick, className, needTradeUrl }) {
-  const off = count === 0 || needTradeUrl;
+  if (needTradeUrl) {
+    // Trade havola ulanmagan — "Sotish" o'rniga havola maydoniga olib boradi.
+    return (
+      <button type="button" onClick={focusTradeUrl} className={cn("ad-cta on flex items-center justify-center gap-2 whitespace-nowrap rounded-[14px] text-[15px] uppercase", className)}>
+        {t("sellx.connectTradeUrl")}
+      </button>
+    );
+  }
+  const off = count === 0;
   return (
     <button
       type="button"
@@ -298,7 +315,7 @@ function SellButton({ count, submitting, onClick, className, needTradeUrl }) {
       className={cn("ad-cta flex items-center justify-center gap-2 whitespace-nowrap rounded-[14px] text-[15px] uppercase", !off && "on", className)}
     >
       {submitting ? <span className="size-4 rounded-full border-2 border-white/30 border-t-[#FF3B45] spin" /> : null}
-      {needTradeUrl ? t("sellx.needTradeUrl") : off ? t("sellx.pickSkin") : submitting ? t("sellx.sending") : t("sellx.ctaSell", { n: count })}
+      {off ? t("sellx.pickSkin") : submitting ? t("sellx.sending") : t("sellx.ctaSell", { n: count })}
     </button>
   );
 }
