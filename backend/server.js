@@ -40,6 +40,7 @@ const tradeAccountBridge = require("./tradeAccountBridge");
 const { validateTradeUrlFor, tradeUrlOwner } = require("./tradeUrl");
 const tradeOfferView = require("./tradeOfferView");
 const { isVpnIp } = require("./vpnCheck");
+const { realClientIp } = require("./clientIp");
 
 const app  = express();
 const PORT = process.env.WEBAPP_PORT || 3000;
@@ -53,6 +54,12 @@ const PORT = process.env.WEBAPP_PORT || 3000;
 // barcha userlar bitta IP bo'lib ko'rinadi va IP bo'yicha limitlar (admin
 // login) hammani birdan bloklab qo'yishi mumkin edi.
 if (process.env.VERCEL) app.set("trust proxy", 1);
+// Cloudflare proksisi orqali kelsa — haqiqiy IP CF-Connecting-IP'da (clientIp.js).
+// req.ip shu yerda almashtiriladi: rate-limit va VPN blok shuni ishlatadi.
+app.use((req, res, next) => {
+    Object.defineProperty(req, "ip", { value: realClientIp(req.ip, req.headers["cf-connecting-ip"]), configurable: true });
+    next();
+});
 
 app.use(helmet({
     contentSecurityPolicy: false,
