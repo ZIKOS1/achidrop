@@ -288,8 +288,8 @@ function SortMenu({ value, onChange }) {
 }
 
 // Asosiy tugma (dizayn): qizil konturli, nurli. "SOTISH · N TA" / "SKIN TANLANG".
-function SellButton({ count, submitting, onClick, className }) {
-  const off = count === 0;
+function SellButton({ count, submitting, onClick, className, needTradeUrl }) {
+  const off = count === 0 || needTradeUrl;
   return (
     <button
       type="button"
@@ -298,7 +298,7 @@ function SellButton({ count, submitting, onClick, className }) {
       className={cn("ad-cta flex items-center justify-center gap-2 whitespace-nowrap rounded-[14px] text-[15px] uppercase", !off && "on", className)}
     >
       {submitting ? <span className="size-4 rounded-full border-2 border-white/30 border-t-[#FF3B45] spin" /> : null}
-      {off ? t("sellx.pickSkin") : submitting ? t("sellx.sending") : t("sellx.ctaSell", { n: count })}
+      {needTradeUrl ? t("sellx.needTradeUrl") : off ? t("sellx.pickSkin") : submitting ? t("sellx.sending") : t("sellx.ctaSell", { n: count })}
     </button>
   );
 }
@@ -603,6 +603,11 @@ export default function Sell() {
 
   function confirmSell() {
     if (!selected.size) return;
+    if (!quote?.steamTradeUrl) {
+      hap("notif", "error");
+      showToast(t("sellx.needTradeUrl"), "err");
+      return;
+    }
     if (selectedItems.some((i) => i.tooCheap) && total < (quote?.bulkSellSom || 0)) {
       hap("notif", "error");
       showToast(t("sell.cheapBulk", { sum: fmtMoney(quote.bulkSellSom) }), "err");
@@ -685,7 +690,7 @@ export default function Sell() {
       ) : (
         <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
           <section className="min-w-0 space-y-[18px]">
-            {quote?.tradeOfferReady && (
+            {quote && (
               <TradeUrlCard value={quote.steamTradeUrl} onOpen={openLink} onSaved={(v) => setQuote((q) => ({ ...q, steamTradeUrl: v }))} />
             )}
             {/* Qidiruv + saralash + Top-5 + yangilash */}
@@ -811,7 +816,7 @@ export default function Sell() {
                   <span className="text-base text-foreground">{t("sellx.totalLabel")}</span>
                   <span className="text-[30px] font-bold tabular-nums text-[var(--heading)]">{total.toLocaleString("ru-RU").replace(/ /g, " ")} <span className="text-base text-primary">so'm</span></span>
                 </div>
-                <SellButton count={selected.size} submitting={submitting} onClick={confirmSell} className="h-[52px] w-full" />
+                <SellButton count={selected.size} submitting={submitting} needTradeUrl={!!quote && !quote.steamTradeUrl} onClick={confirmSell} className="h-[52px] w-full" />
                 <p className="text-sm leading-normal text-muted-foreground [text-wrap:pretty]">{t("sellx.nextStep")}</p>
               </div>
               <div className="ad-frame-glow" />
@@ -881,7 +886,7 @@ export default function Sell() {
               <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{t("sellx.pickedN", { n: selected.size })}</p>
               <p className="whitespace-nowrap text-xl font-bold tabular-nums text-[var(--heading)]">{total.toLocaleString("ru-RU").replace(/ /g, " ")} <span className="text-[13px] text-primary">so'm</span></p>
             </div>
-            <SellButton count={selected.size} submitting={submitting} onClick={confirmSell} className="h-12 px-[18px] text-sm" />
+            <SellButton count={selected.size} submitting={submitting} needTradeUrl={!!quote && !quote.steamTradeUrl} onClick={confirmSell} className="h-12 px-[18px] text-sm" />
           </div>
         </div>
       )}

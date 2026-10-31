@@ -1513,12 +1513,15 @@ const INSTANT_SELL_ERRORS = {
     too_cheap: `Narxi $${lisSkinsPrice.MIN_SELL_USD} dan arzon skinlarni faqat jami $${lisSkinsPrice.BULK_SELL_USD} dan ko'p sotuvda sotish mumkin`,
     not_tradable: "Ba'zi skinlarni hozir yuborib bo'lmaydi (trade lock)",
     not_found: "Skin inventaringizda topilmadi (sahifani yangilang)",
+    need_trade_url: "Avval Steam trade havolangizni kiriting",
 };
 app.post("/api/instant-sell", auth, sensitiveLimiter, async (req, res) => {
     const u = req.user;
     if (!u) return res.status(404).json({ error: "User not found" });
     if (!u.steamId64) return res.status(400).json({ error: "Avval Steam hisobingizni ulang" });
     if (!lisSkinsPrice.isLisConfigured()) return res.status(400).json({ error: INSTANT_SELL_ERRORS.no_key, code: "no_key" });
+    // Trade havola majburiy — bot offerni shu havolaga yuboradi.
+    if (!usableTradeUrl(u)) return res.status(400).json({ error: INSTANT_SELL_ERRORS.need_trade_url, code: "need_trade_url" });
 
     const raw = Array.isArray(req.body.assetIds) ? req.body.assetIds : (req.body.assetId ? [req.body.assetId] : []);
     const assetIds = [...new Set(raw.map(String))];
