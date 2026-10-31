@@ -44,5 +44,11 @@
             "destination": "https://achidrop.com/:path+",
             "permanent": true
         }
+    ],
+    "crons": [
+        {
+            "path": "/api/cron/ops",
+            "schedule": "5 16 * * *"
+        }
     ]
 }

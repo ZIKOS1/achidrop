@@ -5,7 +5,7 @@ const helmet      = require("helmet");
 const rateLimit   = require("express-rate-limit");
 const crypto  = require("crypto");
 const path    = require("path");
-const { read, write, refresh, readDoc, writeDoc } = require("./database/db");
+const { read, write, refresh, readDoc, writeDoc, flipDocField } = require("./database/db");
 const { fetchInventory, fetchUserInventory, fetchCommunityInventory, communityInventoryMeta, steamWebApiInventory, steamApisGet } = require("./steam");
 const inventoryBridge = require("./inventoryBridge");
 const { createPendingAuth, peekPendingAuth, consumePendingAuth, getSteamAuth, steamConnectedHtml } = require("./auth-steam");
@@ -42,6 +42,8 @@ const tradeOfferView = require("./tradeOfferView");
 const { isVpnIp } = require("./vpnCheck");
 const { realClientIp } = require("./clientIp");
 const humanCheck = require("./humanCheck");
+const opsAlerts = require("./opsAlerts");
+const { waitUntil } = require("@vercel/functions");
 const { parseCookie, cookieFlags } = require("./session");
 
 const app  = express();
@@ -219,7 +221,47 @@ app.use("/api", async (req, res, next) => {
     maybeCheckPendingWithdrawals((user, text) => notifyUser(user, text, tgSendMessage));
     maybeCheckPendingWithdrawals((user, text) => notifyUser(user, text, tgSendMessage), "marketPurchases");
 
+    // Bot o'chib qolganini tekshirish + kunlik hisobot (opsAlerts.js) — fire-and-forget.
+    maybeRunOpsChecks();
+
     next();
+});
+
+// ── Adminlarga avtomatik xabarlar: bot o'chdi/yondi, kunlik hisobot (opsAlerts.js) ──
+const OPS_CHECK_EVERY_MS = 60 * 1000;
+let lastOpsCheckAt = 0;
+const opsDeps = {
+    now: () => Date.now(),
+    readDoc, flipDocField,
+    notifyAdmins: (text) => toAdmins((id) => tgSendMessage(id, text)),
+    loadReportData: async (day) => {
+        await Promise.all([instantSellManager.refreshRequests(), refresh("withdrawals"), refresh("tradeBalances")]);
+        const raw = read("instantSellRequests");
+        const requests = Array.isArray(raw) ? raw : [];
+        const todays = requests.filter(r => r.status === "credited" && financeStats.dayKey(r.resolvedAt) === day);
+        const lisUsd = await lisSkinsPrice.fetchLisPricesUsd(todays.flatMap(r => (r.items || []).map(i => i.marketHashName))).catch(() => new Map());
+        const fin = financeStats.buildFinance({ requests: todays, lisUsd, rate: lisSkinsPrice.getUsdToSomRate(), holds: balanceManager.getAllHoldsForAdmin(), users: getUsers() });
+        const withdrawals = read("withdrawals");
+        return {
+            requests, withdrawals: Array.isArray(withdrawals) ? withdrawals : [],
+            profit: fin.lisTotal > 0 ? fin.profit : null, profitMissing: fin.missingLis, owedTotal: fin.owed.total,
+        };
+    },
+};
+async function runOpsChecks() {
+    await opsAlerts.checkBotHealth(opsDeps).catch((err) => console.log("BOT HEALTH XATO:", err.message));
+    await opsAlerts.maybeSendDailyReport(opsDeps).catch((err) => console.log("KUNLIK HISOBOT XATO:", err.message));
+}
+function maybeRunOpsChecks() {
+    if (Date.now() - lastOpsCheckAt < OPS_CHECK_EVERY_MS) return;
+    lastOpsCheckAt = Date.now();
+    // waitUntil — Vercel javob qaytgandan keyin ham funksiyani tekshiruv tugaguncha tirik saqlaydi.
+    waitUntil(runOpsChecks());
+}
+// Vercel Cron — saytga hech kim kirmasa ham kuniga bir marta (vercel.json "crons").
+app.get("/api/cron/ops", async (req, res) => {
+    await runOpsChecks();
+    res.json({ ok: true });
 });
 
 // ── VPN blok (admin Sozlamalar → vpnBlockEnabled) ───────────────────────────

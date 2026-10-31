@@ -264,6 +264,20 @@ async function removeDoc(id) {
   await Store.deleteOne({ _id: id });
 }
 // O'qish va o'chirish bitta atomik amal — bir martalik kodlar uchun (auth-steam.js).
+// Atomar "bayroq": data[field] hali `value` bo'lmasa — o'rnatadi va true qaytaradi.
+// Bir nechta Vercel nusxasi bir vaqtda chaqirsa ham faqat bittasi true oladi
+// (xabar ikki marta ketmasin). Hujjat yo'q bo'lsa yaratiladi.
+async function flipDocField(id, field, value, extra = {}) {
+  const $set = { [`data.${field}`]: value, v: newV() };
+  for (const [k, x] of Object.entries(extra)) $set[`data.${k}`] = x;
+  try {
+    const r = await Store.updateOne({ _id: id, [`data.${field}`]: { $ne: value } }, { $set }, { upsert: true });
+    return (r.modifiedCount || 0) + (r.upsertedCount || 0) === 1;
+  } catch (err) {
+    if (err?.code === 11000) return false; // boshqa nusxa ulgurdi
+    throw err;
+  }
+}
 async function takeDoc(id) {
   const doc = await Store.findOneAndDelete({ _id: id }).lean();
   return doc ? doc.data : null;
@@ -274,4 +288,4 @@ async function listIds(prefix) {
   return docs.map(d => d._id);
 }
 
-module.exports = { read, write, connect, refresh, withTransaction, readTx, writeTx, readTxWhere, updateTx, patchCache, readDoc, writeDoc, removeDoc, takeDoc, listIds, diffArrayOps };
+module.exports = { read, write, connect, refresh, withTransaction, readTx, writeTx, readTxWhere, updateTx, patchCache, readDoc, writeDoc, removeDoc, takeDoc, flipDocField, listIds, diffArrayOps };
