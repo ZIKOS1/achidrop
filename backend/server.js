@@ -2699,6 +2699,11 @@ app.get("/api/auth/steam/callback", async (req, res) => {
             if (!getUsers().some(x => x.id === pending.tgId)) {
                 return res.status(404).send("Foydalanuvchi topilmadi — botga /start yuboring va qaytadan urinib ko'ring.");
             }
+            // Bitta Steam = bitta Telegram akkaunt: boshqa Telegram akkauntga ulangan
+            // Steam'ni bu yerga ulab bo'lmaydi (Telegramsiz dublikat pastda qo'shiladi).
+            if (getUsers().some(x => x.id !== pending.tgId && x.telegramId != null && x.steamId64 === steamUser.steamid)) {
+                return res.status(409).send("Bu Steam akkaunt boshqa AchiDrop akkauntiga ulangan. Qo'llab-quvvatlashga yozing.");
+            }
             // Shu Steam bilan saytda (Telegramsiz) ochilgan akkaunt bo'lsa — shu
             // Telegram akkauntiga qo'shiladi: bitta Steam = bitta akkaunt, bitta balans.
             await mergeSteamDuplicatesInto(pending.tgId, steamUser.steamid);
