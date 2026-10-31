@@ -8,6 +8,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import Modal from "./components/Modal";
 import Toast from "./components/Toast";
 import VpnBlock from "./components/VpnBlock";
+import HumanCheck from "./components/HumanCheck";
 import Login from "./pages/Login";
 import Auctions from "./pages/Auctions";
 import LotDetail from "./pages/LotDetail";
@@ -101,6 +102,7 @@ export default function App() {
   const [theme, setTheme] = useState(getInitialTheme);
   const [lang, setLangState] = useState(getCurrentLang);
   const [vpnBlocked, setVpnBlocked] = useState(false);
+  const [humanSiteKey, setHumanSiteKey] = useState(null); // bor bo'lsa — "Odammisiz?" oynasi
   const toastTimer = useRef(null);
 
   const toggleTheme = useCallback(() => {
@@ -130,6 +132,19 @@ export default function App() {
     window.addEventListener("vpn-blocked", onBlocked);
     return () => window.removeEventListener("vpn-blocked", onBlocked);
   }, []);
+
+  const checkHuman = useCallback(() => {
+    api("/api/human-status").then((r) => setHumanSiteKey(r.required ? r.siteKey : null)).catch(() => {});
+  }, []);
+  useEffect(() => {
+    checkHuman();
+    window.addEventListener("human-required", checkHuman);
+    return () => window.removeEventListener("human-required", checkHuman);
+  }, [checkHuman]);
+  const onHumanPassed = useCallback(() => {
+    setHumanSiteKey(null);
+    loadMe();
+  }, [loadMe]);
 
   const navigate = useCallback((rawName, rawData = null) => {
     const { name, data } = allowed({ name: rawName, data: rawData });
@@ -184,6 +199,7 @@ export default function App() {
   // ilova qobig'ini (About/Auksionlar) ko'rsatamiz — mehmon sifatida ko'rish
   // kirishni talab qilmaydi, faqat login/bid/balans kabi amallar talab qiladi.
   if (vpnBlocked) return <VpnBlock onCleared={() => { setVpnBlocked(false); loadMe(); }} />;
+  if (humanSiteKey) return <HumanCheck siteKey={humanSiteKey} onPassed={onHumanPassed} />;
 
   if (!authChecked) {
     return (

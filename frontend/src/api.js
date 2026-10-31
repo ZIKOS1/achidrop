@@ -34,6 +34,7 @@ export async function api(url, opts = {}) {
   const json = await r.json().catch(() => ({}));
   // VPN blok yoqilgan va user VPN orqali kirgan — App "VPN'ni o'chiring" oynasini ochadi.
   if (r.status === 403 && json.code === "vpn_blocked") window.dispatchEvent(new Event("vpn-blocked"));
+  if (r.status === 403 && json.code === "human_required") window.dispatchEvent(new Event("human-required"));
   if (!r.ok) throw json;
   return json;
 }

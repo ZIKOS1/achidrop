@@ -41,6 +41,8 @@ const { validateTradeUrlFor, tradeUrlOwner } = require("./tradeUrl");
 const tradeOfferView = require("./tradeOfferView");
 const { isVpnIp } = require("./vpnCheck");
 const { realClientIp } = require("./clientIp");
+const humanCheck = require("./humanCheck");
+const { parseCookie, cookieFlags } = require("./session");
 
 const app  = express();
 const PORT = process.env.WEBAPP_PORT || 3000;
@@ -231,6 +233,30 @@ app.use("/api", async (req, res, next) => {
     if (getSettings().vpnBlockEnabled !== true || req.path.startsWith("/admin")) return next();
     if (await isVpnIp(req.ip)) return res.status(403).json({ error: "VPN'ni o'chiring", code: "vpn_blocked" });
     next();
+});
+
+// ── "Odammisiz?" tekshiruvi (admin Sozlamalar → humanCheckEnabled, humanCheck.js) ──
+// Telegram Mini App (imzoli initData) — Telegram'ning o'zi tasdiqlagan, tekshirilmaydi.
+// Steam OpenID qaytishi tashqi brauzerda ochiladi (cookie yo'q) — u ham ozod.
+const HUMAN_EXEMPT = ["/admin", "/human-status", "/human-verify", "/vpn-status", "/auth/steam/"];
+function humanCheckOn() {
+    return getSettings().humanCheckEnabled === true && humanCheck.configured();
+}
+function isHuman(req) {
+    return humanCheck.isValidPass(parseCookie(req)[humanCheck.COOKIE_NAME]) || !!validateInitData(req.headers["x-init-data"]);
+}
+app.get("/api/human-status", (req, res) => {
+    const required = humanCheckOn() && !isHuman(req);
+    res.json({ required, siteKey: required ? process.env.TURNSTILE_SITE_KEY : null });
+});
+app.post("/api/human-verify", sensitiveLimiter, async (req, res) => {
+    if (!await humanCheck.verifyToken(req.body.token, req.ip)) return res.status(400).json({ error: "Tekshiruvdan o'tilmadi, qayta urinib ko'ring" });
+    res.setHeader("Set-Cookie", `${humanCheck.COOKIE_NAME}=${humanCheck.makePass()}; HttpOnly; ${cookieFlags()}SameSite=Lax; Path=/; Max-Age=${humanCheck.PASS_TTL_MS / 1000}`);
+    res.json({ success: true });
+});
+app.use("/api", (req, res, next) => {
+    if (!humanCheckOn() || HUMAN_EXEMPT.some(p => req.path.startsWith(p)) || isHuman(req)) return next();
+    res.status(403).json({ error: "Tekshiruvdan o'ting", code: "human_required" });
 });
 
 // ── Vaqtincha o'chirilgan bo'limlar (features.js) ─────────────────────────
@@ -2561,6 +2587,8 @@ app.get("/api/admin/settings", requireAdminPanel, (req, res) => {
     res.json({
         earlyAccessEnabled: s.earlyAccessEnabled !== false,
         vpnBlockEnabled: s.vpnBlockEnabled === true,
+        humanCheckEnabled: s.humanCheckEnabled === true,
+        humanCheckConfigured: humanCheck.configured(),
         steamId64: s.steamId64 || null,
         referralBonus: s.referralBonus ?? 10000,
         tradeFeeTiers: tradeManager.getFeeTiers(),
@@ -2587,6 +2615,7 @@ app.post("/api/admin/settings", requireAdminPanel, (req, res) => {
     const s = getSettings();
     if (typeof req.body.earlyAccessEnabled === "boolean") s.earlyAccessEnabled = req.body.earlyAccessEnabled;
     if (typeof req.body.vpnBlockEnabled === "boolean") s.vpnBlockEnabled = req.body.vpnBlockEnabled;
+    if (typeof req.body.humanCheckEnabled === "boolean") s.humanCheckEnabled = req.body.humanCheckEnabled;
     if (req.body.referralBonus !== undefined) {
         const rb = Number(req.body.referralBonus);
         if (isNaN(rb) || rb < 0) return res.status(400).json({ error: "Referral bonus musbat raqam bo'lishi kerak" });
@@ -2625,6 +2654,8 @@ app.post("/api/admin/settings", requireAdminPanel, (req, res) => {
         lisConfigured: lisSkinsPrice.isLisConfigured(),
         earlyAccessEnabled: s.earlyAccessEnabled !== false,
         vpnBlockEnabled: s.vpnBlockEnabled === true,
+        humanCheckEnabled: s.humanCheckEnabled === true,
+        humanCheckConfigured: humanCheck.configured(),
         steamId64: s.steamId64 || null,
         referralBonus: s.referralBonus ?? 10000,
         tradeFeeTiers: tradeManager.getFeeTiers(),

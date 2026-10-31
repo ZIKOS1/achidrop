@@ -8,6 +8,7 @@ import {
   Ticket,
   Lock,
   ShieldOff,
+  ShieldCheck,
   Gamepad2,
   Coins,
   X,
@@ -27,6 +28,7 @@ export default function AdminHome() {
   const [settings, setSettings] = useState(null);
   const [toggling, setToggling] = useState(false);
   const [togglingVpn, setTogglingVpn] = useState(false);
+  const [togglingHuman, setTogglingHuman] = useState(false);
   const [steamConnecting, setSteamConnecting] = useState(false);
   const [refBonus, setRefBonus] = useState("");
   const [savingRefBonus, setSavingRefBonus] = useState(false);
@@ -116,6 +118,20 @@ export default function AdminHome() {
       showToast(e.error || "Xato", "err");
     } finally {
       setTogglingVpn(false);
+    }
+  }
+
+  async function toggleHumanCheck() {
+    setTogglingHuman(true);
+    try {
+      const r = await api("/api/admin/settings", { method: "POST", body: JSON.stringify({ humanCheckEnabled: !settings.humanCheckEnabled }) });
+      setSettings(r);
+      hap("notif", "success");
+      showToast(r.humanCheckEnabled ? "Odam tekshiruvi yoqildi" : "Odam tekshiruvi o'chirildi", "ok");
+    } catch (e) {
+      showToast(e.error || "Xato", "err");
+    } finally {
+      setTogglingHuman(false);
     }
   }
 
@@ -347,6 +363,27 @@ export default function AdminHome() {
                 className={"mt-3 w-full py-2.5 font-heading text-sm font-bold uppercase tracking-wide transition-colors disabled:opacity-50 " + (settings.vpnBlockEnabled ? "bg-destructive/15 text-destructive hover:bg-destructive/25" : "bg-success/15 text-success hover:bg-success/25")}
               >
                 {togglingVpn ? "..." : settings.vpnBlockEnabled ? "O'chirish" : "Yoqish"}
+              </button>
+            </div>
+          )}
+
+          {settings && (
+            <div className="border border-border bg-card p-5">
+              <div className="flex items-center justify-between">
+                <p className="flex items-center gap-1.5 font-heading text-sm font-bold text-foreground"><ShieldCheck className="size-3.5" /> Odam tekshiruvi</p>
+                <span className={"border px-2 py-0.5 text-xs font-semibold " + (settings.humanCheckEnabled ? "border-success/40 bg-success/10 text-success" : "border-destructive/40 bg-destructive/10 text-destructive")}>
+                  {settings.humanCheckEnabled ? "Yoqilgan" : "O'chirilgan"}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">Yoqilgan bo'lsa, saytga brauzerdan kirganlar Cloudflare "Odammisiz?" tekshiruvidan o'tadi (24 soatda bir marta). Telegram Mini App va admin panel tekshirilmaydi.</p>
+              {!settings.humanCheckConfigured && <p className="mt-1 text-xs text-destructive">Turnstile kalitlari (TURNSTILE_SITE_KEY, TURNSTILE_SECRET) Vercel'da sozlanmagan — yoqilsa ham ishlamaydi.</p>}
+              <button
+                type="button"
+                disabled={togglingHuman}
+                onClick={toggleHumanCheck}
+                className={"mt-3 w-full py-2.5 font-heading text-sm font-bold uppercase tracking-wide transition-colors disabled:opacity-50 " + (settings.humanCheckEnabled ? "bg-destructive/15 text-destructive hover:bg-destructive/25" : "bg-success/15 text-success hover:bg-success/25")}
+              >
+                {togglingHuman ? "..." : settings.humanCheckEnabled ? "O'chirish" : "Yoqish"}
               </button>
             </div>
           )}
