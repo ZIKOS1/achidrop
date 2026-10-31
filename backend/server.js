@@ -39,6 +39,7 @@ const financeStats = require("./financeStats");
 const tradeAccountBridge = require("./tradeAccountBridge");
 const { validateTradeUrlFor, tradeUrlOwner } = require("./tradeUrl");
 const tradeOfferView = require("./tradeOfferView");
+const { isVpnIp } = require("./vpnCheck");
 
 const app  = express();
 const PORT = process.env.WEBAPP_PORT || 3000;
@@ -209,6 +210,19 @@ app.use("/api", async (req, res, next) => {
     maybeCheckPendingWithdrawals((user, text) => notifyUser(user, text, tgSendMessage));
     maybeCheckPendingWithdrawals((user, text) => notifyUser(user, text, tgSendMessage), "marketPurchases");
 
+    next();
+});
+
+// ── VPN blok (admin Sozlamalar → vpnBlockEnabled) ───────────────────────────
+// Yoqilgan bo'lsa VPN/proksi IP'dan kelgan so'rovlar rad etiladi; sayt
+// "VPN'ni o'chiring" oynasini ko'rsatadi. Admin panel bloklanmaydi.
+app.get("/api/vpn-status", async (req, res) => {
+    const blocked = getSettings().vpnBlockEnabled === true && await isVpnIp(req.ip);
+    res.json({ blocked });
+});
+app.use("/api", async (req, res, next) => {
+    if (getSettings().vpnBlockEnabled !== true || req.path.startsWith("/admin")) return next();
+    if (await isVpnIp(req.ip)) return res.status(403).json({ error: "VPN'ni o'chiring", code: "vpn_blocked" });
     next();
 });
 
@@ -2539,6 +2553,7 @@ app.get("/api/admin/settings", requireAdminPanel, (req, res) => {
     const s = getSettings();
     res.json({
         earlyAccessEnabled: s.earlyAccessEnabled !== false,
+        vpnBlockEnabled: s.vpnBlockEnabled === true,
         steamId64: s.steamId64 || null,
         referralBonus: s.referralBonus ?? 10000,
         tradeFeeTiers: tradeManager.getFeeTiers(),
@@ -2564,6 +2579,7 @@ function validTradeFeeTiers(tiers) {
 app.post("/api/admin/settings", requireAdminPanel, (req, res) => {
     const s = getSettings();
     if (typeof req.body.earlyAccessEnabled === "boolean") s.earlyAccessEnabled = req.body.earlyAccessEnabled;
+    if (typeof req.body.vpnBlockEnabled === "boolean") s.vpnBlockEnabled = req.body.vpnBlockEnabled;
     if (req.body.referralBonus !== undefined) {
         const rb = Number(req.body.referralBonus);
         if (isNaN(rb) || rb < 0) return res.status(400).json({ error: "Referral bonus musbat raqam bo'lishi kerak" });
@@ -2601,6 +2617,7 @@ app.post("/api/admin/settings", requireAdminPanel, (req, res) => {
         botTradeUrl: s.botTradeUrl || "",
         lisConfigured: lisSkinsPrice.isLisConfigured(),
         earlyAccessEnabled: s.earlyAccessEnabled !== false,
+        vpnBlockEnabled: s.vpnBlockEnabled === true,
         steamId64: s.steamId64 || null,
         referralBonus: s.referralBonus ?? 10000,
         tradeFeeTiers: tradeManager.getFeeTiers(),

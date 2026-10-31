@@ -7,6 +7,7 @@ import {
   Plus,
   Ticket,
   Lock,
+  ShieldOff,
   Gamepad2,
   Coins,
   X,
@@ -25,6 +26,7 @@ export default function AdminHome() {
   const [error, setError] = useState(false);
   const [settings, setSettings] = useState(null);
   const [toggling, setToggling] = useState(false);
+  const [togglingVpn, setTogglingVpn] = useState(false);
   const [steamConnecting, setSteamConnecting] = useState(false);
   const [refBonus, setRefBonus] = useState("");
   const [savingRefBonus, setSavingRefBonus] = useState(false);
@@ -100,6 +102,20 @@ export default function AdminHome() {
       showToast(e.error || "Xato", "err");
     } finally {
       setToggling(false);
+    }
+  }
+
+  async function toggleVpnBlock() {
+    setTogglingVpn(true);
+    try {
+      const r = await api("/api/admin/settings", { method: "POST", body: JSON.stringify({ vpnBlockEnabled: !settings.vpnBlockEnabled }) });
+      setSettings(r);
+      hap("notif", "success");
+      showToast(r.vpnBlockEnabled ? "VPN blok yoqildi" : "VPN blok o'chirildi", "ok");
+    } catch (e) {
+      showToast(e.error || "Xato", "err");
+    } finally {
+      setTogglingVpn(false);
     }
   }
 
@@ -313,6 +329,26 @@ export default function AdminHome() {
             </div>
           ) : (
             <BlockSkeleton lines={2} />
+          )}
+
+          {settings && (
+            <div className="border border-border bg-card p-5">
+              <div className="flex items-center justify-between">
+                <p className="flex items-center gap-1.5 font-heading text-sm font-bold text-foreground"><ShieldOff className="size-3.5" /> VPN blok</p>
+                <span className={"border px-2 py-0.5 text-xs font-semibold " + (settings.vpnBlockEnabled ? "border-success/40 bg-success/10 text-success" : "border-destructive/40 bg-destructive/10 text-destructive")}>
+                  {settings.vpnBlockEnabled ? "Yoqilgan" : "O'chirilgan"}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">Yoqilgan bo'lsa, VPN yoki proksi bilan kirganlarga sayt o'rniga "VPN'ni o'chiring" oynasi chiqadi. Admin panel bloklanmaydi.</p>
+              <button
+                type="button"
+                disabled={togglingVpn}
+                onClick={toggleVpnBlock}
+                className={"mt-3 w-full py-2.5 font-heading text-sm font-bold uppercase tracking-wide transition-colors disabled:opacity-50 " + (settings.vpnBlockEnabled ? "bg-destructive/15 text-destructive hover:bg-destructive/25" : "bg-success/15 text-success hover:bg-success/25")}
+              >
+                {togglingVpn ? "..." : settings.vpnBlockEnabled ? "O'chirish" : "Yoqish"}
+              </button>
+            </div>
           )}
 
           {settings && (

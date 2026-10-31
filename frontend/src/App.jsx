@@ -7,6 +7,7 @@ import AppShell from "./components/AppShell";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Modal from "./components/Modal";
 import Toast from "./components/Toast";
+import VpnBlock from "./components/VpnBlock";
 import Login from "./pages/Login";
 import Auctions from "./pages/Auctions";
 import LotDetail from "./pages/LotDetail";
@@ -99,6 +100,7 @@ export default function App() {
   const [modal, setModal] = useState({ open: false });
   const [theme, setTheme] = useState(getInitialTheme);
   const [lang, setLangState] = useState(getCurrentLang);
+  const [vpnBlocked, setVpnBlocked] = useState(false);
   const toastTimer = useRef(null);
 
   const toggleTheme = useCallback(() => {
@@ -121,6 +123,13 @@ export default function App() {
   useEffect(() => {
     loadMe().finally(() => setAuthChecked(true));
   }, [loadMe]);
+
+  useEffect(() => {
+    api("/api/vpn-status").then((r) => r.blocked && setVpnBlocked(true)).catch(() => {});
+    const onBlocked = () => setVpnBlocked(true);
+    window.addEventListener("vpn-blocked", onBlocked);
+    return () => window.removeEventListener("vpn-blocked", onBlocked);
+  }, []);
 
   const navigate = useCallback((rawName, rawData = null) => {
     const { name, data } = allowed({ name: rawName, data: rawData });
@@ -174,6 +183,8 @@ export default function App() {
   // Tashqarida (websaytdan to'g'ridan-to'g'ri) auth tekshirilayotganda ham
   // ilova qobig'ini (About/Auksionlar) ko'rsatamiz — mehmon sifatida ko'rish
   // kirishni talab qilmaydi, faqat login/bid/balans kabi amallar talab qiladi.
+  if (vpnBlocked) return <VpnBlock onCleared={() => { setVpnBlocked(false); loadMe(); }} />;
+
   if (!authChecked) {
     return (
       <div style={{ minHeight: "100vh" }} className="bg-background p-4 sm:p-6">
