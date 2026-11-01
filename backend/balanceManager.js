@@ -129,6 +129,28 @@ function capHoldToBalance(summary, balance) {
     return { ...summary, pending, available, frozen, nextUnlockAt: frozen > 0 ? summary.nextUnlockAt : null };
 }
 
+// Admin panel (foydalanuvchi sahifasi): umumiy summa + har bir hali chiqarilmagan
+// tushum — qancha, qachon tushgan, qachon yechsa bo'ladi. Sof funksiya (testlanadi).
+// Umumiy summalar balansga cheklangan (capHoldToBalance), ro'yxat esa ledger'dagidek.
+function holdDetails(entries, balance, now = Date.now()) {
+    const summary = capHoldToBalance(summarizeHoldEntries(entries, now), balance);
+    const items = (entries || [])
+        .filter(e => e.withdrawalStatus !== "withdrawn" && e.withdrawalStatus !== "reversed")
+        .map(e => ({
+            id: e.id, amount: e.amount, source: e.source || null, refId: e.tradeId ?? null,
+            receivedAt: e.receivedAt, unlockAt: new Date(unlockAtMs(e)).toISOString(),
+            state: e.withdrawalStatus === "pending" ? "pending" : (isMatured(e, now) ? "available" : "frozen"),
+        }))
+        .sort((a, b) => a.unlockAt.localeCompare(b.unlockAt));
+    return { ...summary, items };
+}
+
+function getHoldDetails(userId) {
+    const ledger = getLedger(userId);
+    const user = asArr(read("users")).find(u => u.id === userId);
+    return holdDetails(ledger?.entries || [], user?.balance);
+}
+
 function getHoldSummary(userId) {
     const ledger = getLedger(userId);
     const summary = summarizeHoldEntries(ledger?.entries || []);
@@ -342,7 +364,7 @@ async function unlockWithPromo(userId, rawCode) {
 
 module.exports = {
     unlockFrozenEntries, unlockWithPromo,
-    creditTradeProceeds, getHoldSummary, summarizeHoldEntries, capHoldToBalance, isMatured, HOLD_MS,
+    creditTradeProceeds, getHoldSummary, getHoldDetails, holdDetails, summarizeHoldEntries, capHoldToBalance, isMatured, HOLD_MS,
     requestWithdrawal, getWithdrawalById, approveWithdrawal, rejectWithdrawal,
     getAllHoldsForAdmin, reverseTradeCreditEntry,
 };

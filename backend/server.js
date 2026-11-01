@@ -2387,7 +2387,7 @@ app.get("/api/admin/users", requireAdminPanel, async (req, res) => {
 app.get("/api/admin/users/:id", requireAdminPanel, async (req, res) => {
     const u = getUsers().find(x => x.id === Number(req.params.id));
     if (!u) return res.status(404).json({ error: "User topilmadi" });
-    await Promise.all([instantSellManager.refreshRequests(), refresh("withdrawals")]).catch(() => {});
+    await Promise.all([instantSellManager.refreshRequests(), refresh("withdrawals"), refresh("tradeBalances")]).catch(() => {});
     const isCeo = req.adminSession?.role === "ceo";
     // Faoliyat: qaysi skinni qachon sotgan, pul yechishlar, balans tarixi.
     const sells = instantSellManager.getMyInstantSellRequests(u.id).map(r => ({
@@ -2417,6 +2417,8 @@ app.get("/api/admin/users/:id", requireAdminPanel, async (req, res) => {
         joined:    u.joined,
         sells,
         withdrawals,
+        // Muzlatilgan / yechsa bo'ladigan / so'ralgan pul va har tushum qachon ochilishi.
+        hold: balanceManager.getHoldDetails(u.id),
         balanceHistory: (u.balanceHistory || []).slice(-100).reverse(),
     });
 });

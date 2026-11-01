@@ -161,6 +161,8 @@ export default function AdminUserDetail({ id }) {
             {u.blocked ? "Blokdan chiqarish" : "Bloklash"}
           </button>
 
+          {u.hold && <HoldBlock hold={u.hold} />}
+
           <Activity u={u} ceo={u.viewerRole === "ceo"} onAct={actOnRequest} />
 
           {u.wins?.length > 0 && (
@@ -335,6 +337,65 @@ function Activity({ u, ceo, onAct }) {
           ))}
         </ul>
       ) : <p className="p-4 text-center text-sm text-muted-foreground">Balans tarixi bo'sh</p>)}
+    </div>
+  );
+}
+
+// "3 kun 4 soat" / "5 soat 12 daqiqa" / "hozir"
+function timeLeft(iso, now) {
+  const ms = Date.parse(iso) - now;
+  if (!(ms > 0)) return "hozir";
+  const d = Math.floor(ms / 86400000), h = Math.floor((ms % 86400000) / 3600000), m = Math.floor((ms % 3600000) / 60000);
+  if (d > 0) return `${d} kun ${h} soat`;
+  if (h > 0) return `${h} soat ${m} daqiqa`;
+  return `${Math.max(m, 1)} daqiqa`;
+}
+
+const HOLD_STATE = {
+  frozen: ["Muzlatilgan", "border-sky-500/40 bg-sky-500/10 text-sky-500"],
+  available: ["Yechsa bo'ladi", "border-success/40 bg-success/10 text-success"],
+  pending: ["So'ralgan", "border-amber-500/40 bg-amber-500/10 text-amber-500"],
+};
+const SOURCE_TEXT = { instant_sell: "Skin sotish", trade: "Obmen" };
+
+// Muzlatilgan pul: qancha, har tushum qachon yechsa bo'ladigan bo'ladi.
+function HoldBlock({ hold }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(t); }, []);
+  const items = hold.items || [];
+  return (
+    <div className="border border-border bg-card">
+      <div className="border-b border-border px-4 py-3">
+        <h2 className="font-heading text-sm font-bold uppercase tracking-wide text-foreground">Muzlatilgan pul</h2>
+      </div>
+      <div className="grid grid-cols-3 gap-px bg-border text-center">
+        <div className="bg-card p-3"><p className="font-heading font-bold text-sky-500">{fmtMoney(hold.frozen || 0)}</p><p className="text-[11px] text-muted-foreground">Muzlatilgan</p></div>
+        <div className="bg-card p-3"><p className="font-heading font-bold text-success">{fmtMoney(hold.available || 0)}</p><p className="text-[11px] text-muted-foreground">Yechsa bo'ladi</p></div>
+        <div className="bg-card p-3"><p className="font-heading font-bold text-amber-500">{fmtMoney(hold.pending || 0)}</p><p className="text-[11px] text-muted-foreground">So'ralgan</p></div>
+      </div>
+      {hold.nextUnlockAt && (
+        <p className="border-t border-border px-4 py-2.5 text-center text-xs text-muted-foreground">
+          Keyingi ochilish: <span className="font-semibold text-foreground">{fmtDate(hold.nextUnlockAt)}</span> ({timeLeft(hold.nextUnlockAt, now)} qoldi)
+        </p>
+      )}
+      {items.length ? (
+        <ul className="divide-y divide-border border-t border-border">
+          {items.map((it) => (
+            <li key={it.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+              <span className="min-w-0">
+                <span className="block font-heading font-bold text-foreground">{fmtMoney(it.amount || 0)}</span>
+                <span className="block text-[11px] text-muted-foreground">
+                  {SOURCE_TEXT[it.source] || it.source || "Tushum"}{it.refId ? ` #${it.refId}` : ""} · tushgan: {fmtDate(it.receivedAt)}
+                </span>
+                {it.state === "frozen" && (
+                  <span className="block text-[11px] text-sky-500">ochiladi: {fmtDate(it.unlockAt)} · {timeLeft(it.unlockAt, now)} qoldi</span>
+                )}
+              </span>
+              <Badge map={HOLD_STATE} status={it.state} />
+            </li>
+          ))}
+        </ul>
+      ) : <p className="border-t border-border p-4 text-center text-sm text-muted-foreground">Muzlatilgan yoki yechiladigan pul yo'q</p>}
     </div>
   );
 }
