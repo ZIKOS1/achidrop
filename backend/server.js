@@ -1627,6 +1627,7 @@ app.post("/api/steam-inv-token", auth, sensitiveLimiter, (req, res) => {
 // admin Telegram'da "Oldim"ni bosgach tushadi.
 const SELL_CHECK_INV_MAX_AGE_MS = 15 * 60 * 1000;
 const { sellAdminMessages } = require("./sellAdminNotify");
+const { notifyWithdrawRequest } = require("./withdrawBot");
 const INSTANT_SELL_ERRORS = {
     no_key: "Skin sotish tez orada ishga tushadi",
     empty: "Hech qanday skin tanlanmagan",
@@ -1759,14 +1760,8 @@ app.post("/api/trade-withdraw", auth, sensitiveLimiter, async (req, res) => {
     if (result.error) return res.status(400).json({ error: "Hozircha yechib olish mumkin bo'lgan mablag' yo'q" });
     const { request } = result;
 
-    if (process.env.ADMIN_ID) {
-        toAdmins((adminId) => tgSendMessage(adminId, `💸 *Pul chiqarish so'rovi!*\n\n👤 ${mdEscape(u.name ?? String(u.id))}\n🪪 \`${u.id}\`\n💰 *${request.amount.toLocaleString()} so'm*\n💳 \`${request.cardNumber}\``,
-            { inline_keyboard: [[
-                { text: "✅ Tasdiqlash", callback_data: `wd_approve_${request.id}` },
-                { text: "❌ Rad etish",  callback_data: `wd_reject_${request.id}` },
-            ]] }
-        ));
-    }
+    // Alohida "pul yechish" botiga (WITHDRAW_BOT_TOKEN) — backend/withdrawBot.js.
+    if (process.env.ADMIN_ID) await notifyWithdrawRequest(u, request);
     res.json({ request });
 });
 

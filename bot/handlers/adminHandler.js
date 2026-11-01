@@ -100,6 +100,49 @@ function userDetailKeyboard(u) {
     ]);
 }
 
+// Pul yechish "Tasdiqlash/Rad etish" tugmalari. Asosiy botda ham, alohida
+// pul yechish botida (bot/withdrawBot.js) ham ishlaydi. userSend — foydalanuvchiga
+// javob ketadigan funksiya (doim asosiy bot: user yangi botni /start qilmagan).
+function registerWithdrawActions(bot, userSend) {
+    const isAdmin = (ctx) => isAdminId(ctx.from?.id);
+
+    // ── 💸 Pul chiqarish so'rovini tasdiqlash/rad etish (Obmen) ──────────────
+    bot.action(/^wd_approve_(\d+)$/, async (ctx) => {
+        await ctx.answerCbQuery();
+        if (!isAdmin(ctx)) return;
+        const id = Number(ctx.match[1]);
+        let result;
+        try { result = await balanceManager.approveWithdrawal(id); }
+        catch (err) { return ctx.reply("❌ Xatolik: " + err.message); }
+        if (result.error) return ctx.reply("❌ So'rov topilmadi yoki allaqachon ko'rib chiqilgan.");
+        const { request, user } = result;
+        ctx.editMessageText(
+            `✅ *Tasdiqlandi!*\n\n👤 ${user?.name ?? request.userId}\n💰 ${request.amount.toLocaleString()} so'm\n💳 \`${request.cardNumber}\``,
+            { parse_mode: "Markdown" }
+        ).catch(() => ctx.reply("✅ Tasdiqlandi."));
+        notifyUser(request.userId,
+            `✅ *Pul chiqarish so'rovingiz tasdiqlandi!*\n\n💰 ${request.amount.toLocaleString()} so'm kartangizga o'tkazildi.`,
+            userSend, { parse_mode: "Markdown" }
+        );
+    });
+
+    bot.action(/^wd_reject_(\d+)$/, async (ctx) => {
+        await ctx.answerCbQuery();
+        if (!isAdmin(ctx)) return;
+        const id = Number(ctx.match[1]);
+        let result;
+        try { result = await balanceManager.rejectWithdrawal(id, null); }
+        catch (err) { return ctx.reply("❌ Xatolik: " + err.message); }
+        if (result.error) return ctx.reply("❌ So'rov topilmadi yoki allaqachon ko'rib chiqilgan.");
+        const { request } = result;
+        ctx.editMessageText(`❌ *Rad etildi.*\n\n🪪 \`${request.userId}\``, { parse_mode: "Markdown" }).catch(() => ctx.reply("❌ Rad etildi."));
+        notifyUser(request.userId,
+            `❌ *Pul chiqarish so'rovingiz rad etildi.*\n\nAdmin bilan bog'laning.`,
+            userSend, { parse_mode: "Markdown" }
+        );
+    });
+}
+
 module.exports = (bot) => {
     const isAdmin = (ctx) => isAdminId(ctx.from?.id);
 
@@ -245,41 +288,8 @@ module.exports = (bot) => {
         ctx.editMessageText("Bekor qilindi.").catch(() => {});
     });
 
-    // ── 💸 Pul chiqarish so'rovini tasdiqlash/rad etish (Obmen) ──────────────
-    bot.action(/^wd_approve_(\d+)$/, async (ctx) => {
-        await ctx.answerCbQuery();
-        if (!isAdmin(ctx)) return;
-        const id = Number(ctx.match[1]);
-        let result;
-        try { result = await balanceManager.approveWithdrawal(id); }
-        catch (err) { return ctx.reply("❌ Xatolik: " + err.message); }
-        if (result.error) return ctx.reply("❌ So'rov topilmadi yoki allaqachon ko'rib chiqilgan.");
-        const { request, user } = result;
-        ctx.editMessageText(
-            `✅ *Tasdiqlandi!*\n\n👤 ${user?.name ?? request.userId}\n💰 ${request.amount.toLocaleString()} so'm\n💳 \`${request.cardNumber}\``,
-            { parse_mode: "Markdown" }
-        ).catch(() => ctx.reply("✅ Tasdiqlandi."));
-        notifyUser(request.userId,
-            `✅ *Pul chiqarish so'rovingiz tasdiqlandi!*\n\n💰 ${request.amount.toLocaleString()} so'm kartangizga o'tkazildi.`,
-            bot.telegram.sendMessage.bind(bot.telegram), { parse_mode: "Markdown" }
-        );
-    });
-
-    bot.action(/^wd_reject_(\d+)$/, async (ctx) => {
-        await ctx.answerCbQuery();
-        if (!isAdmin(ctx)) return;
-        const id = Number(ctx.match[1]);
-        let result;
-        try { result = await balanceManager.rejectWithdrawal(id, null); }
-        catch (err) { return ctx.reply("❌ Xatolik: " + err.message); }
-        if (result.error) return ctx.reply("❌ So'rov topilmadi yoki allaqachon ko'rib chiqilgan.");
-        const { request } = result;
-        ctx.editMessageText(`❌ *Rad etildi.*\n\n🪪 \`${request.userId}\``, { parse_mode: "Markdown" }).catch(() => ctx.reply("❌ Rad etildi."));
-        notifyUser(request.userId,
-            `❌ *Pul chiqarish so'rovingiz rad etildi.*\n\nAdmin bilan bog'laning.`,
-            bot.telegram.sendMessage.bind(bot.telegram), { parse_mode: "Markdown" }
-        );
-    });
+    // ── 💸 Pul chiqarish so'rovini tasdiqlash/rad etish (eski xabarlar uchun ham) ──
+    registerWithdrawActions(bot, bot.telegram.sendMessage.bind(bot.telegram));
 
     // ── 🎟 Promo boshqaruv (Statistikadan kirish) ─────────────────────────────
     bot.action("manage_promos", async (ctx) => {
@@ -1065,3 +1075,5 @@ module.exports = (bot) => {
 // ── Promo kodlar (adminHandler ga qo'shimcha) ─────────────────────────────────
 // Bu qatorlarni module.exports ichiga qo'shish kerak emas,
 // chunki alohida faylga chiqaramiz
+
+module.exports.registerWithdrawActions = registerWithdrawActions;

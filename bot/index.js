@@ -192,6 +192,9 @@ async function main() {
     bot.launch();
     console.log("✅ BOT ishga tushdi!");
 
+    // Alohida pul yechish boti (WITHDRAW_BOT_TOKEN bo'lsa).
+    require("./withdrawBot").startWithdrawBot(bot);
+
     process.once("SIGINT",  () => bot.stop("SIGINT"));
     process.once("SIGTERM", () => bot.stop("SIGTERM"));
 }

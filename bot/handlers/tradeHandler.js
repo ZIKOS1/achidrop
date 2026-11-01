@@ -7,6 +7,7 @@ const { createPendingAuth } = require("../../backend/auth-steam");
 const tradeManager   = require("../../backend/tradeManager");
 const tradeDelivery  = require("../../backend/tradeDelivery");
 const balanceManager = require("../../backend/balanceManager");
+const { notifyWithdrawRequest } = require("../../backend/withdrawBot");
 const chatManager    = require("../../backend/chatManager");
 const skinUtils      = require("../../backend/skinUtils");
 
@@ -404,12 +405,8 @@ module.exports = (bot) => {
             `✅ *So'rov yuborildi!*\n\n💰 ${fmt(request.amount)} so'm\n💳 Karta: \`${request.cardNumber}\`\n\n⏳ Admin tekshirib, tez orada o'tkazadi.`,
             { parse_mode: "Markdown" }
         ).catch(() => {});
-        toAdmins((adminId) => bot.telegram.sendMessage(adminId, `💸 *Pul chiqarish so'rovi!*\n\n👤 ${user?.name ?? userId}\n🪪 \`${userId}\`\n💰 *${fmt(request.amount)} so'm*\n💳 \`${request.cardNumber}\``,
-            { parse_mode: "Markdown", ...Markup.inlineKeyboard([[
-                Markup.button.callback("✅ Tasdiqlash", `wd_approve_${request.id}`),
-                Markup.button.callback("❌ Rad etish",  `wd_reject_${request.id}`),
-            ]])}
-        )).catch(() => {});
+        // Alohida "pul yechish" botiga (WITHDRAW_BOT_TOKEN) — backend/withdrawBot.js.
+        notifyWithdrawRequest(user ?? { id: userId }, request).catch(() => {});
     });
 
     bot.action("wd_promo", async (ctx) => {
