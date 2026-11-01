@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 function load(env) {
-    const keys = ["WITHDRAW_BOT_TOKEN", "BOT_TOKEN", "ADMIN_ID", "ADMIN_IDS"];
+    const keys = ["WITHDRAW_BOT_TOKEN", "BOT_TOKEN", "ADMIN_ID", "ADMIN_IDS", "WITHDRAW_ADMIN_IDS"];
     const saved = Object.fromEntries(keys.map(k => [k, process.env[k]]));
     for (const k of keys) delete process.env[k];
     Object.assign(process.env, env);
@@ -18,14 +18,14 @@ function fakeFetch(calls) {
 
 const request = { id: 77, userId: 5, amount: 150000, cardNumber: "8600123412341234" };
 
-test("WITHDRAW_BOT_TOKEN bor → so'rov alohida botdan har adminga, tugmalar bilan", async () => {
-    const { mod, restore } = load({ WITHDRAW_BOT_TOKEN: "WD", BOT_TOKEN: "MAIN", ADMIN_ID: "1", ADMIN_IDS: "2" });
+test("WITHDRAW_BOT_TOKEN bor → so'rov alohida botdan FAQAT 585108093 ga, tugmalar bilan", async () => {
+    const { mod, restore } = load({ WITHDRAW_BOT_TOKEN: "WD", BOT_TOKEN: "MAIN", ADMIN_ID: "1", ADMIN_IDS: "2,585108093" });
     try {
         const calls = [];
         await mod.notifyWithdrawRequest({ id: 5, name: "a_b" }, request, fakeFetch(calls));
-        assert.equal(calls.length, 2);
-        assert.ok(calls.every(c => c.url === "https://api.telegram.org/botWD/sendMessage"));
-        assert.deepEqual(calls.map(c => String(c.body.chat_id)).sort(), ["1", "2"]);
+        assert.equal(calls.length, 1);
+        assert.equal(calls[0].url, "https://api.telegram.org/botWD/sendMessage");
+        assert.equal(String(calls[0].body.chat_id), "585108093");
         const b = calls[0].body;
         assert.match(b.text, /Pul chiqarish so'rovi/);
         assert.match(b.text, /a\\_b/);
@@ -43,4 +43,16 @@ test("WITHDRAW_BOT_TOKEN yo'q → asosiy botga (avvalgidek)", async () => {
         assert.equal(calls.length, 1);
         assert.equal(calls[0].url, "https://api.telegram.org/botMAIN/sendMessage");
     } finally { restore(); }
+});
+
+test("isWithdrawAdmin: faqat 585108093; boshqa adminlar (ADMIN_ID) emas; WITHDRAW_ADMIN_IDS bilan o'zgartirsa bo'ladi", () => {
+    const a = load({ ADMIN_ID: "1", ADMIN_IDS: "585108093" });
+    try {
+        assert.equal(a.mod.isWithdrawAdmin(585108093), true);
+        assert.equal(a.mod.isWithdrawAdmin("585108093"), true);
+        assert.equal(a.mod.isWithdrawAdmin(1), false);
+        assert.equal(a.mod.isWithdrawAdmin(undefined), false);
+    } finally { a.restore(); }
+    const b = load({ WITHDRAW_ADMIN_IDS: "7, 8" });
+    try { assert.deepEqual(b.mod.withdrawAdminIds(), [7, 8]); } finally { b.restore(); }
 });

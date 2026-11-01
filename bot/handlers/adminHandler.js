@@ -5,6 +5,7 @@ const { finishAuction, cancelAuction } = require("../../backend/auctionLifecycle
 const { notifyUser, pushNotification } = require("../../backend/notify");
 const balanceManager = require("../../backend/balanceManager");
 const supportManager = require("../../backend/supportManager");
+const { isWithdrawAdmin } = require("../../backend/withdrawBot");
 
 function readUsers() {
     const data = read("users");
@@ -104,7 +105,8 @@ function userDetailKeyboard(u) {
 // pul yechish botida (bot/withdrawBot.js) ham ishlaydi. userSend — foydalanuvchiga
 // javob ketadigan funksiya (doim asosiy bot: user yangi botni /start qilmagan).
 function registerWithdrawActions(bot, userSend) {
-    const isAdmin = (ctx) => isAdminId(ctx.from?.id);
+    // Faqat pul yechish admini (585108093) tasdiqlay/rad eta oladi — backend/withdrawBot.js.
+    const isAdmin = (ctx) => isWithdrawAdmin(ctx.from?.id);
 
     // ── 💸 Pul chiqarish so'rovini tasdiqlash/rad etish (Obmen) ──────────────
     bot.action(/^wd_approve_(\d+)$/, async (ctx) => {

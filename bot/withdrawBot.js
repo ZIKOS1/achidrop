@@ -3,7 +3,7 @@
 // tugmalari shu yerda ishlaydi, foydalanuvchiga javob esa ASOSIY bot orqali ketadi.
 // Token yo'q bo'lsa — hech narsa qilinmaydi (so'rovlar asosiy botga keladi).
 const { Telegraf } = require("telegraf");
-const { isAdminId } = require("../backend/adminIds");
+const { isWithdrawAdmin } = require("../backend/withdrawBot");
 const { registerWithdrawActions } = require("./handlers/adminHandler");
 
 function startWithdrawBot(mainBot) {
@@ -16,9 +16,9 @@ function startWithdrawBot(mainBot) {
     const wb = new Telegraf(token);
     wb.catch((err, ctx) => console.error(`❌ Pul yechish boti xatosi [${ctx.updateType}]:`, err.message || err));
 
-    wb.start((ctx) => ctx.reply(isAdminId(ctx.from?.id)
+    wb.start((ctx) => ctx.reply(isWithdrawAdmin(ctx.from?.id)
         ? "💸 Pul yechish so'rovlari shu botga keladi. Har bir so'rovda \"Tasdiqlash\" yoki \"Rad etish\"ni bosing."
-        : "Bu bot faqat adminlar uchun."));
+        : "Bu bot faqat pul yechish admini uchun."));
 
     registerWithdrawActions(wb, mainBot.telegram.sendMessage.bind(mainBot.telegram));
 
