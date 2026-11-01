@@ -71,6 +71,8 @@ export default function Modal({ modal, onClose }) {
         ) : (
           <>
             {!modal.noInput && <input
+              // Ketma-ket modal (masalan summa → sabab) oldingi yozilgan qiymatni olib qolmasin.
+              key={`${modal.title}|${modal.okLabel}|${modal.placeholder}`}
               ref={inpRef}
               type={modal.inputType || "text"}
               inputMode={modal.inputType === "number" ? "numeric" : undefined}

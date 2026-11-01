@@ -2388,6 +2388,7 @@ app.get("/api/admin/users/:id", requireAdminPanel, async (req, res) => {
     const u = getUsers().find(x => x.id === Number(req.params.id));
     if (!u) return res.status(404).json({ error: "User topilmadi" });
     await Promise.all([instantSellManager.refreshRequests(), refresh("withdrawals")]).catch(() => {});
+    const isCeo = req.adminSession?.role === "ceo";
     // Faoliyat: qaysi skinni qachon sotgan, pul yechishlar, balans tarixi.
     const sells = instantSellManager.getMyInstantSellRequests(u.id).map(r => ({
         id: r.id, groupId: r.groupId ?? r.id, status: r.status, totalSom: r.totalSom,
@@ -2397,8 +2398,12 @@ app.get("/api/admin/users/:id", requireAdminPanel, async (req, res) => {
     }));
     const withdrawals = (read("withdrawals") || []).filter(w => w.userId === u.id)
         .sort((a, b) => String(b.requestedAt).localeCompare(String(a.requestedAt)))
-        .map(w => ({ id: w.id, amount: w.amount, status: w.status, card: w.cardNumber ? `•••• ${String(w.cardNumber).slice(-4)}` : null, requestedAt: w.requestedAt, resolvedAt: w.resolvedAt, rejectComment: w.rejectComment ?? null }));
+        .map(w => ({ id: w.id, amount: w.amount, status: w.status, card: w.cardNumber ? `•••• ${String(w.cardNumber).slice(-4)}` : null,
+            // To'liq karta faqat CEO'ga — pul yechishni faqat u tasdiqlaydi (to'lash uchun kerak).
+            cardFull: isCeo ? (w.cardNumber ?? null) : undefined,
+            requestedAt: w.requestedAt, resolvedAt: w.resolvedAt, rejectComment: w.rejectComment ?? null }));
     res.json({
+        viewerRole: req.adminSession?.role || null,
         id:        u.id,
         name:      u.name,
         username:  u.username || null,
@@ -2416,6 +2421,12 @@ app.get("/api/admin/users/:id", requireAdminPanel, async (req, res) => {
     });
 });
 
+// Balans tarixidagi sabab: admin yozgan izoh bo'lsa — "Admin tomonidan ayirildi: <izoh>".
+function adminReason(base, note) {
+    const n = String(note ?? "").trim().slice(0, 200);
+    return n ? `${base}: ${n}` : base;
+}
+
 // POST /api/admin/users/:id/balance — balans qo'shish
 app.post("/api/admin/users/:id/balance", requireAdminPanel, (req, res) => {
     const amount = Number(req.body.amount);
@@ -2427,7 +2438,7 @@ app.post("/api/admin/users/:id/balance", requireAdminPanel, (req, res) => {
 
     u.balance = (u.balance ?? 0) + amount;
     if (!Array.isArray(u.balanceHistory)) u.balanceHistory = [];
-    u.balanceHistory.push({ amount, reason: "Admin tomonidan qo'shildi", date: new Date().toISOString() });
+    u.balanceHistory.push({ amount, reason: adminReason("Admin tomonidan qo'shildi", req.body.reason), date: new Date().toISOString() });
     saveUsers(arr);
     res.json({ success: true, balance: u.balance });
 });
@@ -2443,7 +2454,7 @@ app.post("/api/admin/users/:id/balance-subtract", requireAdminPanel, (req, res) 
 
     u.balance = (u.balance ?? 0) - amount;
     if (!Array.isArray(u.balanceHistory)) u.balanceHistory = [];
-    u.balanceHistory.push({ amount: -amount, reason: "Admin tomonidan ayirildi", date: new Date().toISOString() });
+    u.balanceHistory.push({ amount: -amount, reason: adminReason("Admin tomonidan ayirildi", req.body.reason), date: new Date().toISOString() });
     saveUsers(arr);
     res.json({ success: true, balance: u.balance });
 });
@@ -2630,6 +2641,31 @@ app.post("/api/admin/instant-sell/:id/reject", requireAdminPanel, async (req, re
     if (result.error) return res.status(400).json({ error: result.error });
     notifyUser(result.request.userId, instantSellManager.rejectedText(result.request), tgSendMessage);
     res.json({ request: result.request });
+});
+
+// ── ADMIN: Pul yechish so'rovlari (foydalanuvchi sahifasidan) — FAQAT CEO ─────
+// Telegram'dagi @faststarz_bot tugmalari bilan bir xil: tasdiqlash = admin pulni
+// kartaga o'tkazdi (balansdan ayiriladi), rad etish = mablag' yana yechsa bo'ladigan
+// bo'ladi. Bir so'rov ikki joyda bosilsa ham bir marta ishlaydi (status "pending" sharti).
+app.post("/api/admin/withdrawals/:id/approve", requireCeo, async (req, res) => {
+    let result;
+    try { result = await balanceManager.approveWithdrawal(Number(req.params.id)); }
+    catch (err) { return res.status(500).json({ error: err.message }); }
+    if (result.error) return res.status(400).json({ error: "So'rov topilmadi yoki allaqachon ko'rib chiqilgan" });
+    const { request } = result;
+    notifyUser(request.userId, `✅ *Pul chiqarish so'rovingiz tasdiqlandi!*\n\n💰 ${request.amount.toLocaleString()} so'm kartangizga o'tkazildi.`, tgSendMessage);
+    res.json({ request: { id: request.id, status: request.status } });
+});
+
+app.post("/api/admin/withdrawals/:id/reject", requireCeo, async (req, res) => {
+    const comment = String(req.body.reason || "").trim().slice(0, 300) || null;
+    let result;
+    try { result = await balanceManager.rejectWithdrawal(Number(req.params.id), comment); }
+    catch (err) { return res.status(500).json({ error: err.message }); }
+    if (result.error) return res.status(400).json({ error: "So'rov topilmadi yoki allaqachon ko'rib chiqilgan" });
+    const { request } = result;
+    notifyUser(request.userId, `❌ *Pul chiqarish so'rovingiz rad etildi.*${comment ? `\n\nSabab: ${mdEscape(comment)}` : ""}\n\nAdmin bilan bog'laning.`, tgSendMessage);
+    res.json({ request: { id: request.id, status: request.status } });
 });
 
 // ── ADMIN: Lis avtosell (narxlarni egasining kompyuteridagi lisAutosellSync.js yozadi) ──

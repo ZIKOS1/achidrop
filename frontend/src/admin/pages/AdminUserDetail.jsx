@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Minus, ShieldOff, ShieldCheck, ExternalLink, CheckCircle2, XCircle, Package } from "lucide-react";
+import { Plus, Minus, ShieldOff, ShieldCheck, ExternalLink, CheckCircle2, XCircle, Package, ChevronDown } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
 import { confirmTg, fmtMoney, hap, imgSrc } from "../../utils";
@@ -18,48 +18,68 @@ export default function AdminUserDetail({ id }) {
   }
   useEffect(load, [id]);
 
-  function openAddBalance() {
+  // Balans o'zgartirish: 1) summa, 2) sabab (ixtiyoriy — balans tarixida ko'rinadi).
+  function openBalanceChange(kind) {
+    const add = kind === "add";
     openModal({
-      title: "Balans qo'shish",
+      title: add ? "Balans qo'shish" : "Balans ayirish",
       inputType: "number",
       placeholder: "Summa kiriting...",
-      okLabel: "Qo'shish",
-      info: <span className="text-muted-foreground">{u.name} ga qo'shiladigan summa (so'm)</span>,
+      okLabel: "Davom etish",
+      info: <span className="text-muted-foreground">{u.name} {add ? "ga qo'shiladigan" : "dan ayiriladigan"} summa (so'm). Hozirgi balans: {fmtMoney(u.balance || 0)}</span>,
       onSubmit: async (raw) => {
         const amount = Number(raw);
         if (!amount || amount <= 0) return showToast("Musbat raqam kiriting", "err");
-        try {
-          await api(`/api/admin/users/${id}/balance`, { method: "POST", body: JSON.stringify({ amount }) });
-          closeModal();
-          hap("notif", "success");
-          showToast("Balans qo'shildi!", "ok");
-          load();
-        } catch (e) {
-          showToast(e.error || "Xato", "err");
-        }
+        openModal({
+          title: add ? "Balans qo'shish" : "Balans ayirish",
+          placeholder: "Sabab (ixtiyoriy)...",
+          okLabel: add ? `+${fmtMoney(amount)} qo'shish` : `−${fmtMoney(amount)} ayirish`,
+          info: `Foydalanuvchi: ${u.name}\nHozirgi balans: ${fmtMoney(u.balance || 0)}\nYangi balans: ${fmtMoney((u.balance || 0) + (add ? amount : -amount))}`,
+          onSubmit: async (reason) => {
+            try {
+              await api(`/api/admin/users/${id}/${add ? "balance" : "balance-subtract"}`, { method: "POST", body: JSON.stringify({ amount, reason }) });
+              closeModal();
+              hap("notif", "success");
+              showToast(add ? "Balans qo'shildi!" : "Balans ayirildi!", "ok");
+              load();
+            } catch (e) {
+              showToast(e.error || "Xato", "err");
+            }
+          },
+        });
       },
     });
   }
+  const openAddBalance = () => openBalanceChange("add");
+  const openSubtractBalance = () => openBalanceChange("subtract");
 
-  function openSubtractBalance() {
+  // So'rov ustida amal: skin sotish (oldim/rad) yoki pul yechish (to'landi/rad — faqat CEO).
+  // Rad etishda sabab so'raladi — foydalanuvchiga Telegram'da shu sabab boradi.
+  function actOnRequest(type, req, action) {
+    const url = type === "sell" ? `/api/admin/instant-sell/${req.id}/${action}` : `/api/admin/withdrawals/${req.id}/${action}`;
+    const reject = action === "reject";
+    const title = type === "sell"
+      ? (reject ? `Skin sotish #${req.id} — rad etish` : `Skin sotish #${req.id} — oldim`)
+      : (reject ? `Pul yechish #${req.id} — rad etish` : `Pul yechish #${req.id} — to'landi`);
+    const info = type === "sell"
+      ? `Skin: ${req.items.map((i) => i.name).join(", ")}\nSumma: ${fmtMoney(req.totalSom || 0)}\n${reject ? "Natija: pul tushmaydi, userga xabar boradi" : "Natija: pul userning balansiga tushadi"}`
+      : `Summa: ${fmtMoney(req.amount || 0)}\nKarta: ${req.cardFull || req.card || "—"}\n${reject ? "Natija: mablag' qaytadan yechsa bo'ladigan bo'ladi" : "Natija: balansdan ayiriladi (kartaga o'tkazdingizmi?)"}`;
     openModal({
-      title: "Balans ayirish",
-      inputType: "number",
-      placeholder: "Summa kiriting...",
-      okLabel: "Ayirish",
-      info: <span className="text-muted-foreground">{u.name} dan ayiriladigan summa (so'm)</span>,
-      onSubmit: async (raw) => {
-        const amount = Number(raw);
-        if (!amount || amount <= 0) return showToast("Musbat raqam kiriting", "err");
+      title,
+      info,
+      noInput: !reject,
+      placeholder: "Sabab (userga ko'rinadi, ixtiyoriy)...",
+      okLabel: reject ? "Rad etish" : (type === "sell" ? "Oldim — pulni tushirish" : "Ha, to'landi"),
+      onSubmit: async (reason) => {
         try {
-          await api(`/api/admin/users/${id}/balance-subtract`, { method: "POST", body: JSON.stringify({ amount }) });
+          await api(url, { method: "POST", body: JSON.stringify(reject ? { reason } : {}) });
           closeModal();
           hap("notif", "success");
-          showToast("Balans ayirildi!", "ok");
-          load();
+          showToast(reject ? "Rad etildi" : (type === "sell" ? "Pul balansga tushdi" : "To'landi deb belgilandi"), "ok");
         } catch (e) {
-          showToast(e.error || "Xato", "err");
+          showToast(e.error === "wrong_state" ? "Bu so'rov allaqachon ko'rib chiqilgan" : (e.error || "Xato"), "err");
         }
+        load();
       },
     });
   }
@@ -141,7 +161,7 @@ export default function AdminUserDetail({ id }) {
             {u.blocked ? "Blokdan chiqarish" : "Bloklash"}
           </button>
 
-          <Activity u={u} />
+          <Activity u={u} ceo={u.viewerRole === "ceo"} onAct={actOnRequest} />
 
           {u.wins?.length > 0 && (
             <div className="border border-border bg-card">
@@ -187,8 +207,10 @@ function Badge({ map, status }) {
 }
 
 // Foydalanuvchi faoliyati: qaysi skinni qachon sotgan, pul yechishlar, balans tarixi.
-function Activity({ u }) {
+function Activity({ u, ceo, onAct }) {
   const [tab, setTab] = useState("sells");
+  const [open, setOpen] = useState(null); // ochilgan so'rov: "s<id>" | "w<id>"
+  const toggle = (key) => setOpen((o) => (o === key ? null : key));
   const sells = u.sells || [];
   const wds = u.withdrawals || [];
   const hist = u.balanceHistory || [];
@@ -218,10 +240,13 @@ function Activity({ u }) {
         <ul className="divide-y divide-border">
           {sells.map((r) => (
             <li key={r.id} className="space-y-2 px-4 py-3">
-              <div className="flex items-center justify-between gap-2 text-xs">
-                <span className="text-muted-foreground">#{r.groupId} · {fmtDate(r.createdAt)}</span>
+              <button type="button" onClick={() => toggle(`s${r.id}`)} className="flex w-full items-center justify-between gap-2 text-left text-xs">
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <ChevronDown className={"size-3.5 transition-transform " + (open === `s${r.id}` ? "rotate-180" : "")} />
+                  #{r.id} · {fmtDate(r.createdAt)}
+                </span>
                 <Badge map={SELL_STATUS} status={r.status} />
-              </div>
+              </button>
               {r.items.map((it, i) => (
                 <div key={i} className="flex items-center gap-3">
                   <span className="flex size-10 shrink-0 items-center justify-center bg-secondary">
@@ -236,6 +261,22 @@ function Activity({ u }) {
                 {r.resolvedAt ? ` · hal qilingan: ${fmtDate(r.resolvedAt)}` : ""}
                 {r.rejectReason ? ` · sabab: ${r.rejectReason}` : ""}
               </p>
+              {open === `s${r.id}` && (
+                <div className="space-y-2 border border-border bg-secondary/40 p-3 text-xs">
+                  <Row label="So'rov" value={`#${r.id}${r.groupId !== r.id ? ` (sotuv #${r.groupId})` : ""}`} />
+                  <Row label="Summa" value={fmtMoney(r.totalSom || 0)} />
+                  <Row label="Yaratilgan" value={fmtDate(r.createdAt)} />
+                  {r.resolvedAt && <Row label="Hal qilingan" value={fmtDate(r.resolvedAt)} />}
+                  <Row label="Trade offer" value={r.tradeOffer ? OFFER_TEXT[r.tradeOffer.state] || r.tradeOffer.state : "qo'lda yuborish"} />
+                  {r.status === "awaiting_admin" ? (
+                    <ActionButtons
+                      onReject={() => onAct("sell", r, "reject")}
+                      onApprove={() => onAct("sell", r, "approve")}
+                      approveLabel="Oldim"
+                    />
+                  ) : <p className="text-center text-muted-foreground">Bu so'rov allaqachon ko'rib chiqilgan</p>}
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -244,12 +285,36 @@ function Activity({ u }) {
       {tab === "wds" && (wds.length ? (
         <ul className="divide-y divide-border">
           {wds.map((w) => (
-            <li key={w.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-              <span className="min-w-0">
-                <span className="block font-heading font-bold text-foreground">{fmtMoney(w.amount || 0)}</span>
-                <span className="block text-[11px] text-muted-foreground">{w.card || "—"} · {fmtDate(w.requestedAt)}{w.rejectComment ? ` · ${w.rejectComment}` : ""}</span>
-              </span>
-              <Badge map={WD_STATUS} status={w.status} />
+            <li key={w.id} className="space-y-2 px-4 py-3 text-sm">
+              <button type="button" onClick={() => toggle(`w${w.id}`)} className="flex w-full items-center justify-between gap-3 text-left">
+                <span className="flex min-w-0 items-center gap-2">
+                  <ChevronDown className={"size-3.5 shrink-0 text-muted-foreground transition-transform " + (open === `w${w.id}` ? "rotate-180" : "")} />
+                  <span className="min-w-0">
+                    <span className="block font-heading font-bold text-foreground">{fmtMoney(w.amount || 0)}</span>
+                    <span className="block text-[11px] text-muted-foreground">{w.card || "—"} · {fmtDate(w.requestedAt)}{w.rejectComment ? ` · ${w.rejectComment}` : ""}</span>
+                  </span>
+                </span>
+                <Badge map={WD_STATUS} status={w.status} />
+              </button>
+              {open === `w${w.id}` && (
+                <div className="space-y-2 border border-border bg-secondary/40 p-3 text-xs">
+                  <Row label="So'rov" value={`#${w.id}`} />
+                  <Row label="Summa" value={fmtMoney(w.amount || 0)} />
+                  <Row label="Karta" value={<span className="select-all font-mono">{w.cardFull || w.card || "—"}</span>} />
+                  <Row label="So'ralgan" value={fmtDate(w.requestedAt)} />
+                  {w.resolvedAt && <Row label="Hal qilingan" value={fmtDate(w.resolvedAt)} />}
+                  {w.rejectComment && <Row label="Sabab" value={w.rejectComment} />}
+                  {w.status !== "pending" ? (
+                    <p className="text-center text-muted-foreground">Bu so'rov allaqachon ko'rib chiqilgan</p>
+                  ) : ceo ? (
+                    <ActionButtons
+                      onReject={() => onAct("wd", w, "reject")}
+                      onApprove={() => onAct("wd", w, "approve")}
+                      approveLabel="To'landi"
+                    />
+                  ) : <p className="text-center text-muted-foreground">Pul yechishni faqat CEO tasdiqlaydi yoki rad etadi</p>}
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -270,6 +335,19 @@ function Activity({ u }) {
           ))}
         </ul>
       ) : <p className="p-4 text-center text-sm text-muted-foreground">Balans tarixi bo'sh</p>)}
+    </div>
+  );
+}
+
+function ActionButtons({ onReject, onApprove, approveLabel }) {
+  return (
+    <div className="flex gap-2 pt-1">
+      <button type="button" onClick={onReject} className="flex flex-1 items-center justify-center gap-1.5 border border-destructive/50 py-2 text-xs font-bold uppercase text-destructive">
+        <XCircle className="size-4" /> Rad etish
+      </button>
+      <button type="button" onClick={onApprove} className="flex flex-1 items-center justify-center gap-1.5 bg-success py-2 text-xs font-bold uppercase text-white">
+        <CheckCircle2 className="size-4" /> {approveLabel}
+      </button>
     </div>
   );
 }
