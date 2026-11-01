@@ -1626,7 +1626,7 @@ app.post("/api/steam-inv-token", auth, sensitiveLimiter, (req, res) => {
 // so'rovi. Pul DARHOL tushmaydi: user skinni trade linkimizga yuboradi,
 // admin Telegram'da "Oldim"ni bosgach tushadi.
 const SELL_CHECK_INV_MAX_AGE_MS = 15 * 60 * 1000;
-const LIS_AUTO_RATIO = 0.9; // adminga ko'rsatiladigan taxminiy Lis avtosell = Lis min narx × 0.9
+const { sellAdminMessages } = require("./sellAdminNotify");
 const INSTANT_SELL_ERRORS = {
     no_key: "Skin sotish tez orada ishga tushadi",
     empty: "Hech qanday skin tanlanmagan",
@@ -1699,35 +1699,13 @@ function groupView(requests) {
     };
 }
 
-// Har skin uchun adminga ALOHIDA xabar (o'zining "Oldim"/"Rad etish" tugmalari bilan).
-// Taxminiy Lis avtosell: Lis'dagi eng arzon narx × LIS_AUTO_RATIO — admin
-// "Oldim"dan oldin foyda bor-yo'qligini ko'rishi uchun (faqat ma'lumot).
-// Lis xato bersa ham xabar baribir ketadi ("narx yo'q" bilan).
+// Har skin uchun adminga ALOHIDA xabar (skin nomi, taxminiy Lis avto narxi,
+// o'zining "Oldim"/"Rad etish" tugmalari bilan) — format sellAdminNotify.js'da.
 async function notifyAdminsSellSent(u, requests) {
     if (!process.env.ADMIN_ID || !requests.length) return;
-    let lisUsd = new Map();
-    try { lisUsd = await lisSkinsPrice.fetchLisPricesUsd([...new Set(requests.map(r => r.items[0].marketHashName))]); }
-    catch (err) { console.log("LIS AVTO NARX XATO:", err.message); }
-    const rate = lisSkinsPrice.getUsdToSomRate();
-    const autoText = (name) => {
-        const usd = lisUsd.get(name);
-        return Number.isFinite(usd) ? `Lis avto ≈ $${(usd * LIS_AUTO_RATIO).toFixed(2)} (${Math.round(usd * LIS_AUTO_RATIO * rate).toLocaleString()} so'm)` : "Lis avto: narx yo'q";
-    };
-    const who = `👤 ${mdEscape(u.name ?? String(u.id))}\n🪪 \`${u.id}\`\n🎮 Steam: \`${u.steamId64}\``;
+    const msgs = await sellAdminMessages(u, requests, `✉️ User skinni yubordim dedi. Steam'da kelganini tekshiring, keyin "Oldim"ni bosing.`);
     // Ketma-ket — 30 ta xabarni birdan yuborib Telegram limitiga urilmaslik uchun.
-    for (const [i, r] of requests.entries()) {
-        const it = r.items[0];
-        const line = `${it.marketHashName}${it.float != null ? ` (float ${it.float.toFixed(4)})` : ""}`;
-        const part = requests.length > 1 ? ` (${i + 1}/${requests.length})` : "";
-        await toAdmins((adminId) => tgSendMessage(adminId, `💸 *SKIN SOTISH #${r.id}*${part}\n\n${who}\n\n` +
-            `🔫 ${mdEscape(line)}\n💰 *${r.totalSom.toLocaleString()} so'm*\n🤖 ${mdEscape(autoText(it.marketHashName))}\n\n` +
-            `✉️ User skinni yubordim dedi. Steam'da kelganini tekshiring, keyin "Oldim"ni bosing.`,
-            { inline_keyboard: [[
-                { text: "✅ Oldim", callback_data: `isell_ok_${r.id}` },
-                { text: "❌ Rad etish", callback_data: `isell_no_${r.id}` },
-            ]] }
-        ));
-    }
+    for (const m of msgs) await toAdmins((adminId) => tgSendMessage(adminId, m.text, m.keyboard));
 }
 
 // POST /api/instant-sell/sent — { ids: [...] } — user skin(lar)ni Steam'da

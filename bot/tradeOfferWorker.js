@@ -18,7 +18,7 @@ const REJECT_BY_STATE = {
     InvalidItems: ["invalid", "Skin inventarda topilmadi"],
 };
 
-function createWorker({ now, steam, store, notifyAdmins, notifyUser }) {
+function createWorker({ now, steam, store, notifyAdmins, notifyUser, notifyAccepted }) {
     const { rejectedText } = require("../backend/instantSellManager");
     const iso = () => new Date(now()).toISOString();
 
@@ -125,7 +125,9 @@ function createWorker({ now, steam, store, notifyAdmins, notifyUser }) {
 
     async function markAccepted(g, from) {
         if (await store.setTradeOfferState(g.groupId, from, { state: "accepted" })) {
-            await notifyAdmins(`✅ Trade qabul qilindi: AchiDrop #${g.groupId} — skin botda, Steam'da tekshirib "Oldim"ni bosing.`, g.requests);
+            // Har skin alohida xabar (nomi + taxminiy Lis avto) — bot jarayonida notifyAccepted.
+            if (notifyAccepted) await notifyAccepted(g);
+            else await notifyAdmins(`✅ Trade qabul qilindi: AchiDrop #${g.groupId} — skin botda, Steam'da tekshirib "Oldim"ni bosing.`, g.requests);
         }
     }
 
@@ -201,6 +203,8 @@ function startTradeOfferLoop(bot) {
     const ism = require("../backend/instantSellManager");
     const { toAdmins } = require("../backend/adminIds");
     const { notifyUser } = require("../backend/notify");
+    const { sellAdminMessages } = require("../backend/sellAdminNotify");
+    const { read, refresh } = require("../backend/database/db");
     const deps = bridge.mongoDeps();
     const send = bot.telegram.sendMessage.bind(bot.telegram);
 
@@ -246,6 +250,15 @@ function startTradeOfferLoop(bot) {
             ]) },
         })),
         notifyUser: async (userId, text) => notifyUser(userId, text, send, { parse_mode: "Markdown" }),
+        // Trade qabul qilindi → har skin uchun alohida xabar (eski format: skin nomi,
+        // narx, taxminiy Lis avto, "Oldim"/"Rad etish"). Ketma-ket — Telegram limiti.
+        notifyAccepted: async (g) => {
+            await refresh("users").catch(() => {});
+            const raw = read("users");
+            const u = (Array.isArray(raw) ? raw : []).find((x) => x.id === g.userId) || { id: g.userId };
+            const msgs = await sellAdminMessages(u, g.requests, `✅ Trade qabul qilindi (AchiDrop #${g.groupId}) — skin botda. Steam'da tekshirib "Oldim"ni bosing.`);
+            for (const m of msgs) await toAdmins((id) => send(id, m.text, { parse_mode: "Markdown", reply_markup: m.keyboard }));
+        },
     });
 
     // Bir vaqtda bitta nusxa ishlasin (oldingisi tugamaguncha keyingisi o'tkazib yuboriladi).

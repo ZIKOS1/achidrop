@@ -261,3 +261,39 @@ test("scheduleTradeOfferLoop: send/poll recoverStale TUGAGANDAN keyin boshlanadi
     assert.deepEqual(order.slice(-2), ["sync", "send"]);
     assert.ok(beats.length >= 1, "send tsiklida heartbeat");
 });
+
+test("Accepted + notifyAccepted → umumiy xabar emas, guruh notifyAccepted'ga bir marta", async () => {
+    const store = fakeStore(group("sent", { offerId: "9001", sentAt: new Date(T0).toISOString() }));
+    const steam = fakeSteam({ state: "Accepted" });
+    const admin = [], accepted = [];
+    const w = createWorker({ now: () => T0 + 5 * MIN, steam, store, notifyAdmins: async (t) => admin.push(t), notifyUser: async () => {}, notifyAccepted: async (g) => accepted.push(g) });
+    await w.pollSent();
+    await w.pollSent();
+    assert.equal(admin.length, 0);
+    assert.equal(accepted.length, 1);
+    assert.deepEqual(accepted[0].requests.map(r => r.id), [11, 12]);
+});
+
+test("sellAdminMessages: har skin alohida, nomi, narx, Lis avto, Oldim/Rad tugmalari", async () => {
+    const lis = require("../backend/lisSkinsPrice");
+    const orig = [lis.fetchLisPricesUsd, lis.getUsdToSomRate];
+    lis.fetchLisPricesUsd = async () => new Map([["AK-47 | Redline (Field-Tested)", 10]]);
+    lis.getUsdToSomRate = () => 12000;
+    try {
+        const { sellAdminMessages } = require("../backend/sellAdminNotify");
+        const reqs = [
+            { id: 11, userId: 5, totalSom: 100000, items: [{ marketHashName: "AK-47 | Redline (Field-Tested)", float: 0.2 }] },
+            { id: 12, userId: 5, totalSom: 5000, items: [{ marketHashName: "P250 | Sand_Dune" }] },
+        ];
+        const m = await sellAdminMessages({ id: 5, name: "a_b", steamId64: "765" }, reqs, "NOTE");
+        assert.equal(m.length, 2);
+        assert.match(m[0].text, /SKIN SOTISH #11\*? \(1\/2\)/);
+        assert.match(m[0].text, /AK-47 \| Redline/);
+        assert.match(m[0].text, /100.?000 so'm/u);
+        assert.match(m[0].text, /Lis avto ≈ \$9\.00 \(108/);
+        assert.match(m[1].text, /Lis avto: narx yo'q/);
+        assert.match(m[1].text, /Sand\\_Dune/);
+        assert.match(m[0].text, /a\\_b/);
+        assert.deepEqual(m[1].keyboard.inline_keyboard[0].map(b => b.callback_data), ["isell_ok_12", "isell_no_12"]);
+    } finally { [lis.fetchLisPricesUsd, lis.getUsdToSomRate] = orig; }
+});
