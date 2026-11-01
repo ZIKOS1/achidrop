@@ -268,14 +268,15 @@ function Activity({ u, ceo, onAct }) {
                   <Row label="Yaratilgan" value={fmtDate(r.createdAt)} />
                   {r.resolvedAt && <Row label="Hal qilingan" value={fmtDate(r.resolvedAt)} />}
                   <Row label="Trade offer" value={r.tradeOffer ? OFFER_TEXT[r.tradeOffer.state] || r.tradeOffer.state : "qo'lda yuborish"} />
-                  {r.status === "awaiting_admin" ? (
-                    <ActionButtons
-                      onReject={() => onAct("sell", r, "reject")}
-                      onApprove={() => onAct("sell", r, "approve")}
-                      approveLabel="Oldim"
-                    />
-                  ) : <p className="text-center text-muted-foreground">Bu so'rov allaqachon ko'rib chiqilgan</p>}
                 </div>
+              )}
+              {/* Kutilayotgan so'rov — tugmalar doim ko'rinadi (ochish shart emas). */}
+              {r.status === "awaiting_admin" && (
+                <ActionButtons
+                  onReject={() => onAct("sell", r, "reject")}
+                  onApprove={() => onAct("sell", r, "approve")}
+                  approveLabel="Oldim"
+                />
               )}
             </li>
           ))}
@@ -304,17 +305,16 @@ function Activity({ u, ceo, onAct }) {
                   <Row label="So'ralgan" value={fmtDate(w.requestedAt)} />
                   {w.resolvedAt && <Row label="Hal qilingan" value={fmtDate(w.resolvedAt)} />}
                   {w.rejectComment && <Row label="Sabab" value={w.rejectComment} />}
-                  {w.status !== "pending" ? (
-                    <p className="text-center text-muted-foreground">Bu so'rov allaqachon ko'rib chiqilgan</p>
-                  ) : ceo ? (
-                    <ActionButtons
-                      onReject={() => onAct("wd", w, "reject")}
-                      onApprove={() => onAct("wd", w, "approve")}
-                      approveLabel="To'landi"
-                    />
-                  ) : <p className="text-center text-muted-foreground">Pul yechishni faqat CEO tasdiqlaydi yoki rad etadi</p>}
                 </div>
               )}
+              {/* Kutilayotgan so'rov — tugmalar doim ko'rinadi (faqat CEO'ga). */}
+              {w.status === "pending" && (ceo ? (
+                <ActionButtons
+                  onReject={() => onAct("wd", w, "reject")}
+                  onApprove={() => onAct("wd", w, "approve")}
+                  approveLabel="To'landi"
+                />
+              ) : <p className="text-[11px] text-muted-foreground">Pul yechishni faqat CEO tasdiqlaydi yoki rad etadi</p>)}
             </li>
           ))}
         </ul>
