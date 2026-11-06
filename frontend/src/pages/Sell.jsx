@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
-import { Banknote, Check, CheckCircle2, ChevronDown, Clock, Copy, Crown, ExternalLink, Lock, Package, RefreshCw, Search, ShieldCheck, X, XCircle } from "lucide-react";
+import { Banknote, Check, CheckCircle2, ChevronDown, Clock, Copy, Crown, ExternalLink, Lock, Package, RefreshCw, Search, ShieldCheck, SlidersHorizontal, X, XCircle } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
 import { imgSrc, fmtMoney, hap, rarityColor } from "../utils";
 import { t, getCurrentLang } from "../i18n";
 import { cn } from "../lib/cn";
 import { SteamLogo } from "../components/BrandIcons";
-import { SELL_CATEGORIES, sellCategory, TrustBadges, TrustStats, RecentSales, HowItWorks, Faq, TelegramBanner, Confetti } from "../components/SellExtras";
+import { sellCategory, TrustBadges, TrustStats, RecentSales, HowItWorks, Faq, TelegramBanner, Confetti } from "../components/SellExtras";
 import { GuideViewer } from "../components/TradeOnboardingWizard";
+import { ActiveChips, CategoryBar, FilterDrawer, FilterPanel } from "../components/ItemFilters";
+import { EMPTY_FILTERS, applyFilters, buildFacets, countActiveFilters } from "../lib/itemFilters";
 
 // Skin sotish — Claude Design v2 (tungi) / v3 (yorug') bo'yicha: telefonda ro'yxat +
 // pastda oltin "Sotish" paneli, kompyuterda jadval + o'ngda "Tanlanganlar" paneli.
@@ -239,7 +241,7 @@ function TradeUrlCard({ value, onSaved, onOpen }) {
       <div className="ad-panel flex flex-wrap items-center gap-2 rounded-2xl p-3 text-xs">
         <CheckCircle2 className="size-4 shrink-0 text-success" />
         <span className="text-foreground">{t("sellx.tradeUrlSet")}</span>
-        <button type="button" onClick={() => setEditing(true)} className="ml-auto text-primary underline-offset-2 hover:underline">{t("sellx.tradeUrlChange")}</button>
+        <button type="button" onClick={() => setEditing(true)} className="-my-2 ml-auto py-2 pl-2 text-primary underline-offset-2 hover:underline">{t("sellx.tradeUrlChange")}</button>
       </div>
     );
   }
@@ -328,10 +330,10 @@ function SkinCard({ item, selected, disabled, priced, onToggle, index = 0 }) {
 // Inventar qiymati / Sotsa bo'ladi — ikki statistik blok
 function StatBoxes({ value, count, big }) {
   return (
-    <div className={cn("grid gap-2.5", big ? "grid-cols-[1.15fr_1fr]" : "grid-cols-2")}>
+    <div className={cn("grid gap-2.5", big ? "grid-cols-[1.15fr_1fr]" : "grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:grid-cols-2")}>
       <div className={cn("ad-panel", big ? "rounded-2xl px-4 py-3.5" : "rounded-[14px] px-3.5 py-3")}>
         <p className={cn("uppercase tracking-[0.15em] text-muted-foreground", big ? "text-[11.5px]" : "text-[11px]")}>{t("sell.inventoryValue")}</p>
-        <p className={cn("mt-1 whitespace-nowrap font-bold tabular-nums text-[var(--heading)]", big ? "text-[26px]" : "text-[22px]")}>
+        <p className={cn("mt-1 whitespace-nowrap font-bold tabular-nums text-[var(--heading)]", big ? "text-[26px]" : "text-[clamp(17px,5.6vw,22px)]")}>
           {value.toLocaleString("ru-RU").replace(/ /g, " ")} <span className={cn("text-primary", big ? "text-[15px]" : "text-sm")}>so'm</span>
         </p>
       </div>
@@ -344,7 +346,7 @@ function StatBoxes({ value, count, big }) {
 }
 
 // Saralash menyusi — tugmadan pastga kattalashib ochiladi (07).
-function SortMenu({ value, onChange }) {
+function SortMenu({ value, onChange, className }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -355,14 +357,16 @@ function SortMenu({ value, onChange }) {
   }, [open]);
   const opts = ["desc", "asc", "name"];
   return (
-    <div ref={ref} className="relative shrink-0">
+    <div ref={ref} className={cn("relative", className)}>
       <button
         type="button"
+        aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className={cn("ad-field flex h-[46px] items-center gap-1.5 whitespace-nowrap rounded-[14px] px-3.5 text-[14.5px] transition-colors", open ? "!border-ring" : "hover:!border-ring/60")}
+        className={cn("ad-field flex h-[46px] w-full items-center justify-between gap-1.5 whitespace-nowrap rounded-[14px] px-3.5 text-[14.5px] transition-colors", open ? "!border-ring" : "hover:!border-ring/60")}
       >
         <span className="hidden text-muted-foreground sm:inline">{t("sellx.sort.label")}:</span>
-        <span className="font-semibold text-primary">{t(`sellx.sort.${value}`)}</span>
+        <span className="font-semibold text-primary sm:hidden">{t(`sellx.sortShort.${value}`)}</span>
+        <span className="hidden font-semibold text-primary sm:inline">{t(`sellx.sort.${value}`)}</span>
         <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform duration-200", open && "rotate-180")} />
       </button>
       {open && (
@@ -372,7 +376,7 @@ function SortMenu({ value, onChange }) {
               key={o}
               type="button"
               onClick={() => { onChange(o); setOpen(false); hap("selection"); }}
-              className={cn("flex w-full items-center justify-between rounded-none px-3.5 py-2.5 text-left text-xs transition-colors", value === o ? "bg-[var(--row-sel)] font-semibold text-primary" : "text-foreground hover:bg-[var(--row-hov)]")}
+              className={cn("flex min-h-11 w-full items-center justify-between rounded-none px-3.5 py-2.5 text-left text-sm transition-colors sm:min-h-0 sm:text-xs", value === o ? "bg-[var(--row-sel)] font-semibold text-primary" : "text-foreground hover:bg-[var(--row-hov)]")}
             >
               {t(`sellx.sort.${o}`)}
               {value === o && <Check className="size-3.5" />}
@@ -553,7 +557,8 @@ export default function Sell() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null); // { request, botTradeUrl }
   const [mine, setMine] = useState([]);
-  const [category, setCategory] = useState("all");
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [sort, setSort] = useState("desc");
   const [shown, setShown] = useState(PAGE);
   const [stats, setStats] = useState(null);
@@ -631,25 +636,27 @@ export default function Sell() {
   const items = quote?.items || [];
   const sellable = (it) => quote?.lisConfigured && it.tradable && Number.isFinite(sellPrice(it));
 
-  const catCounts = useMemo(() => {
-    const c = { all: items.length };
-    for (const it of items) { const k = sellCategory(it.marketHashName || it.name); c[k] = (c[k] || 0) + 1; }
-    return c;
-  }, [items]);
+  const statusOf = useCallback(
+    (it) => (isLocked(it) ? "locked" : quote?.lisConfigured && it.tradable && Number.isFinite(sellPrice(it)) ? "ok" : "none"),
+    [quote?.lisConfigured]
+  );
+  const facets = useMemo(() => buildFacets(items, { statusOf }), [items, statusOf]);
+  const activeFilterCount = countActiveFilters(filters);
+  const closeFilter = useCallback(() => setFilterOpen(false), []);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     let list = q ? items.filter((i) => i.name.toLowerCase().includes(q)) : items;
-    if (category !== "all") list = list.filter((i) => sellCategory(i.marketHashName || i.name) === category);
+    list = applyFilters(list, filters, { priceOf: sellPrice, statusOf });
     const byPrice = sort === "asc" ? (a, b) => (sellPrice(a) || 0) - (sellPrice(b) || 0) : (a, b) => (sellPrice(b) || 0) - (sellPrice(a) || 0);
     const cmp = sort === "name" ? (a, b) => a.name.localeCompare(b.name) : byPrice;
     // Sotiladiganlari doim oldinda, umuman sotilmaydiganlar (medal, coin...) eng oxirida.
     const rank = (it) => (sellable(it) ? 2 : it.sellable === false ? 0 : 1);
     return [...list].sort((a, b) => (rank(b) - rank(a)) || cmp(a, b));
-  }, [items, query, category, sort, quote?.lisConfigured]);
+  }, [items, query, filters, sort, quote?.lisConfigured, statusOf]);
 
   // Filtr/qidiruv/saralash o'zgarsa yana birinchi 20 tadan boshlanadi.
-  useEffect(() => { setShown(PAGE); }, [query, category, sort]);
+  useEffect(() => { setShown(PAGE); }, [query, filters, sort]);
 
   const selectedItems = items.filter((i) => selected.has(i.assetId));
   const total = selectedItems.reduce((s, i) => s + (sellPrice(i) || 0), 0);
@@ -799,9 +806,21 @@ export default function Sell() {
               <TradeUrlCard value={quote.steamTradeUrl} onOpen={openLink} onSaved={(v) => setQuote((q) => ({ ...q, steamTradeUrl: v }))} />
             )}
             {quote?.tradeOfferReady && <TradeBotGuide bot={quote.tradeBot} onOpen={openLink} />}
-            {/* Qidiruv + saralash + Top-5 + yangilash */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              <label className="ad-field group flex h-[46px] min-w-0 flex-[1_1_220px] max-xl:order-1 items-center gap-2.5 rounded-[14px] px-3.5 transition-[border-color,box-shadow] duration-200 focus-within:!border-ring sm:max-w-[320px]">
+            {/* Turlar paneli (lis-skins uslubida): pichoq, stiker, agent, case ... */}
+            {items.length > 0 && <CategoryBar facets={facets} filters={filters} onChange={setFilters} />}
+
+            <div className="flex items-start gap-4">
+              {/* Keng ekran: chapda doimiy filtr paneli */}
+              {items.length > 0 && (
+                <aside className="ad-panel scrollbar-thin sticky top-24 hidden max-h-[calc(100vh-7rem)] w-[230px] shrink-0 overflow-y-auto rounded-2xl px-3.5 2xl:block">
+                  <FilterPanel facets={facets} filters={filters} onChange={setFilters} />
+                </aside>
+              )}
+
+              <div className="min-w-0 flex-1 space-y-3.5">
+            {/* Qidiruv + filtr + saralash + Top-5 + yangilash */}
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="ad-field group order-1 flex h-[46px] min-w-0 flex-[1_1_calc(100%-54px)] items-center gap-2.5 rounded-[14px] px-3.5 transition-[border-color,box-shadow] duration-200 focus-within:!border-ring sm:flex-[1_1_220px]">
                 <Search className="size-[18px] shrink-0 text-muted-foreground transition-colors group-focus-within:text-primary" />
                 <input
                   value={query}
@@ -815,39 +834,33 @@ export default function Sell() {
                   </button>
                 )}
               </label>
-              <span className="hidden min-w-0 flex-1 sm:block max-xl:order-3" />
-              {items.length > 0 && <div className="max-xl:order-4"><SortMenu value={sort} onChange={setSort} /></div>}
-              {quote?.lisConfigured && sellableItems.length > 0 && (
-                <button type="button" onClick={selectTop5} className="flex h-[46px] shrink-0 items-center gap-[7px] max-xl:order-5 whitespace-nowrap rounded-[14px] border border-[rgba(227,20,31,.7)] bg-[rgba(227,20,31,.1)] px-3.5 text-[14.5px] font-semibold text-primary transition-colors hover:bg-[rgba(227,20,31,.2)] active:scale-95">
-                  <Crown className="size-[17px]" />
-                  {t("sellx.top5")}
-                </button>
-              )}
-              <button type="button" onClick={() => load(true)} disabled={loading} aria-label={t("sell.refresh")} title={t("sell.refresh")} className="ad-field flex size-[46px] shrink-0 max-xl:order-2 items-center justify-center rounded-[14px] text-foreground transition-colors hover:!border-ring/60 disabled:opacity-50">
+              <button type="button" onClick={() => load(true)} disabled={loading} aria-label={t("sell.refresh")} title={t("sell.refresh")} className="ad-field order-2 flex size-[46px] shrink-0 items-center justify-center rounded-[14px] text-foreground transition-colors hover:!border-ring/60 disabled:opacity-50 sm:order-5">
                 <RefreshCw className={cn("size-[18px]", loading && "spin")} />
               </button>
+              {items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { setFilterOpen(true); hap("selection"); }}
+                  className={cn("order-3 flex h-[46px] shrink-0 items-center gap-2 rounded-[14px] border px-3.5 text-[14.5px] font-semibold transition-colors 2xl:hidden", activeFilterCount > 0 ? "border-[#E3141F] bg-[var(--row-sel)] text-primary" : "border-[var(--ad-line)] bg-[var(--ad-field)] text-foreground hover:border-ring/60")}
+                >
+                  <SlidersHorizontal className="size-[17px]" />
+                  {t("filter.title")}
+                  {activeFilterCount > 0 && <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#E3141F] px-1 text-[11px] font-bold tabular-nums text-white">{activeFilterCount}</span>}
+                </button>
+              )}
+              {items.length > 0 && <SortMenu value={sort} onChange={setSort} className="order-3 min-w-0 flex-1 sm:flex-none" />}
+              {quote?.lisConfigured && sellableItems.length > 0 && (
+                <button type="button" onClick={selectTop5} aria-label={t("sellx.top5")} title={t("sellx.top5")} className="order-4 flex h-[46px] shrink-0 items-center gap-[7px] whitespace-nowrap rounded-[14px] border border-[rgba(227,20,31,.7)] bg-[rgba(227,20,31,.1)] px-3.5 text-[14.5px] font-semibold text-primary transition-colors hover:bg-[rgba(227,20,31,.2)] active:scale-95">
+                  <Crown className="size-[17px]" />
+                  <span className="sm:hidden">5</span>
+                  <span className="hidden sm:inline">{t("sellx.top5")}</span>
+                </button>
+              )}
             </div>
-            {query && !loading && <p className="-mt-2 px-1 text-xs text-muted-foreground">{visible.length ? t("sellx.found", { n: visible.length }) : <span className="text-destructive">{t("sellx.notFound")}</span>}</p>}
 
-            {/* Filtr chiplari */}
-            {items.length > 0 && (
-              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]">
-                {SELL_CATEGORIES.filter((c) => c === "all" || catCounts[c]).map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => { setCategory(c); hap("selection"); }}
-                    className={cn(
-                      "flex h-[38px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-[15px] transition-all duration-200 active:scale-95",
-                      category === c ? "border-[#E3141F] bg-[#E3141F] font-bold text-white" : "border-[var(--ad-line)] bg-[var(--ad-field)] font-medium text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {t(`sellx.cat.${c}`)}
-                    <span className="opacity-75">{catCounts[c] || 0}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+            <ActiveChips filters={filters} onChange={setFilters} />
+
+            {(query || activeFilterCount > 0) && !loading && <p className="px-1 text-xs text-muted-foreground">{visible.length ? t("sellx.found", { n: visible.length }) : <span className="text-destructive">{t("sellx.notFound")}</span>}</p>}
 
             {/* Ro'yxat / jadval */}
             {loading && !quote ? (
@@ -856,7 +869,7 @@ export default function Sell() {
                   <span className="size-4 rounded-full border-2 border-primary/30 border-t-primary spin" />
                   {t("sellx.loadingInv")}
                 </div>
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] sm:gap-3.5">
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] sm:gap-3.5">
                   {Array.from({ length: 8 }).map((_, i) => (
                     <div key={i} className="ad-skin overflow-hidden rounded-2xl border border-[var(--ad-line)] p-3">
                       <div className="skeleton h-20 w-full rounded-xl" />
@@ -882,7 +895,7 @@ export default function Sell() {
               ) : (
                 <div>
                   {/* Hammasi bir marta yuklangan — "Yana ko'rsatish" faqat ekranda ochadi, serverga so'rov yubormaydi. */}
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] sm:gap-3.5">
+                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] sm:gap-3.5">
                     {visible.slice(0, shown).map((it, i) => (
                       <SkinCard
                         key={it.assetId}
@@ -908,6 +921,8 @@ export default function Sell() {
                 </div>
               )
             )}
+              </div>
+            </div>
           </section>
 
           {/* Keng ekran: statistika + "Tanlanganlar" ramkasi + afzalliklar */}
@@ -978,6 +993,8 @@ export default function Sell() {
         </div>
       )}
 
+      <FilterDrawer open={filterOpen} onClose={closeFilter} facets={facets} filters={filters} onChange={setFilters} resultCount={visible.length} />
+
       <TrustStats stats={stats} />
       <div className="lg:hidden"><TrustBadges /></div>
       <HowItWorks />
@@ -986,7 +1003,7 @@ export default function Sell() {
 
       {/* xl dan kichik ekran: pastda "Tanlandi · N" paneli */}
       {!steamMissing && items.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-30 flex justify-center bg-[linear-gradient(180deg,transparent,var(--background)_30%)] px-3.5 pb-4 pt-3 lg:left-66 xl:hidden">
+        <div className="fixed bottom-0 left-0 right-0 z-30 flex justify-center bg-[linear-gradient(180deg,transparent,var(--background)_30%)] px-3.5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 lg:left-66 xl:hidden">
           <div className="ad-bar flex w-full max-w-[560px] items-center gap-3 rounded-[18px] py-2.5 pl-4 pr-2.5">
             <div className="flex min-w-0 flex-1 flex-col">
               <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{t("sellx.pickedN", { n: selected.size })}</p>

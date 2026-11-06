@@ -37,7 +37,7 @@ export default function AdminUsers() {
   return (
     <div className="space-y-4">
       <BackLink onClick={() => navigate("admin")} label="Admin panelga qaytish" />
-      <h1 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground">Foydalanuvchilar</h1>
+      <h1 className="font-heading text-xl font-bold uppercase tracking-wide text-foreground sm:text-2xl">Foydalanuvchilar</h1>
 
       <div className="flex items-center gap-2 border border-border bg-secondary px-3 py-2.5 focus-within:border-primary">
         <Search className="size-4 shrink-0 text-muted-foreground" />
@@ -56,7 +56,7 @@ export default function AdminUsers() {
             type="button"
             onClick={() => setSort(o.key)}
             className={
-              "border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors " +
+              "border px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors " +
               (sort === o.key
                 ? "border-primary bg-primary/10 text-primary"
                 : "border-border bg-secondary text-muted-foreground hover:text-foreground")
@@ -85,19 +85,19 @@ export default function AdminUsers() {
                     className={"size-2 shrink-0 rounded-full " + (u.blocked ? "bg-destructive" : "bg-success")}
                     aria-hidden="true"
                   />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-                    {u.name}{u.username ? ` (@${u.username})` : ""}
-                  </span>
-                  {u.blocked && (
-                    <span className="shrink-0 border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-destructive">
-                      Bloklangan
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-foreground">
+                      {u.name}{u.username ? ` (@${u.username})` : ""}
                     </span>
-                  )}
-                  {sort === "sold" && (
-                    <span className="shrink-0 text-xs text-muted-foreground">{u.soldCount || 0} ta skin ·</span>
-                  )}
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {fmtMoney(sort === "sold" ? u.soldSom || 0 : u.balance || 0)}
+                    {u.blocked && (
+                      <span className="mt-1 inline-block border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-destructive">
+                        Bloklangan
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0 text-right text-xs text-muted-foreground">
+                    {sort === "sold" && <span className="block">{u.soldCount || 0} ta skin</span>}
+                    <span className="block">{fmtMoney(sort === "sold" ? u.soldSom || 0 : u.balance || 0)}</span>
                   </span>
                 </button>
               </li>

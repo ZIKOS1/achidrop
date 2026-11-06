@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Image as ImageIcon, Trash2, GripVertical, Plus, Save } from "lucide-react";
+import { Image as ImageIcon, Trash2, GripVertical, Plus, Save, ChevronUp, ChevronDown } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
 import { hap, imgSrc, confirmTg } from "../../utils";
@@ -99,6 +99,15 @@ function GuideGallery({ guideKey, title, desc }) {
     }
   }
 
+  // Telefonda HTML5 drag ishlamaydi — tartib o'qlar bilan o'zgartiriladi.
+  function move(i, delta) {
+    const j = i + delta;
+    if (j < 0 || j >= images.length) return;
+    const next = images.slice();
+    [next[i], next[j]] = [next[j], next[i]];
+    persistOrder(next);
+  }
+
   function onDragStart(i) {
     dragFrom.current = i;
   }
@@ -151,35 +160,40 @@ function GuideGallery({ guideKey, title, desc }) {
               className="space-y-2 border border-border bg-card p-2.5"
             >
               <div className="flex items-center gap-3">
-                <GripVertical className="size-4 shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing" />
+                <GripVertical className="hidden size-4 shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing sm:block" />
+                  <span className="flex shrink-0 flex-col sm:hidden">
+                    <button type="button" aria-label="Yuqoriga" disabled={i === 0} onClick={() => move(i, -1)} className="flex size-9 items-center justify-center text-muted-foreground disabled:opacity-30"><ChevronUp className="size-5" /></button>
+                    <button type="button" aria-label="Pastga" disabled={i === images.length - 1} onClick={() => move(i, 1)} className="flex size-9 items-center justify-center text-muted-foreground disabled:opacity-30"><ChevronDown className="size-5" /></button>
+                  </span>
                 <span className="flex h-16 w-28 shrink-0 items-center justify-center overflow-hidden border border-border bg-secondary/40">
                   <img src={imgSrc(im.image)} alt="" className="size-full object-contain" />
                 </span>
-                <span className="flex-1 text-sm text-muted-foreground">{i + 1}-qadam</span>
+                <span className="min-w-0 flex-1 text-sm text-muted-foreground">{i + 1}-qadam</span>
                 <button
                   type="button"
                   disabled={busyId === im.id}
                   onClick={() => remove(im.id)}
-                  className="flex items-center gap-1.5 bg-destructive/15 px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/25 disabled:opacity-50"
+                  aria-label="O'chirish"
+                  className="flex shrink-0 items-center gap-1.5 bg-destructive/15 px-3 py-2.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/25 disabled:opacity-50 sm:py-1.5"
                 >
                   <Trash2 className="size-3.5" />
-                  O'chirish
+                  <span className="hidden sm:inline">O'chirish</span>
                 </button>
               </div>
-              <div className="flex items-center gap-2 border-t border-border pt-2">
+              <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
                 <input
                   type="text"
                   value={captionDrafts[im.id] ?? ""}
                   onChange={(e) => setCaptionDrafts((d) => ({ ...d, [im.id]: e.target.value }))}
                   placeholder="Bu qadam uchun izoh (ixtiyoriy) — masalan: 'Profil sozlamalariga o'ting'"
                   maxLength={300}
-                  className="flex-1 border border-border bg-secondary px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-primary"
+                  className="min-w-0 flex-[1_1_180px] border border-border bg-secondary px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-primary"
                 />
                 <button
                   type="button"
                   disabled={savingCaptionId === im.id || (captionDrafts[im.id] ?? "") === (im.caption || "")}
                   onClick={() => saveCaption(im.id)}
-                  className="flex shrink-0 items-center gap-1.5 bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/25 disabled:opacity-50"
+                  className="ml-auto flex shrink-0 items-center gap-1.5 bg-primary/15 px-3 py-2.5 text-xs sm:py-1.5 font-semibold text-primary transition-colors hover:bg-primary/25 disabled:opacity-50"
                 >
                   <Save className="size-3.5" />
                   Saqlash
@@ -200,9 +214,9 @@ export default function AdminGuides() {
     <div className="space-y-6">
       <BackLink onClick={() => navigate("admin")} label="Admin panelga qaytish" />
       <div>
-        <h1 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground">Yo'riqnomalar</h1>
+        <h1 className="font-heading text-xl font-bold uppercase tracking-wide text-foreground sm:text-2xl">Yo'riqnomalar</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Xaridorlarga bosqichma-bosqich ko'rsatiladigan skrinshot yo'riqnomalar. Har bir bo'limga rasmlarni qadam-qadam tartibda yuklang — tartibni o'zgartirish uchun kartani ushlab, boshqa joyga sudrab qo'ying.
+          Xaridorlarga bosqichma-bosqich ko'rsatiladigan skrinshot yo'riqnomalar. Har bir bo'limga rasmlarni qadam-qadam tartibda yuklang — tartibni o'zgartirish uchun kartani ushlab, boshqa joyga sudrab qo'ying (telefonda — o'qlar bilan).
         </p>
       </div>
 

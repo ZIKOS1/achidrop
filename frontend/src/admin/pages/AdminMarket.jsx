@@ -81,8 +81,8 @@ export default function AdminMarket() {
   return (
     <div className="space-y-4">
       <BackLink onClick={() => navigate("admin")} label="Admin panelga qaytish" />
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="font-heading text-xl font-bold uppercase tracking-wide text-foreground sm:text-2xl">
           Market — bot inventaridan sotuvga qo'yish
         </h1>
         <button
@@ -139,7 +139,7 @@ export default function AdminMarket() {
       )}
 
       {selected && (
-        <div className="max-w-lg space-y-4 border border-border bg-card p-5">
+        <div className="max-w-lg space-y-4 border border-border bg-card p-4 sm:p-5">
           <div>
             <h2 className="font-heading text-lg font-bold text-foreground">
               {selected.name} {selected.wear ? `(${selected.wear})` : ""}
@@ -149,20 +149,20 @@ export default function AdminMarket() {
 
           <div>
             <label className={labelCls}>Narx (har bir nusxa uchun, so'm)</label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <input
                 type="number"
                 inputMode="numeric"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 placeholder="Masalan: 150000"
-                className={inputCls + " flex-1"}
+                className={inputCls + " min-w-0 !w-auto flex-[1_1_150px]"}
               />
               <button
                 type="button"
                 disabled={suggesting}
                 onClick={suggestPrice}
-                className="inline-flex shrink-0 items-center gap-1.5 border border-border bg-secondary px-3 py-2.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                className="inline-flex flex-[1_1_auto] items-center justify-center gap-1.5 border border-border bg-secondary px-3 py-2.5 text-xs sm:flex-none font-semibold text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
               >
                 <Wand2 className={"size-3.5" + (suggesting ? " animate-pulse" : "")} />
                 Lis narxidan taklif qil
@@ -184,7 +184,7 @@ export default function AdminMarket() {
               type="button"
               disabled={busy || !price}
               onClick={submitBulkList}
-              className="flex flex-1 items-center justify-center gap-2 bg-primary py-3 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground disabled:opacity-40"
+              className="flex min-w-0 flex-1 items-center justify-center gap-2 bg-primary px-2 py-3 font-heading text-sm font-bold uppercase tracking-wide text-primary-foreground disabled:opacity-40"
             >
               <ShoppingCart className="size-4" />
               {busy ? "..." : `Hammasini sotuvga qo'yish (${selected.count} ta)`}

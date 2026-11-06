@@ -47,13 +47,13 @@ function TicketThread({ ticket, onUpdate }) {
 
   return (
     <div className="space-y-3 border border-border bg-card p-4 shadow-panel">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0 break-words">
           <p className="font-heading text-sm font-bold text-foreground">{ticket.userName || ticket.userId} — {ticket.lotName}</p>
           <p className="text-[11px] text-muted-foreground">Ticket #{ticket.id} · {ticket.status === "open" ? "Ochiq" : "Yopilgan"}</p>
         </div>
         {ticket.status === "open" && (
-          <button type="button" onClick={close} className="flex items-center gap-1.5 bg-success/15 px-3 py-1.5 text-xs font-semibold text-success transition-colors hover:bg-success/25">
+          <button type="button" onClick={close} className="flex shrink-0 items-center gap-1.5 bg-success/15 px-3 py-2.5 text-xs font-semibold text-success transition-colors hover:bg-success/25">
             <CheckCircle2 className="size-3.5" />
             Yopish
           </button>
@@ -67,7 +67,7 @@ function TicketThread({ ticket, onUpdate }) {
               <p className={"mb-0.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground " + (m.by === "admin" ? "text-right" : "text-left")}>
                 {m.by === "system" ? "Tizim" : m.by === "admin" ? (m.name || "Admin") : (ticket.userName || "Foydalanuvchi")}
               </p>
-              <div className={"px-3 py-2 text-xs " + (m.by === "admin" ? "bg-primary/15 text-foreground" : "bg-secondary/60 text-foreground")}>
+              <div className={"break-words px-3 py-2 text-xs " + (m.by === "admin" ? "bg-primary/15 text-foreground" : "bg-secondary/60 text-foreground")}>
                 {m.text}
               </div>
             </div>
@@ -83,13 +83,13 @@ function TicketThread({ ticket, onUpdate }) {
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send()}
             placeholder="Javob yozing..."
-            className="flex-1 border border-border bg-secondary px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            className="min-w-0 flex-1 border border-border bg-secondary px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
           />
           <button
             type="button"
             disabled={busy || !text.trim()}
             onClick={send}
-            className="flex items-center justify-center bg-primary px-3 text-primary-foreground disabled:opacity-50"
+            aria-label="Yuborish" className="flex min-w-11 shrink-0 items-center justify-center bg-primary px-3 text-primary-foreground disabled:opacity-50"
           >
             <Send className="size-4" />
           </button>
@@ -124,7 +124,7 @@ export default function AdminSupport() {
     <div className="space-y-6">
       <BackLink onClick={() => navigate("admin")} label="Admin panelga qaytish" />
       <div>
-        <h1 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground">Qo'llab-quvvatlash</h1>
+        <h1 className="font-heading text-xl font-bold uppercase tracking-wide text-foreground sm:text-2xl">Qo'llab-quvvatlash</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Avtomatik skin yuborish bir necha marta muvaffaqiyatsiz bo'lgan foydalanuvchilarning "Xatolik bo'lyapti" murojaatlari. {openCount > 0 ? `${openCount} ta ochiq.` : ""}
         </p>

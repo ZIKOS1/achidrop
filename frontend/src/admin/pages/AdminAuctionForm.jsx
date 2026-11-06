@@ -165,14 +165,14 @@ export default function AdminAuctionForm({ id }) {
   return (
     <div className="space-y-4">
       <BackLink onClick={() => navigate("admin-auctions")} label="Auksionlarga qaytish" />
-      <h1 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground">
+      <h1 className="font-heading text-xl font-bold uppercase tracking-wide text-foreground sm:text-2xl">
         {isEdit ? "Auctionni tahrirlash" : "Yangi auction"}
       </h1>
 
       {loading ? (
         <BlockSkeleton lines={5} />
       ) : (
-        <div className="max-w-2xl space-y-5 border border-border bg-card p-5">
+        <div className="max-w-2xl space-y-5 border border-border bg-card p-4 sm:p-5">
           {!isEdit && (
             <div>
               <label className={labelCls}>Steam inventar (ixtiyoriy)</label>

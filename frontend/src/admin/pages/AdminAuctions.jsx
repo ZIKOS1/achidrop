@@ -91,7 +91,7 @@ export default function AdminAuctions() {
     <div className="space-y-4">
       <BackLink onClick={() => navigate("admin")} label="Admin panelga qaytish" />
       <div className="flex items-center justify-between gap-2">
-        <h1 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground">Auksionlar</h1>
+        <h1 className="font-heading text-xl font-bold uppercase tracking-wide text-foreground sm:text-2xl">Auksionlar</h1>
         <button
           type="button"
           onClick={() => navigate("admin-auction-form", null)}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Image as ImageIcon, Trash2, GripVertical, Plus, Link2, Save } from "lucide-react";
+import { Image as ImageIcon, Trash2, GripVertical, Plus, Link2, Save, ChevronUp, ChevronDown } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../context";
 import { hap, imgSrc, confirmTg } from "../../utils";
@@ -132,6 +132,15 @@ export default function AdminBanners() {
     }
   }
 
+  // Telefonda HTML5 drag ishlamaydi — tartib o'qlar bilan o'zgartiriladi.
+  function move(i, delta) {
+    const j = i + delta;
+    if (j < 0 || j >= banners.length) return;
+    const next = banners.slice();
+    [next[i], next[j]] = [next[j], next[i]];
+    persistOrder(next);
+  }
+
   function onDragStart(i) {
     dragFrom.current = i;
   }
@@ -152,9 +161,9 @@ export default function AdminBanners() {
     <div className="space-y-6">
       <BackLink onClick={() => navigate("admin")} label="Admin panelga qaytish" />
       <div>
-        <h1 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground">Reklama bannerlari</h1>
+        <h1 className="font-heading text-xl font-bold uppercase tracking-wide text-foreground sm:text-2xl">Reklama bannerlari</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {requiredSize ? `Rasm o'lchami aynan ${requiredSize.width}x${requiredSize.height} bo'lishi kerak.` : ""} Hech qanday banner bo'lmasa, standart banner ko'rsatiladi. Bir nechta banner bo'lsa, ular navbat bilan aylanadi (nuqtalar bilan). Tartibni o'zgartirish uchun kartani ushlab, boshqa joyga sudrab qo'ying.
+          {requiredSize ? `Rasm o'lchami aynan ${requiredSize.width}x${requiredSize.height} bo'lishi kerak.` : ""} Hech qanday banner bo'lmasa, standart banner ko'rsatiladi. Bir nechta banner bo'lsa, ular navbat bilan aylanadi (nuqtalar bilan). Tartibni o'zgartirish uchun kartani ushlab, boshqa joyga sudrab qo'ying (telefonda — o'qlar bilan).
         </p>
       </div>
 
@@ -190,19 +199,24 @@ export default function AdminBanners() {
                 className="space-y-2 border border-border bg-card p-3 shadow-panel"
               >
                 <div className="flex items-center gap-3">
-                  <GripVertical className="size-4 shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing" />
+                  <GripVertical className="hidden size-4 shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing sm:block" />
+                  <span className="flex shrink-0 flex-col sm:hidden">
+                    <button type="button" aria-label="Yuqoriga" disabled={i === 0} onClick={() => move(i, -1)} className="flex size-9 items-center justify-center text-muted-foreground disabled:opacity-30"><ChevronUp className="size-5" /></button>
+                    <button type="button" aria-label="Pastga" disabled={i === banners.length - 1} onClick={() => move(i, 1)} className="flex size-9 items-center justify-center text-muted-foreground disabled:opacity-30"><ChevronDown className="size-5" /></button>
+                  </span>
                   <span className="flex h-14 w-24 shrink-0 items-center justify-center overflow-hidden border border-border bg-secondary/40">
                     <img src={imgSrc(b.image)} alt="" className="size-full object-cover" />
                   </span>
-                  <span className="flex-1 text-sm text-muted-foreground">{i + 1}-o'rin</span>
+                  <span className="min-w-0 flex-1 text-sm text-muted-foreground">{i + 1}-o'rin</span>
                   <button
                     type="button"
                     disabled={busyId === b.id}
                     onClick={() => remove(b.id)}
-                    className="flex items-center gap-1.5 bg-destructive/15 px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/25 disabled:opacity-50"
+                    aria-label="O'chirish"
+                    className="flex shrink-0 items-center gap-1.5 bg-destructive/15 px-3 py-2.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/25 disabled:opacity-50 sm:py-1.5"
                   >
                     <Trash2 className="size-3.5" />
-                    O'chirish
+                    <span className="hidden sm:inline">O'chirish</span>
                   </button>
                 </div>
 
@@ -211,7 +225,7 @@ export default function AdminBanners() {
                   <select
                     value={draft.linkPage}
                     onChange={(e) => setDraft(b.id, { linkPage: e.target.value })}
-                    className="border border-border bg-secondary px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary"
+                    className="min-w-0 flex-[1_1_140px] border border-border bg-secondary px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary sm:flex-none"
                   >
                     {LINK_PAGES.map((p) => (
                       <option key={p.value} value={p.value}>{p.label}</option>
@@ -224,14 +238,14 @@ export default function AdminBanners() {
                       value={draft.linkData}
                       onChange={(e) => setDraft(b.id, { linkData: e.target.value })}
                       placeholder={draft.linkPage === "auction-detail" ? "Lot ID" : "Trade ID"}
-                      className="w-28 border border-border bg-secondary px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary"
+                      className="w-24 border border-border bg-secondary px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary"
                     />
                   )}
                   <button
                     type="button"
                     disabled={savingLinkId === b.id || (needsData && !draft.linkData)}
                     onClick={() => saveLink(b.id)}
-                    className="ml-auto flex items-center gap-1.5 bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/25 disabled:opacity-50"
+                    className="ml-auto flex shrink-0 items-center gap-1.5 bg-primary/15 px-3 py-2.5 text-xs sm:py-1.5 font-semibold text-primary transition-colors hover:bg-primary/25 disabled:opacity-50"
                   >
                     <Save className="size-3.5" />
                     Saqlash

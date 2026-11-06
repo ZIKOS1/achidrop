@@ -119,10 +119,10 @@ export default function AdminLisAutosell() {
 
       {s && (
         <div className="flex gap-2">
-          <button type="button" onClick={() => setShowAll(false)} className={!showAll ? "bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground" : "border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"}>
+          <button type="button" onClick={() => setShowAll(false)} className={!showAll ? "bg-primary px-3 py-2 text-xs font-bold text-primary-foreground" : "border border-border px-3 py-2 text-xs text-muted-foreground hover:text-foreground"}>
             Sotiladiganlar ({sellable.length})
           </button>
-          <button type="button" onClick={() => setShowAll(true)} className={showAll ? "bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground" : "border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"}>
+          <button type="button" onClick={() => setShowAll(true)} className={showAll ? "bg-primary px-3 py-2 text-xs font-bold text-primary-foreground" : "border border-border px-3 py-2 text-xs text-muted-foreground hover:text-foreground"}>
             Hammasi ({items.length})
           </button>
         </div>
@@ -159,9 +159,9 @@ export default function AdminLisAutosell() {
 
 function Stat({ label, value, sub }) {
   return (
-    <div className="border border-border bg-card p-4">
+    <div className="min-w-0 border border-border bg-card p-3 sm:p-4">
       <p className="text-[11px] text-muted-foreground">{label}</p>
-      <p className="mt-1 font-heading text-lg font-bold text-foreground">{value}</p>
+      <p className="mt-1 break-words font-heading text-base font-bold text-foreground sm:text-lg">{value}</p>
       {sub && <p className="mt-0.5 text-[11px] text-muted-foreground">{sub}</p>}
     </div>
   );

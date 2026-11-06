@@ -10,7 +10,6 @@ import { SteamLogo } from "./BrandIcons";
 // haqiqiy ma'lumotdan (/api/public-stats) — soxta statistika/sharh yo'q.
 
 // ── Turkumlar (filtr chiplari) ───────────────────────────────────────────────
-export const SELL_CATEGORIES = ["all", "weapon", "knife", "gloves", "case", "other"];
 
 export function sellCategory(name = "") {
   if (name.startsWith("★")) return /Gloves|Hand Wraps/i.test(name) ? "gloves" : "knife";

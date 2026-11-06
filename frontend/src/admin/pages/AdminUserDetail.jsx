@@ -108,11 +108,11 @@ export default function AdminUserDetail({ id }) {
 
       {u && (
         <>
-          <div className="border border-border bg-card p-6 text-center">
+          <div className="border border-border bg-card p-4 text-center sm:p-6">
             <div className="mx-auto mb-3 flex size-16 items-center justify-center bg-primary font-heading text-xl font-bold text-primary-foreground clip-tactical">
               {u.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
             </div>
-            <p className="font-heading text-lg font-bold uppercase tracking-wide text-foreground">
+            <p className="break-words font-heading text-lg font-bold uppercase tracking-wide text-foreground">
               {u.name}{u.username ? ` (@${u.username})` : ""}
             </p>
             <p className="text-xs text-muted-foreground">ID: {u.id}</p>
@@ -121,7 +121,7 @@ export default function AdminUserDetail({ id }) {
             </span>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
             <Stat label="Balans" value={fmtMoney(u.balance || 0)} />
             <Stat label="Yutishlar" value={(u.wins || []).length} />
             <Stat label="Trade Link" value={u.tradeLink ? <CheckCircle2 className="mx-auto size-5 text-success" /> : <XCircle className="mx-auto size-5 text-destructive" />} />
@@ -172,9 +172,9 @@ export default function AdminUserDetail({ id }) {
               </div>
               <ul className="divide-y divide-border">
                 {u.wins.map((w, i) => (
-                  <li key={i} className="flex items-center justify-between px-4 py-3 text-sm">
-                    <span className="text-foreground">{w.lotName}</span>
-                    <span className="font-heading font-bold text-primary">{fmtMoney(w.price || 0)}</span>
+                  <li key={i} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                    <span className="min-w-0 break-words text-foreground">{w.lotName}</span>
+                    <span className="shrink-0 font-heading font-bold text-primary">{fmtMoney(w.price || 0)}</span>
                   </li>
                 ))}
               </ul>
@@ -226,13 +226,13 @@ function Activity({ u, ceo, onAct }) {
         <h2 className="font-heading text-sm font-bold uppercase tracking-wide text-foreground">Faoliyat</h2>
       </div>
       <div className="grid grid-cols-3 gap-px bg-border text-center">
-        <div className="bg-card p-3"><p className="font-heading font-bold text-foreground">{credited.reduce((n, r) => n + r.items.length, 0)}</p><p className="text-[11px] text-muted-foreground">Sotilgan skin</p></div>
-        <div className="bg-card p-3"><p className="font-heading font-bold text-success">{fmtMoney(soldSom)}</p><p className="text-[11px] text-muted-foreground">Sotuvdan tushgan</p></div>
-        <div className="bg-card p-3"><p className="font-heading font-bold text-foreground">{fmtMoney(paidSom)}</p><p className="text-[11px] text-muted-foreground">Yechib olingan</p></div>
+        <div className="min-w-0 bg-card p-2 sm:p-3"><p className="break-words font-heading text-[13px] font-bold leading-tight sm:text-base text-foreground">{credited.reduce((n, r) => n + r.items.length, 0)}</p><p className="text-[11px] text-muted-foreground">Sotilgan skin</p></div>
+        <div className="min-w-0 bg-card p-2 sm:p-3"><p className="break-words font-heading text-[13px] font-bold leading-tight sm:text-base text-success">{fmtMoney(soldSom)}</p><p className="text-[11px] text-muted-foreground">Sotuvdan tushgan</p></div>
+        <div className="min-w-0 bg-card p-2 sm:p-3"><p className="break-words font-heading text-[13px] font-bold leading-tight sm:text-base text-foreground">{fmtMoney(paidSom)}</p><p className="text-[11px] text-muted-foreground">Yechib olingan</p></div>
       </div>
       <div className="flex border-y border-border text-xs">
         {tabs.map(([k, label]) => (
-          <button key={k} type="button" onClick={() => setTab(k)} className={"flex-1 px-2 py-2.5 font-semibold transition-colors " + (tab === k ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")}>
+          <button key={k} type="button" onClick={() => setTab(k)} className={"min-w-0 flex-1 px-1 py-2.5 font-semibold leading-tight transition-colors sm:px-2 " + (tab === k ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")}>
             {label}
           </button>
         ))}
@@ -369,9 +369,9 @@ function HoldBlock({ hold }) {
         <h2 className="font-heading text-sm font-bold uppercase tracking-wide text-foreground">Muzlatilgan pul</h2>
       </div>
       <div className="grid grid-cols-3 gap-px bg-border text-center">
-        <div className="bg-card p-3"><p className="font-heading font-bold text-sky-500">{fmtMoney(hold.frozen || 0)}</p><p className="text-[11px] text-muted-foreground">Muzlatilgan</p></div>
-        <div className="bg-card p-3"><p className="font-heading font-bold text-success">{fmtMoney(hold.available || 0)}</p><p className="text-[11px] text-muted-foreground">Yechsa bo'ladi</p></div>
-        <div className="bg-card p-3"><p className="font-heading font-bold text-amber-500">{fmtMoney(hold.pending || 0)}</p><p className="text-[11px] text-muted-foreground">So'ralgan</p></div>
+        <div className="min-w-0 bg-card p-2 sm:p-3"><p className="break-words font-heading text-[13px] font-bold leading-tight sm:text-base text-sky-500">{fmtMoney(hold.frozen || 0)}</p><p className="text-[11px] text-muted-foreground">Muzlatilgan</p></div>
+        <div className="min-w-0 bg-card p-2 sm:p-3"><p className="break-words font-heading text-[13px] font-bold leading-tight sm:text-base text-success">{fmtMoney(hold.available || 0)}</p><p className="text-[11px] text-muted-foreground">Yechsa bo'ladi</p></div>
+        <div className="min-w-0 bg-card p-2 sm:p-3"><p className="break-words font-heading text-[13px] font-bold leading-tight sm:text-base text-amber-500">{fmtMoney(hold.pending || 0)}</p><p className="text-[11px] text-muted-foreground">So'ralgan</p></div>
       </div>
       {hold.nextUnlockAt && (
         <p className="border-t border-border px-4 py-2.5 text-center text-xs text-muted-foreground">
@@ -403,10 +403,10 @@ function HoldBlock({ hold }) {
 function ActionButtons({ onReject, onApprove, approveLabel }) {
   return (
     <div className="flex gap-2 pt-1">
-      <button type="button" onClick={onReject} className="flex flex-1 items-center justify-center gap-1.5 border border-destructive/50 py-2 text-xs font-bold uppercase text-destructive">
+      <button type="button" onClick={onReject} className="flex flex-1 items-center justify-center gap-1.5 border border-destructive/50 py-2.5 text-xs font-bold uppercase text-destructive">
         <XCircle className="size-4" /> Rad etish
       </button>
-      <button type="button" onClick={onApprove} className="flex flex-1 items-center justify-center gap-1.5 bg-success py-2 text-xs font-bold uppercase text-white">
+      <button type="button" onClick={onApprove} className="flex flex-1 items-center justify-center gap-1.5 bg-success py-2.5 text-xs font-bold uppercase text-white">
         <CheckCircle2 className="size-4" /> {approveLabel}
       </button>
     </div>
@@ -415,18 +415,18 @@ function ActionButtons({ onReject, onApprove, approveLabel }) {
 
 function Stat({ label, value }) {
   return (
-    <div className="border border-border bg-card p-3 text-center">
-      <p className="font-heading text-lg font-bold text-foreground">{value}</p>
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+    <div className="min-w-0 border border-border bg-card p-2 text-center sm:p-3">
+      <p className="break-words font-heading text-[13px] font-bold leading-tight text-foreground sm:text-lg">{value}</p>
+      <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground sm:text-[11px]">{label}</p>
     </div>
   );
 }
 
 function Row({ label, value }) {
   return (
-    <div className="flex items-center justify-between border-b border-border py-2 last:border-0">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium text-foreground">{value}</span>
+    <div className="flex items-center justify-between gap-3 border-b border-border py-2 last:border-0">
+      <span className="shrink-0 text-muted-foreground">{label}</span>
+      <span className="min-w-0 break-words text-right font-medium text-foreground">{value}</span>
     </div>
   );
 }

@@ -159,9 +159,9 @@ export default function AdminHome() {
   return (
     <div className="space-y-6">
       <div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-primary">Admin</span>
-          <h1 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground">Boshqaruv paneli</h1>
+          <h1 className="font-heading text-xl font-bold uppercase tracking-wide text-foreground sm:text-2xl">Boshqaruv paneli</h1>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">Auksionlar, foydalanuvchilar va sozlamalarni shu yerdan boshqaring.</p>
       </div>
@@ -176,11 +176,11 @@ export default function AdminHome() {
             return (
               <div
                 key={s.label}
-                className="hover-lift animate-fade-up border border-border bg-card p-4 shadow-panel"
+                className="hover-lift animate-fade-up min-w-0 border border-border bg-card p-3 shadow-panel sm:p-4"
                 style={{ "--fade-delay": `${i * 40}ms` }}
               >
                 <Icon className={"size-5 " + s.color} />
-                <p className="mt-3 font-heading text-2xl font-bold tracking-tight text-foreground">{s.value}</p>
+                <p className="mt-3 break-words font-heading text-lg font-bold leading-tight tracking-tight text-foreground sm:text-2xl">{s.value}</p>
                 <p className="truncate text-xs text-muted-foreground">{s.label}</p>
               </div>
             );
@@ -244,7 +244,7 @@ export default function AdminHome() {
         </h2>
         <div className="space-y-4">
           {settings && (
-            <div className="border border-border bg-card p-5">
+            <div className="border border-border bg-card p-4 sm:p-5">
               <p className="flex items-center gap-1.5 font-heading text-sm font-bold text-foreground"><Gift className="size-3.5" /> Referral bonusi</p>
               <p className="mt-1 text-xs text-muted-foreground">Do'st taklif qilgan va taklif qilingan foydalanuvchiga beriladigan bonus (so'm).</p>
               <div className="mt-3 flex gap-2">
@@ -269,7 +269,7 @@ export default function AdminHome() {
           )}
 
           {settings && (
-            <div className="border border-border bg-card p-5">
+            <div className="border border-border bg-card p-4 sm:p-5">
               <p className="flex items-center gap-2 font-heading text-sm font-bold text-foreground">
                 <Coins className="size-4 text-accent" />
                 Obmen komissiyasi
@@ -285,7 +285,7 @@ export default function AdminHome() {
                       value={tier.max}
                       onChange={(e) => setFeeTierField(i, "max", e.target.value)}
                       placeholder="Narxgacha (so'm)"
-                      className="w-full border border-border bg-secondary px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                      className="w-full min-w-0 border border-border bg-secondary px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
                     />
                     <input
                       type="number"
@@ -293,13 +293,13 @@ export default function AdminHome() {
                       value={tier.fee}
                       onChange={(e) => setFeeTierField(i, "fee", e.target.value)}
                       placeholder="Komissiya (so'm)"
-                      className="w-full border border-border bg-secondary px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                      className="w-full min-w-0 border border-border bg-secondary px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
                     />
                     <button
                       type="button"
                       disabled={feeTiers.length <= 1}
                       onClick={() => removeFeeTier(i)}
-                      className="shrink-0 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-30"
+                      aria-label="O'chirish" className="flex size-9 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-destructive disabled:opacity-30"
                     >
                       <X className="size-4" />
                     </button>
@@ -326,7 +326,7 @@ export default function AdminHome() {
           )}
 
           {settings ? (
-            <div className="border border-border bg-card p-5">
+            <div className="border border-border bg-card p-4 sm:p-5">
               <div className="flex items-center justify-between">
                 <p className="flex items-center gap-1.5 font-heading text-sm font-bold text-foreground"><Lock className="size-3.5" /> Erta kirish (VIP+)</p>
                 <span className={"border px-2 py-0.5 text-xs font-semibold " + (settings.earlyAccessEnabled ? "border-success/40 bg-success/10 text-success" : "border-destructive/40 bg-destructive/10 text-destructive")}>
@@ -348,7 +348,7 @@ export default function AdminHome() {
           )}
 
           {settings && (
-            <div className="border border-border bg-card p-5">
+            <div className="border border-border bg-card p-4 sm:p-5">
               <div className="flex items-center justify-between">
                 <p className="flex items-center gap-1.5 font-heading text-sm font-bold text-foreground"><ShieldOff className="size-3.5" /> VPN blok</p>
                 <span className={"border px-2 py-0.5 text-xs font-semibold " + (settings.vpnBlockEnabled ? "border-success/40 bg-success/10 text-success" : "border-destructive/40 bg-destructive/10 text-destructive")}>
@@ -368,7 +368,7 @@ export default function AdminHome() {
           )}
 
           {settings && (
-            <div className="border border-border bg-card p-5">
+            <div className="border border-border bg-card p-4 sm:p-5">
               <div className="flex items-center justify-between">
                 <p className="flex items-center gap-1.5 font-heading text-sm font-bold text-foreground"><ShieldCheck className="size-3.5" /> Odam tekshiruvi</p>
                 <span className={"border px-2 py-0.5 text-xs font-semibold " + (settings.humanCheckEnabled ? "border-success/40 bg-success/10 text-success" : "border-destructive/40 bg-destructive/10 text-destructive")}>
@@ -389,7 +389,7 @@ export default function AdminHome() {
           )}
 
           {settings && (
-            <div className="border border-border bg-card p-5">
+            <div className="border border-border bg-card p-4 sm:p-5">
               <div className="flex items-center justify-between">
                 <p className="flex items-center gap-2 font-heading text-sm font-bold text-foreground">
                   <Gamepad2 className="size-4 text-accent" />

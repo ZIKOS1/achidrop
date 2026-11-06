@@ -74,14 +74,14 @@ export default function CeoAccounts() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="flex items-center gap-2 font-heading text-2xl font-bold uppercase tracking-wide text-foreground">
+        <h1 className="flex items-center gap-2 font-heading text-xl font-bold uppercase tracking-wide text-foreground sm:text-2xl">
           <Crown className="size-6 text-primary" />
           CEO — Adminlar
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">Admin panelga kiruvchi akkauntlarni shu yerdan boshqaring.</p>
       </div>
 
-      <form onSubmit={createAccount} className="border border-border bg-card p-5 shadow-panel">
+      <form onSubmit={createAccount} className="border border-border bg-card p-4 sm:p-5 shadow-panel">
         <h2 className="mb-3 flex items-center gap-1.5 font-heading text-sm font-bold uppercase tracking-wide text-foreground">
           <Plus className="size-4 text-primary" />
           Yangi admin qo'shish
@@ -125,7 +125,7 @@ export default function CeoAccounts() {
           {accounts.map((acc) => (
             <div key={acc.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
               <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                <p className="flex items-center gap-1.5 break-all text-sm font-medium text-foreground">
                   {acc.username}
                   {acc.role === "ceo" && <Crown className="size-3.5 text-primary" title="CEO" />}
                 </p>
@@ -140,7 +140,7 @@ export default function CeoAccounts() {
                 type="button"
                 onClick={() => resetPassword(acc)}
                 title="Parolni yangilash"
-                className="flex items-center gap-1 border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-accent/40 hover:text-accent"
+                className="flex size-10 items-center justify-center gap-1 border border-border text-xs text-muted-foreground sm:size-auto sm:px-2.5 sm:py-1.5 transition-colors hover:border-accent/40 hover:text-accent"
               >
                 <Lock className="size-3.5" />
               </button>
@@ -148,7 +148,7 @@ export default function CeoAccounts() {
                 type="button"
                 onClick={() => toggleActive(acc)}
                 title={acc.active !== false ? "O'chirish (vaqtincha)" : "Yoqish"}
-                className="flex items-center gap-1 border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-warning/40 hover:text-warning"
+                className="flex size-10 items-center justify-center gap-1 border border-border text-xs text-muted-foreground sm:size-auto sm:px-2.5 sm:py-1.5 transition-colors hover:border-warning/40 hover:text-warning"
               >
                 {acc.active !== false ? <ShieldOff className="size-3.5" /> : <ShieldCheck className="size-3.5" />}
               </button>
@@ -156,7 +156,7 @@ export default function CeoAccounts() {
                 type="button"
                 onClick={() => removeAccount(acc)}
                 title="Butunlay o'chirish"
-                className="flex items-center gap-1 border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive"
+                className="flex size-10 items-center justify-center gap-1 border border-border text-xs text-muted-foreground sm:size-auto sm:px-2.5 sm:py-1.5 transition-colors hover:border-destructive/40 hover:text-destructive"
               >
                 <Trash2 className="size-3.5" />
               </button>

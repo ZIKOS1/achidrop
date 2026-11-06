@@ -87,16 +87,16 @@ export default function AdminPromos() {
   return (
     <div className="space-y-6">
       <BackLink onClick={() => navigate("admin")} label="Admin panelga qaytish" />
-      <h1 className="font-heading text-2xl font-bold uppercase tracking-wide text-foreground">Promo kodlar</h1>
+      <h1 className="font-heading text-xl font-bold uppercase tracking-wide text-foreground sm:text-2xl">Promo kodlar</h1>
 
-      <form onSubmit={createPromo} className="space-y-3 border border-border bg-card p-5">
+      <form onSubmit={createPromo} className="space-y-3 border border-border bg-card p-4 sm:p-5">
         <p className="font-heading text-sm font-bold uppercase tracking-wide text-foreground">Yangi promo kod</p>
 
         <div className="flex border border-border bg-secondary/30 p-1">
           <button
             type="button"
             onClick={() => setType("balance")}
-            className={"flex flex-1 items-center justify-center gap-1.5 py-2 text-xs font-semibold uppercase tracking-wide transition-colors " + (type === "balance" ? "bg-primary text-primary-foreground" : "text-muted-foreground")}
+            className={"flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-center text-[11px] font-semibold uppercase leading-tight transition-colors sm:flex-row sm:gap-1.5 sm:text-xs sm:tracking-wide " + (type === "balance" ? "bg-primary text-primary-foreground" : "text-muted-foreground")}
           >
             <Wallet className="size-3.5" />
             Balans bonusi
@@ -104,7 +104,7 @@ export default function AdminPromos() {
           <button
             type="button"
             onClick={() => setType("trade")}
-            className={"flex flex-1 items-center justify-center gap-1.5 py-2 text-xs font-semibold uppercase tracking-wide transition-colors " + (type === "trade" ? "bg-primary text-primary-foreground" : "text-muted-foreground")}
+            className={"flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-center text-[11px] font-semibold uppercase leading-tight transition-colors sm:flex-row sm:gap-1.5 sm:text-xs sm:tracking-wide " + (type === "trade" ? "bg-primary text-primary-foreground" : "text-muted-foreground")}
           >
             <Repeat className="size-3.5" />
             Obmen (tekin)
@@ -112,7 +112,7 @@ export default function AdminPromos() {
           <button
             type="button"
             onClick={() => setType("withdraw")}
-            className={"flex flex-1 items-center justify-center gap-1.5 py-2 text-xs font-semibold uppercase tracking-wide transition-colors " + (type === "withdraw" ? "bg-primary text-primary-foreground" : "text-muted-foreground")}
+            className={"flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-center text-[11px] font-semibold uppercase leading-tight transition-colors sm:flex-row sm:gap-1.5 sm:text-xs sm:tracking-wide " + (type === "withdraw" ? "bg-primary text-primary-foreground" : "text-muted-foreground")}
           >
             <Banknote className="size-3.5" />
             Pul yechish
@@ -211,7 +211,7 @@ export default function AdminPromos() {
                   type="button"
                   disabled={busyCode === p.code}
                   onClick={() => toggle(p)}
-                  className="flex flex-1 items-center justify-center gap-1.5 border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                  className="flex flex-1 items-center justify-center gap-1.5 border border-border px-3 py-2.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
                 >
                   {p.active ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
                   {p.active ? "Pauza" : "Yoqish"}
@@ -220,7 +220,7 @@ export default function AdminPromos() {
                   type="button"
                   disabled={busyCode === p.code}
                   onClick={() => remove(p)}
-                  className="flex flex-1 items-center justify-center gap-1.5 bg-destructive/15 px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/25 disabled:opacity-50"
+                  className="flex flex-1 items-center justify-center gap-1.5 bg-destructive/15 px-3 py-2.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/25 disabled:opacity-50"
                 >
                   <Trash2 className="size-3.5" />
                   O'chirish

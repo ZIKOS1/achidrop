@@ -153,7 +153,7 @@ function BalancePill({ user, navigate }) {
     <button
       type="button"
       onClick={() => navigate("balance")}
-      className={cn(PILL, "whitespace-nowrap px-4 text-[15px] font-bold tabular-nums text-foreground hover:border-ring/60")}
+      className={cn(PILL, "shrink-0 whitespace-nowrap px-3 text-sm font-bold tabular-nums text-foreground hover:border-ring/60 sm:px-4 sm:text-[15px]")}
     >
       {fmtMoney(user.balance ?? 0)}
     </button>

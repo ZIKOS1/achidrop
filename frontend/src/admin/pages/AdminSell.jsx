@@ -100,7 +100,7 @@ function SettingsCard() {
   if (!s) return <div className="skeleton h-40 w-full" />;
   const input = "w-full border border-border bg-secondary px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary";
   return (
-    <div className="space-y-3 border border-border bg-card p-5">
+    <div className="space-y-3 border border-border bg-card p-4 sm:p-5">
       <p className="flex items-center gap-2 font-heading text-sm font-bold text-foreground">
         <Settings2 className="size-4 text-accent" />
         Narx sozlamalari
@@ -116,14 +116,14 @@ function SettingsCard() {
           return (
             <div key={i} className="flex items-center gap-2">
               {last ? (
-                <span className="w-32 shrink-0 text-xs text-foreground">{tiers.length > 1 ? `${from} $ dan qimmat` : "Hamma narxlar"}</span>
+                <span className="w-[104px] shrink-0 text-xs text-foreground sm:w-32">{tiers.length > 1 ? `${from} $ dan qimmat` : "Hamma narxlar"}</span>
               ) : (
-                <span className="flex w-32 shrink-0 items-center gap-1 text-xs text-foreground">
-                  <input type="number" inputMode="decimal" value={t.maxUsd} onChange={(e) => setTier(i, "maxUsd", e.target.value)} className={input + " !w-16 !px-2 !py-1.5"} />
+                <span className="flex w-[104px] shrink-0 items-center gap-1 whitespace-nowrap text-xs text-foreground sm:w-32">
+                  <input type="number" inputMode="decimal" value={t.maxUsd} onChange={(e) => setTier(i, "maxUsd", e.target.value)} className={input + " !w-14 min-w-0 !px-2 !py-1.5 sm:!w-16"} />
                   $ gacha
                 </span>
               )}
-              <input type="number" inputMode="decimal" value={t.percent} onChange={(e) => setTier(i, "percent", e.target.value)} className={input + " !py-1.5"} />
+              <input type="number" inputMode="decimal" value={t.percent} onChange={(e) => setTier(i, "percent", e.target.value)} className={input + " min-w-0 !px-2 !py-1.5"} />
               <span className="text-xs text-muted-foreground">%</span>
               {!last ? (
                 <button type="button" onClick={() => removeTier(i)} className="shrink-0 p-1.5 text-muted-foreground hover:text-destructive" aria-label="O'chirish">
@@ -216,7 +216,7 @@ function TradeAccountCard() {
   if (acc === undefined) return <div className="skeleton h-28 w-full" />;
   const input = "w-full border border-border bg-secondary px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary";
   return (
-    <div className="space-y-3 border border-border bg-card p-5">
+    <div className="space-y-3 border border-border bg-card p-4 sm:p-5">
       <p className="flex items-center gap-2 font-heading text-sm font-bold text-foreground">
         <KeyRound className="size-4 text-accent" />
         Trade akkaunt (avtomatik trade)
@@ -303,12 +303,12 @@ export default function AdminSell() {
             key={f.key}
             type="button"
             onClick={() => setFilter(f.key)}
-            className={filter === f.key ? "bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground" : "border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"}
+            className={filter === f.key ? "bg-primary px-3 py-2 text-xs font-bold text-primary-foreground" : "border border-border px-3 py-2 text-xs text-muted-foreground hover:text-foreground"}
           >
             {f.label}
           </button>
         ))}
-        <button type="button" onClick={load} className="ml-auto flex items-center gap-1 border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground">
+        <button type="button" onClick={load} className="ml-auto flex items-center gap-1 border border-border px-3 py-2 text-xs text-muted-foreground hover:text-foreground">
           <RefreshCw className="size-3.5" /> Yangilash
         </button>
       </div>
@@ -322,7 +322,7 @@ export default function AdminSell() {
           {list.map((r) => (
             <div key={r.id} className="space-y-3 border border-border bg-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
+                <div className="min-w-0 break-words">
                   <p className="font-heading text-sm font-bold text-foreground">#{r.id} · {r.userName || r.userId}</p>
                   <p className="text-[11px] text-muted-foreground">
                     ID {r.userId}{r.steamId64 ? ` · Steam ${r.steamId64}` : ""} · {new Date(r.createdAt).toLocaleString()}{r.status === "awaiting_admin" && r.groupId != null && (!r.tradeOffer || r.tradeOffer.state === "failed") ? (r.sentAt ? " · ✉️ yubordim dedi" : " · ⏳ hali yubormagan") : ""}
@@ -345,7 +345,7 @@ export default function AdminSell() {
                     <span className="flex size-9 shrink-0 items-center justify-center bg-secondary">
                       {it.imageUrl ? <img src={imgSrc(it.imageUrl)} alt="" className="max-h-full max-w-full object-contain" /> : <Package className="size-4 text-muted-foreground" />}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-xs text-foreground">
+                    <span className="line-clamp-2 min-w-0 flex-1 text-xs text-foreground">
                       {it.marketHashName}{it.float != null ? ` · ${it.float.toFixed(4)}` : ""}
                     </span>
                     <span className="shrink-0 text-xs font-semibold text-foreground">{fmtMoney(it.priceSom)}</span>
@@ -355,14 +355,14 @@ export default function AdminSell() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-heading text-sm font-bold text-success">Jami: {fmtMoney(r.totalSom ?? r.priceSom)}</span>
                 {r.status === "awaiting_admin" && (
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                     {r.tradeOffer && r.tradeOffer.state !== "accepted" && r.tradeOffer.state !== "failed" && (
-                      <span className="text-[11px] font-semibold text-warning">⚠️ Trade hali qabul qilinmagan</span>
+                      <span className="w-full text-[11px] font-semibold text-warning sm:w-auto">⚠️ Trade hali qabul qilinmagan</span>
                     )}
-                    <button type="button" disabled={busyId === r.id} onClick={() => act(r.id, "reject")} className="border border-destructive/50 px-3 py-2 text-xs font-bold text-destructive disabled:opacity-50">
+                    <button type="button" disabled={busyId === r.id} onClick={() => act(r.id, "reject")} className="flex-1 border border-destructive/50 px-3 py-2.5 text-xs font-bold text-destructive disabled:opacity-50 sm:flex-none">
                       ❌ Rad etish
                     </button>
-                    <button type="button" disabled={busyId === r.id} onClick={() => act(r.id, "approve")} className="bg-success px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+                    <button type="button" disabled={busyId === r.id} onClick={() => act(r.id, "approve")} className="flex-1 bg-success px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50 sm:flex-none">
                       ✅ Oldim
                     </button>
                   </div>
