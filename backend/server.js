@@ -36,6 +36,7 @@ const { checkPromoForUser, markPromoUsed } = require("./promoCheck");
 const lisSkinsPrice = require("./lisSkinsPrice");
 const lisAutosell = require("./lisAutosell");
 const financeStats = require("./financeStats");
+const rating = require("./rating");
 const tradeAccountBridge = require("./tradeAccountBridge");
 const { validateTradeUrlFor, tradeUrlOwner } = require("./tradeUrl");
 const tradeOfferView = require("./tradeOfferView");
@@ -1788,6 +1789,227 @@ app.get("/api/leaderboard", auth, (req, res) => {
         .slice(0, 10)
         .map((u, i) => ({ rank: i + 1, id: u.id, name: u.name, wins: (u.wins || []).length }));
     res.json(top);
+});
+
+// ── Reyting (umumiy + konkurs) — backend/rating.js ──────────────────────────
+async function ratingContext() {
+    await Promise.all([refresh("rating").catch(() => {}), instantSellManager.refreshRequests().catch(() => {})]);
+    const cfg = rating.normalizeConfig(read("rating"));
+    const sales = rating.collectSales({
+        instantSell: instantSellManager.getAllRequests(),
+        trades: (() => { const t = read("trades"); return Array.isArray(t) ? t : Object.values(t || {}); })(),
+        excludeUser: isAdminId,
+    });
+    return { cfg, sales };
+}
+function saveRatingConfig(cfg) { write("rating", cfg); }
+
+function publicContest(c, now = Date.now()) {
+    if (!c) return null;
+    return {
+        id: c.id, title: c.title, prize: c.prize || "", prizes: Array.isArray(c.prizes) ? c.prizes : [],
+        startAt: c.startAt, endAt: c.endAt || null, closedAt: c.closedAt || null,
+        state: rating.contestState(c, now),
+        xpPerSale: rating.contestCfg(c).xpPerSale, xpPer1000Som: rating.contestCfg(c).xpPer1000Som,
+    };
+}
+
+// scope: "general" | contest obyekti. includeVolume — faqat admin uchun.
+function buildRanking(cfg, sales, scope, { includeVolume = false } = {}) {
+    const isGeneral = scope === "general";
+    const tallyCfg = isGeneral ? cfg.general : rating.contestCfg(scope);
+    const win = isGeneral ? {} : rating.contestWindow(scope);
+    const ranked = rating.rank(rating.tally(sales, tallyCfg, win));
+    // Daraja (ramka) doim UMUMIY XP bo'yicha — konkurs ro'yxatida ham.
+    const generalXp = isGeneral ? null : rating.tally(sales, cfg.general);
+    const users = getUsers();
+    const byId = new Map(users.map(u => [String(u.id), u]));
+    return ranked.map(r => {
+        const u = byId.get(String(r.userId));
+        const row = {
+            rank: r.rank, id: r.userId,
+            name: u?.name || u?.steamUsername || "Foydalanuvchi",
+            avatar: u?.steamAvatar ?? null,
+            xp: r.xp, sales: r.sales,
+        };
+        const gxp = isGeneral ? r.xp : (generalXp.get(String(r.userId))?.xp || 0);
+        row.tier = rating.tierInfo(gxp, cfg.general.tierMins).tier;
+        if (includeVolume) row.volume = r.volume;
+        return row;
+    });
+}
+
+// GET /api/rating?type=general|contest — ochiq (login shart emas), top 50 + o'zim
+app.get("/api/rating", optionalAuth, async (req, res) => {
+    const { cfg, sales } = await ratingContext();
+    const type = req.query.type === "contest" ? "contest" : "general";
+    const me = req.user;
+    let scope = "general", contest = null;
+    if (type === "contest") {
+        const c = rating.currentContest(cfg.contests);
+        if (!c) return res.json({ type, contest: null, top: [], me: null });
+        scope = c; contest = publicContest(c);
+    }
+    const all = buildRanking(cfg, sales, scope);
+    let mine = null;
+    if (me) {
+        mine = all.find(r => String(r.id) === String(me.id)) || {
+            rank: null, id: me.id, name: me.name || me.steamUsername || "", avatar: me.steamAvatar ?? null, xp: 0, sales: 0,
+        };
+        // Daraja doim umumiy XP bo'yicha (konkursda ham ramka o'sha darajaniki).
+        const generalXp = scope === "general" ? mine.xp
+            : (rating.tally(sales, cfg.general).get(String(me.id))?.xp || 0);
+        mine = { ...mine, generalXp, ...rating.tierInfo(generalXp, cfg.general.tierMins) };
+    }
+    res.json({
+        type, contest,
+        rules: scope === "general"
+            ? { xpPerSale: cfg.general.xpPerSale, xpPer1000Som: cfg.general.xpPer1000Som }
+            : { xpPerSale: contest.xpPerSale, xpPer1000Som: contest.xpPer1000Som },
+        participants: all.length,
+        tiers: rating.TIER_KEYS.map((key, i) => ({ key, minXp: cfg.general.tierMins[i] })),
+        top: all.slice(0, 50),
+        me: mine,
+    });
+});
+
+// ── ADMIN: Reyting ────────────────────────────────────────────────────────────
+app.get("/api/admin/rating", requireAdminPanel, async (req, res) => {
+    const { cfg, sales } = await ratingContext();
+    const scopeId = req.query.scope || "general";
+    let scope = "general";
+    if (scopeId !== "general") {
+        scope = cfg.contests.find(c => String(c.id) === String(scopeId));
+        if (!scope) return res.status(404).json({ error: "Konkurs topilmadi" });
+    }
+    const contests = [...cfg.contests]
+        .sort((a, b) => Date.parse(b.startAt) - Date.parse(a.startAt))
+        .map(c => ({ ...publicContest(c), participants: buildRanking(cfg, sales, c).length }));
+    res.json({
+        general: { xpPerSale: cfg.general.xpPerSale, xpPer1000Som: cfg.general.xpPer1000Som, tierMins: cfg.general.tierMins },
+        contests,
+        scope: scopeId,
+        adjustments: scope === "general" ? cfg.general.adjustments : (scope.adjustments || {}),
+        ranking: buildRanking(cfg, sales, scope, { includeVolume: true }).slice(0, 200),
+    });
+});
+
+function parseXpRules(body, target) {
+    for (const k of ["xpPerSale", "xpPer1000Som"]) {
+        if (body[k] === undefined) continue;
+        const n = Number(body[k]);
+        if (!Number.isFinite(n) || n < 0 || n > 1e6) return `${k} 0 dan katta raqam bo'lishi kerak`;
+        target[k] = n;
+    }
+    return null;
+}
+function parseDate(v) {
+    if (v === null || v === "") return null;
+    const ms = Date.parse(v);
+    return Number.isFinite(ms) ? new Date(ms).toISOString() : undefined;
+}
+function parsePrizes(v) {
+    if (!Array.isArray(v)) return undefined;
+    return v.map(p => String(p ?? "").trim().slice(0, 120)).filter(Boolean).slice(0, 10);
+}
+
+app.post("/api/admin/rating/general", requireAdminPanel, async (req, res) => {
+    const { cfg } = await ratingContext();
+    const err = parseXpRules(req.body, cfg.general);
+    if (err) return res.status(400).json({ error: err });
+    if (req.body.tierMins !== undefined) {
+        const mins = rating.normalizeTierMins(req.body.tierMins);
+        if (!mins) return res.status(400).json({ error: "Daraja chegaralari noto'g'ri: 6 ta, birinchisi 0, o'sish tartibida" });
+        cfg.general.tierMins = mins;
+    }
+    saveRatingConfig(cfg);
+    res.json({ ok: true, general: cfg.general });
+});
+
+// Yangi konkurs — startAt bo'sh bo'lsa hozirdan; startAt'gacha bo'lgan sotuvlar
+// sanalmaydi, ya'ni hamma 0 XP dan boshlaydi.
+app.post("/api/admin/rating/contests", requireAdminPanel, async (req, res) => {
+    const { cfg } = await ratingContext();
+    const title = String(req.body.title || "").trim().slice(0, 80);
+    if (!title) return res.status(400).json({ error: "Konkurs nomini kiriting" });
+    const startAt = req.body.startAt ? parseDate(req.body.startAt) : new Date().toISOString();
+    const endAt = req.body.endAt ? parseDate(req.body.endAt) : null;
+    if (!startAt || endAt === undefined) return res.status(400).json({ error: "Sana noto'g'ri" });
+    if (endAt && Date.parse(endAt) <= Date.parse(startAt)) return res.status(400).json({ error: "Tugash sanasi boshlanishdan keyin bo'lishi kerak" });
+    if (cfg.contests.some(c => rating.contestState(c) !== "finished"))
+        return res.status(400).json({ error: "Faol yoki rejalashtirilgan konkurs bor — avval uni yoping" });
+    const c = {
+        id: Date.now(), title, prize: String(req.body.prize || "").trim().slice(0, 200),
+        prizes: parsePrizes(req.body.prizes) || [],
+        startAt, endAt, closedAt: null,
+        xpPerSale: rating.DEFAULT_GENERAL.xpPerSale, xpPer1000Som: rating.DEFAULT_GENERAL.xpPer1000Som,
+        adjustments: {}, createdAt: new Date().toISOString(),
+    };
+    const err = parseXpRules(req.body, c);
+    if (err) return res.status(400).json({ error: err });
+    cfg.contests.push(c);
+    saveRatingConfig(cfg);
+    res.json({ ok: true, contest: publicContest(c) });
+});
+
+app.post("/api/admin/rating/contests/:id", requireAdminPanel, async (req, res) => {
+    const { cfg } = await ratingContext();
+    const c = cfg.contests.find(x => String(x.id) === req.params.id);
+    if (!c) return res.status(404).json({ error: "Konkurs topilmadi" });
+    if (req.body.title !== undefined) {
+        const title = String(req.body.title || "").trim().slice(0, 80);
+        if (!title) return res.status(400).json({ error: "Konkurs nomini kiriting" });
+        c.title = title;
+    }
+    if (req.body.prize !== undefined) c.prize = String(req.body.prize || "").trim().slice(0, 200);
+    const prizes = parsePrizes(req.body.prizes);
+    if (prizes) c.prizes = prizes;
+    if (req.body.endAt !== undefined) {
+        const endAt = parseDate(req.body.endAt);
+        if (endAt === undefined) return res.status(400).json({ error: "Sana noto'g'ri" });
+        if (endAt && Date.parse(endAt) <= Date.parse(c.startAt)) return res.status(400).json({ error: "Tugash sanasi boshlanishdan keyin bo'lishi kerak" });
+        c.endAt = endAt;
+    }
+    const err = parseXpRules(req.body, c);
+    if (err) return res.status(400).json({ error: err });
+    saveRatingConfig(cfg);
+    res.json({ ok: true, contest: publicContest(c) });
+});
+
+app.post("/api/admin/rating/contests/:id/close", requireAdminPanel, async (req, res) => {
+    const { cfg } = await ratingContext();
+    const c = cfg.contests.find(x => String(x.id) === req.params.id);
+    if (!c) return res.status(404).json({ error: "Konkurs topilmadi" });
+    if (!c.closedAt) c.closedAt = new Date().toISOString();
+    saveRatingConfig(cfg);
+    res.json({ ok: true, contest: publicContest(c) });
+});
+
+app.delete("/api/admin/rating/contests/:id", requireAdminPanel, async (req, res) => {
+    const { cfg } = await ratingContext();
+    const before = cfg.contests.length;
+    cfg.contests = cfg.contests.filter(x => String(x.id) !== req.params.id);
+    if (cfg.contests.length === before) return res.status(404).json({ error: "Konkurs topilmadi" });
+    saveRatingConfig(cfg);
+    res.json({ ok: true });
+});
+
+// Qo'lda XP qo'shish/ayirish: { scope: "general" | contestId, userId, delta }
+app.post("/api/admin/rating/adjust", requireAdminPanel, async (req, res) => {
+    const { cfg } = await ratingContext();
+    const delta = Math.round(Number(req.body.delta));
+    const userId = Number(req.body.userId);
+    if (!Number.isFinite(delta) || delta === 0) return res.status(400).json({ error: "XP miqdori noto'g'ri" });
+    if (!getUsers().some(u => u.id === userId)) return res.status(404).json({ error: "Foydalanuvchi topilmadi" });
+    let target;
+    if (!req.body.scope || req.body.scope === "general") target = cfg.general;
+    else target = cfg.contests.find(c => String(c.id) === String(req.body.scope));
+    if (!target) return res.status(404).json({ error: "Konkurs topilmadi" });
+    if (!target.adjustments || typeof target.adjustments !== "object") target.adjustments = {};
+    const next = (Number(target.adjustments[userId]) || 0) + delta;
+    if (next) target.adjustments[userId] = next; else delete target.adjustments[userId];
+    saveRatingConfig(cfg);
+    res.json({ ok: true, adjustment: next });
 });
 
 // GET /api/bid-history

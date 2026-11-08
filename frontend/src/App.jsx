@@ -21,6 +21,7 @@ import MarketSell from "./pages/MarketSell";
 import MarketDetail from "./pages/MarketDetail";
 import Inventory from "./pages/Inventory";
 import Leaderboard from "./pages/Leaderboard";
+import Rating from "./pages/Rating";
 import BidHistory from "./pages/BidHistory";
 import BalHistory from "./pages/BalHistory";
 import Notifications from "./pages/Notifications";
@@ -29,7 +30,7 @@ import { FEATURES } from "./features";
 
 // Nav'ning asosiy (top-level) sahifalari — shulardan boshqasi ochilganda
 // Telegram BackButton ko'rsatiladi va "orqaga" shu xaritaga qarab boradi.
-const TOP_LEVEL_PAGES = ["sell", "auctions", "inventory", "profile", "balance", "trade", "market", "login"];
+const TOP_LEVEL_PAGES = ["sell", "rating", "auctions", "inventory", "profile", "balance", "trade", "market", "login"];
 
 function parentOf(page) {
   if (page === "auction-detail") return "auctions";
@@ -70,6 +71,7 @@ const PAGES = {
   "market-detail": (data) => <MarketDetail id={data} />,
   inventory: () => <Inventory />,
   leaderboard: () => <Leaderboard />,
+  rating: () => <Rating />,
   "bid-history": () => <BidHistory />,
   "bal-history": () => <BalHistory />,
   notifications: () => <Notifications />,

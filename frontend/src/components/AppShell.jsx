@@ -22,6 +22,7 @@ import {
   MessagesSquare,
   ChevronRight,
   Menu,
+  Trophy,
 } from "lucide-react";
 import { cn } from "../lib/cn";
 import { useApp } from "../context";
@@ -41,6 +42,7 @@ const SECTIONS = [
     key: "main",
     items: [
       { key: "sell", labelKey: "nav.sell", icon: Banknote, group: ["sell"] },
+      { key: "rating", labelKey: "nav.rating", icon: Trophy, group: ["rating"] },
       { key: "auctions", labelKey: "nav.auctions", icon: Gavel, group: ["auctions", "auction-detail", "leaderboard"], feature: "auctions" },
       { key: "inventory", labelKey: "nav.inventory", icon: Package, group: ["inventory"], feature: "inventory" },
       { key: "trade", labelKey: "nav.trade", icon: Repeat, group: ["trade", "trade-detail"], feature: "trade" },

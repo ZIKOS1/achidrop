@@ -509,3 +509,75 @@ body {
 @media (max-width: 639px) {
   input, select, textarea { font-size: 16px; }
 }
+
+/* ── Reyting sahifasi (Rating.jsx) — ramkalar: oltin / kumush / bronza ───── */
+.rt-tab-pill { background: linear-gradient(180deg, #F0242E, #B8101A); box-shadow: 0 6px 22px -8px rgba(227,20,31,.8), inset 0 1px 0 rgba(255,255,255,.25); }
+.rt-time { background: var(--ad-field); border: 1px solid var(--ad-line); }
+.rt-live { box-shadow: 0 0 0 0 rgba(227,20,31,.7); animation: rt-live 1.6s ease-out infinite; }
+@keyframes rt-live { 0% { box-shadow: 0 0 0 0 rgba(227,20,31,.7); } 100% { box-shadow: 0 0 0 8px rgba(227,20,31,0); } }
+.rt-hero-glow { position: absolute; inset: auto -10% -60% 30%; height: 120%; background: radial-gradient(closest-side, rgba(227,20,31,.22), transparent); pointer-events: none; }
+.rt-prize { background: var(--ad-field); border: 1px solid var(--ad-line); }
+.rt-prize-1 { border-color: rgba(232,176,75,.55); background: linear-gradient(90deg, rgba(232,176,75,.14), transparent 70%), var(--ad-field); }
+.rt-prize-2 { border-color: rgba(194,198,204,.5); background: linear-gradient(90deg, rgba(194,198,204,.12), transparent 70%), var(--ad-field); }
+.rt-prize-3 { border-color: rgba(205,127,70,.5); background: linear-gradient(90deg, rgba(205,127,70,.12), transparent 70%), var(--ad-field); }
+
+.rt-pod { position: relative; padding: 3px; border-radius: 20px; }
+.rt-pod-in { position: relative; border-radius: 17px; background: var(--ad-frame-in); overflow: hidden; }
+.rt-pod-in::after { content: ""; position: absolute; inset: auto 0 0 0; height: 45%; background: linear-gradient(0deg, var(--pod-tint), transparent); pointer-events: none; }
+.rt-pod-1 { --pod-tint: rgba(232,176,75,.16); background: linear-gradient(135deg, #FFE08A, #B8862B 40%, #7C2028 78%, #E3141F); box-shadow: 0 18px 50px -18px rgba(232,176,75,.55); }
+.rt-pod-2 { --pod-tint: rgba(194,198,204,.12); background: linear-gradient(135deg, #E6E8EC, #7A7E85 45%, #4A4D53 70%, #9A9EA6); }
+.rt-pod-3 { --pod-tint: rgba(205,127,70,.14); background: linear-gradient(135deg, #F0B98A, #9A5A2C 45%, #5C2A14 72%, #C21A24); }
+.rt-pod-1::before { content: ""; position: absolute; left: 25%; right: 25%; top: 0; height: 2px; background: linear-gradient(90deg, transparent, #fff, transparent); z-index: 1; }
+.rt-bar { background: linear-gradient(90deg, #7C2028, #E3141F 60%, #FF5A62); box-shadow: 0 0 12px rgba(227,20,31,.6); }
+
+/* Daraja ranglari — Claude Design "Darajalar va ramkalar" */
+.rt-t-bronze   { --tc: #CD7F46; --tc2: #6E3A1A; --tc3: #F0B98A; }
+.rt-t-silver   { --tc: #C2C6CC; --tc2: #5A5E66; --tc3: #F4F5F7; }
+.rt-t-gold     { --tc: #E8B04B; --tc2: #7A5414; --tc3: #FFE08A; }
+.rt-t-platinum { --tc: #3FC1A5; --tc2: #12564A; --tc3: #A6F2DF; }
+.rt-t-diamond  { --tc: #7B83F0; --tc2: #2E2F8A; --tc3: #C9CCFF; }
+.rt-t-legend   { --tc: #FF2A35; --tc2: #6E0A12; --tc3: #FF9AA0; }
+:root[data-theme="light"] .rt-t-silver { --tc: #8A8F98; }
+:root[data-theme="light"] .rt-t-gold { --tc: #B9861F; }
+
+/* Avatar ramkasi: metall halqa + ichki qora chiziq + rangli nur */
+.rt-frame { position: relative; display: inline-flex; flex-shrink: 0; border-radius: 9999px; padding: 3px;
+  background: conic-gradient(from 210deg, var(--tc3), var(--tc) 18%, var(--tc2) 40%, var(--tc) 60%, var(--tc3) 75%, var(--tc2) 90%, var(--tc3));
+  box-shadow: 0 0 0 1px rgba(0,0,0,.5), 0 6px 22px -8px var(--tc); }
+.rt-frame::after { content: ""; position: absolute; inset: -4px; border-radius: inherit; border: 1px dashed color-mix(in oklch, var(--tc) 55%, transparent); opacity: .55; pointer-events: none; }
+.rt-frame-in { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; overflow: hidden; border-radius: 9999px;
+  background: radial-gradient(circle at 50% 30%, color-mix(in oklch, var(--tc) 28%, #1A181D), #121114 70%); color: #fff; box-shadow: inset 0 0 0 2px rgba(0,0,0,.55); }
+.rt-t-legend.rt-frame { animation: rt-legend 3s ease-in-out infinite; }
+@keyframes rt-legend { 0%, 100% { box-shadow: 0 0 0 1px rgba(0,0,0,.5), 0 6px 22px -8px var(--tc); } 50% { box-shadow: 0 0 0 1px rgba(0,0,0,.5), 0 0 28px -2px var(--tc); } }
+
+/* Sakkiz burchakli daraja nishoni */
+.rt-oct { display: inline-flex; flex-shrink: 0; padding: 2px; clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
+  background: linear-gradient(160deg, var(--tc3), var(--tc) 45%, var(--tc2)); }
+.rt-oct-in { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; color: var(--tc);
+  clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
+  background: radial-gradient(circle at 50% 30%, color-mix(in oklch, var(--tc) 22%, #19171C), #121114); }
+.rt-tier-name, .rt-tier-tag { color: var(--tc); }
+.rt-tier-tag { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.rt-tier-glow { position: absolute; inset: -40% 40% -40% -20%; background: radial-gradient(closest-side, color-mix(in oklch, var(--tc) 30%, transparent), transparent); pointer-events: none; }
+.rt-t-bronze .rt-bar, .rt-t-silver .rt-bar, .rt-t-gold .rt-bar, .rt-t-platinum .rt-bar, .rt-t-diamond .rt-bar, .rt-t-legend .rt-bar {
+  background: linear-gradient(90deg, var(--tc2), var(--tc) 60%, var(--tc3)); box-shadow: 0 0 12px var(--tc); }
+@media (prefers-reduced-motion: reduce) { .rt-live, .rt-t-legend.rt-frame { animation: none !important; } }
+/* Top 1–10 rasmli ramkalar (design_handoff_reyting_ramkalari) */
+.rt-rankframe { transition: transform .2s ease-out; }
+.rt-rankframe:hover { transform: scale(1.04); }
+.rt-rankframe-ava { background: radial-gradient(circle at 50% 35%, #2E2C33, #121115); color: #ECEAEC; container-type: inline-size; }
+.rt-rankframe-ava > span { font-size: 30cqw; }
+.rt-podframe-1 { max-width: 230px; }
+.rt-podframe-23 { max-width: 190px; }
+.rt-rowframe { width: 76px; }
+@media (min-width: 900px) and (max-width: 1240px) { .rt-podframe-1 { max-width: 200px; } .rt-podframe-23 { max-width: 170px; } }
+@media (max-width: 639px) { .rt-podframe-1, .rt-podframe-23 { max-width: 120px; } .rt-rowframe { width: 64px; } }
+@media (prefers-reduced-motion: reduce) { .rt-rankframe:hover { transform: none; } }
+/* Yorug' rejim: ramkalar qora fondan ajratilgan (yorqinlik → alpha), och fonda
+   xiralashadi — podium kartalari qorong'i "vitrina", boshqa joyda qorong'i plitka. */
+:root[data-theme="light"] .rt-pod-in {
+  --foreground: #ECEAEC; --heading: #FFFFFF; --muted-foreground: #A9A5AC;
+  background: repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 3px, transparent 3px 7px), linear-gradient(180deg, #232226, #17161A);
+}
+:root[data-theme="light"] .rt-rankframe { border-radius: 16px; background: radial-gradient(circle at 50% 45%, #2A272E, #121114 75%); }
+:root[data-theme="light"] .rt-pod-in .rt-rankframe { background: none; }

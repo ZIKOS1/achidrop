@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Gavel, Package, Plus, Users, Ticket, Image as ImageIcon, LogOut, Crosshair, Crown, BookOpen, LifeBuoy, ShoppingCart, Banknote, CircleDollarSign, ChartColumn, Menu, X } from "lucide-react";
+import { Gavel, Package, Plus, Users, Ticket, Image as ImageIcon, LogOut, Crosshair, Crown, BookOpen, LifeBuoy, ShoppingCart, Banknote, CircleDollarSign, ChartColumn, Menu, X, Trophy } from "lucide-react";
 import { api } from "./api";
 import { AdminContext } from "./context";
 import Modal from "../components/Modal";
@@ -19,12 +19,14 @@ import CeoAccounts from "./pages/CeoAccounts";
 import AdminSell from "./pages/AdminSell";
 import AdminLisAutosell from "./pages/AdminLisAutosell";
 import AdminFinance from "./pages/AdminFinance";
+import AdminRating from "./pages/AdminRating";
 
 const PAGES = {
   home: () => <AdminHome />,
   "admin-sell": () => <AdminSell />,
   "admin-lis": () => <AdminLisAutosell />,
   "admin-finance": () => <AdminFinance />,
+  "admin-rating": () => <AdminRating />,
   "admin-auctions": () => <AdminAuctions />,
   "admin-auction-form": (data) => <AdminAuctionForm id={data} />,
   "admin-market": () => <AdminMarket />,
@@ -46,6 +48,7 @@ const NAV_ITEMS = [
   { key: "home", label: "Bosh sahifa", icon: Gavel },
   { key: "admin-finance", label: "Moliya", icon: ChartColumn },
   { key: "admin-sell", label: "Skin sotish", icon: Banknote },
+  { key: "admin-rating", label: "Reyting", icon: Trophy },
   { key: "admin-lis", label: "Lis avtosell", icon: CircleDollarSign },
   { key: "admin-auctions", label: "Auksionlar", icon: Package },
   { key: "admin-auction-form", label: "Yangi auksion", icon: Plus, navData: null },
