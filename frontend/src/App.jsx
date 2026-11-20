@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { api, tg, initData } from "./api";
 import { AppContext } from "./context";
 import { applyTheme, getInitialTheme } from "./theme";
@@ -7,26 +7,40 @@ import AppShell from "./components/AppShell";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Modal from "./components/Modal";
 import Toast from "./components/Toast";
-import VpnBlock from "./components/VpnBlock";
-import HumanCheck from "./components/HumanCheck";
-import Login from "./pages/Login";
-import Auctions from "./pages/Auctions";
-import LotDetail from "./pages/LotDetail";
-import Profile from "./pages/Profile";
-import Balance from "./pages/Balance";
-import Trade from "./pages/Trade";
-import TradeDetail from "./pages/TradeDetail";
-import Market from "./pages/Market";
-import MarketSell from "./pages/MarketSell";
-import MarketDetail from "./pages/MarketDetail";
-import Inventory from "./pages/Inventory";
-import Leaderboard from "./pages/Leaderboard";
-import Rating from "./pages/Rating";
-import BidHistory from "./pages/BidHistory";
-import BalHistory from "./pages/BalHistory";
-import Notifications from "./pages/Notifications";
+const VpnBlock = lazy(() => import("./components/VpnBlock"));
+const HumanCheck = lazy(() => import("./components/HumanCheck"));
+// Bosh sahifa (Sell) darhol yuklanadi — LCP uchun. Qolganlari alohida chunk
+// bo'lib, faqat ochilganda yuklanadi (code-splitting). Auksionlar yoqilsa
+// (FEATURES.auctions) uni ham eager import'ga qaytarish mumkin.
 import Sell from "./pages/Sell";
 import { FEATURES } from "./features";
+
+const Auctions = lazy(() => import("./pages/Auctions"));
+const Login = lazy(() => import("./pages/Login"));
+const LotDetail = lazy(() => import("./pages/LotDetail"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Balance = lazy(() => import("./pages/Balance"));
+const Trade = lazy(() => import("./pages/Trade"));
+const TradeDetail = lazy(() => import("./pages/TradeDetail"));
+const Market = lazy(() => import("./pages/Market"));
+const MarketSell = lazy(() => import("./pages/MarketSell"));
+const MarketDetail = lazy(() => import("./pages/MarketDetail"));
+const Inventory = lazy(() => import("./pages/Inventory"));
+const Leaderboard = lazy(() => import("./pages/Leaderboard"));
+const Rating = lazy(() => import("./pages/Rating"));
+const BidHistory = lazy(() => import("./pages/BidHistory"));
+const BalHistory = lazy(() => import("./pages/BalHistory"));
+const Notifications = lazy(() => import("./pages/Notifications"));
+
+function PageFallback() {
+  return (
+    <div className="space-y-4 p-4">
+      <div className="skeleton h-8 w-1/2" />
+      <div className="skeleton h-40 w-full" />
+      <div className="skeleton h-4 w-4/5" />
+    </div>
+  );
+}
 
 // Nav'ning asosiy (top-level) sahifalari — shulardan boshqasi ochilganda
 // Telegram BackButton ko'rsatiladi va "orqaga" shu xaritaga qarab boradi.
@@ -200,8 +214,8 @@ export default function App() {
   // Tashqarida (websaytdan to'g'ridan-to'g'ri) auth tekshirilayotganda ham
   // ilova qobig'ini (About/Auksionlar) ko'rsatamiz — mehmon sifatida ko'rish
   // kirishni talab qilmaydi, faqat login/bid/balans kabi amallar talab qiladi.
-  if (vpnBlocked) return <VpnBlock onCleared={() => { setVpnBlocked(false); loadMe(); }} />;
-  if (humanSiteKey) return <HumanCheck siteKey={humanSiteKey} onPassed={onHumanPassed} />;
+  if (vpnBlocked) return <Suspense fallback={null}><VpnBlock onCleared={() => { setVpnBlocked(false); loadMe(); }} /></Suspense>;
+  if (humanSiteKey) return <Suspense fallback={null}><HumanCheck siteKey={humanSiteKey} onPassed={onHumanPassed} /></Suspense>;
 
   if (!authChecked) {
     return (
@@ -223,7 +237,7 @@ export default function App() {
 
   return (
     <AppContext.Provider value={ctx}>
-      <AppShell page={page.name}><ErrorBoundary resetKey={page.name}>{render(page.data)}</ErrorBoundary></AppShell>
+      <AppShell page={page.name}><ErrorBoundary resetKey={page.name}><Suspense fallback={<PageFallback />}>{render(page.data)}</Suspense></ErrorBoundary></AppShell>
       <Modal modal={modal} onClose={closeModal} />
       <Toast toast={toast} />
     </AppContext.Provider>
